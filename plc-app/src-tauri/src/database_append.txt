@@ -1,0 +1,9 @@
+﻿    }
+
+    pub async fn clear_all_videos(&self) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM video_configs")
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+}
