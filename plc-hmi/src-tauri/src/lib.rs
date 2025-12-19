@@ -2,8 +2,10 @@ mod tcp_server;
 mod commands;
 mod plc_parser;
 mod database;
+mod websocket_server;
+mod config;
 
-use commands::TcpServerState;
+use commands::{TcpServerState, WebSocketServerState};
 use database::Database;
 use std::sync::Arc;
 use tauri::Manager;
@@ -11,6 +13,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -28,6 +31,7 @@ pub fn run() {
       Ok(())
     })
     .manage(TcpServerState::default())
+    .manage(WebSocketServerState::default())
     .invoke_handler(tauri::generate_handler![
       commands::start_tcp_server,
       commands::stop_tcp_server,
@@ -49,6 +53,27 @@ pub fn run() {
       commands::load_plc_structure,
       commands::list_configured_plcs,
       commands::delete_plc_structure,
+      commands::debug_show_plc_structure,
+      commands::save_tag_mapping,
+      commands::load_tag_mappings,
+      commands::delete_tag_mapping,
+      commands::get_active_tags,
+      commands::get_plc_variables_for_mapping,
+      commands::start_websocket_server,
+      commands::stop_websocket_server,
+      commands::get_websocket_stats,
+      commands::get_websocket_clients,
+      commands::update_websocket_config,
+      commands::get_websocket_config,
+      commands::check_first_run,
+      commands::save_initial_config,
+      commands::get_app_config,
+      commands::get_default_db_path,
+      commands::validate_db_path,
+      commands::get_network_interfaces,
+      commands::save_websocket_config,
+      commands::load_websocket_config,
+      commands::fix_websocket_broadcast_interval,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

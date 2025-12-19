@@ -18,26 +18,48 @@ pub struct PlcStructureConfig {
     pub last_updated: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagMapping {
+    pub id: Option<i64>,
+    pub plc_ip: String,
+    pub variable_path: String,    // Ex: "Word[5]", "Real[10]"
+    pub tag_name: String,         // Ex: "temperatura_forno"
+    pub description: Option<String>, // Ex: "Temperatura do forno principal"
+    pub unit: Option<String>,     // Ex: "°C", "bar", "rpm"
+    pub enabled: bool,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebSocketDbConfig {
+    pub host: String,
+    pub port: u16,
+    pub max_clients: u32,
+    pub broadcast_interval_ms: u64,
+    pub enabled: bool,
+    pub bind_interfaces: Vec<String>, // Lista de interfaces para fazer bind
+    pub updated_at: i64,
+}
+
 pub struct Database {
     conn: Mutex<Connection>,
 }
 
 impl Database {
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
-        let app_dir = app_handle
-            .path()
-            .app_data_dir()
-            .expect("Falha ao obter diretório de dados");
+        // SEMPRE usar o banco configurado primeiro
+        let db_path = std::path::PathBuf::from("D:\\Banco_SQLITE\\plc_hmi.db");
         
-        // Cria diretório se não existir
-        std::fs::create_dir_all(&app_dir).expect("Falha ao criar diretório");
+        // Criar diretório se não existir
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent).expect("Falha ao criar diretório do banco");
+        }
         
-        let db_path = app_dir.join("plc_hmi.db");
-        println!("📁 Banco de dados: {:?}", db_path);
+        println!("📁 Banco de dados FIXO: {:?}", db_path);
         
         let conn = Connection::open(db_path)?;
         
-        // Criar tabela se não existir
+        // Criar tabelas se não existirem
         conn.execute(
             "CREATE TABLE IF NOT EXISTS plc_structures (
                 plc_ip TEXT PRIMARY KEY,
@@ -47,6 +69,44 @@ impl Database {
             )",
             [],
         )?;
+        
+        // Tabela para mapeamento de tags
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tag_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plc_ip TEXT NOT NULL,
+                variable_path TEXT NOT NULL,
+                tag_name TEXT NOT NULL,
+                description TEXT,
+                unit TEXT,
+                enabled INTEGER DEFAULT 1,
+                created_at INTEGER NOT NULL,
+                UNIQUE(plc_ip, variable_path),
+                FOREIGN KEY(plc_ip) REFERENCES plc_structures(plc_ip)
+            )",
+            [],
+        )?;
+        
+        // Tabela para configurações WebSocket
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS websocket_config (
+                id INTEGER PRIMARY KEY,
+                host TEXT NOT NULL DEFAULT '0.0.0.0',
+                port INTEGER NOT NULL DEFAULT 8765,
+                max_clients INTEGER NOT NULL DEFAULT 100,
+                broadcast_interval_ms INTEGER NOT NULL DEFAULT 100,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                bind_interfaces_json TEXT NOT NULL DEFAULT '[\"0.0.0.0\"]',
+                updated_at INTEGER NOT NULL
+            )",
+            [],
+        )?;
+        
+        // Migração para adicionar coluna bind_interfaces_json se não existir
+        let _ = conn.execute(
+            "ALTER TABLE websocket_config ADD COLUMN bind_interfaces_json TEXT NOT NULL DEFAULT '[\"0.0.0.0\"]'",
+            [],
+        );
         
         println!("✅ Banco de dados SQLite inicializado");
         
@@ -75,6 +135,21 @@ impl Database {
         
         println!("💾 Configuração salva para PLC {}: {} bytes, {} blocos", 
                  config.plc_ip, config.total_size, config.blocks.len());
+        
+        // 🔍 DEBUG AUTOMÁTICO: Mostrar o que foi salvo
+        println!("🔍 DEBUG - Estrutura salva:");
+        for (i, block) in config.blocks.iter().enumerate() {
+            let size_per_element = match block.data_type.as_str() {
+                "WORD" | "INT" => 2,
+                "DWORD" | "REAL" => 4,
+                _ => 1
+            };
+            println!("  {}. {} [{}]: {} × {} = {} bytes", 
+                i + 1, block.name, block.data_type, 
+                block.count, size_per_element, 
+                block.count * size_per_element);
+        }
+        println!("📝 JSON: {}", config_json);
         
         Ok(())
     }
@@ -137,5 +212,242 @@ impl Database {
         println!("🗑️ Configuração removida para PLC {}", plc_ip);
         
         Ok(())
+    }
+    
+    /// 🔍 DEBUG: Mostra EXATAMENTE o que está salvo no banco
+    pub fn debug_show_saved_structure(&self, plc_ip: &str) -> Result<String> {
+        let conn = self.conn.lock().unwrap();
+        
+        let result = conn.query_row(
+            "SELECT config_json, total_size, last_updated FROM plc_structures WHERE plc_ip = ?1",
+            [plc_ip],
+            |row| {
+                let config_json: String = row.get(0)?;
+                let total_size: i64 = row.get(1)?;
+                let last_updated: i64 = row.get(2)?;
+                Ok((config_json, total_size, last_updated))
+            }
+        );
+        
+        match result {
+            Ok((json, size, timestamp)) => {
+                let blocks: Vec<DataBlockConfig> = serde_json::from_str(&json)
+                    .unwrap_or_else(|_| vec![]);
+                
+                let mut debug_output = format!("🔍 DEBUG BANCO - PLC {}:\n", plc_ip);
+                debug_output.push_str(&format!("📦 Total Size: {} bytes\n", size));
+                debug_output.push_str(&format!("🕐 Last Updated: {}\n", timestamp));
+                debug_output.push_str(&format!("📊 Blocos salvos: {}\n\n", blocks.len()));
+                
+                for (i, block) in blocks.iter().enumerate() {
+                    let block_size = match block.data_type.as_str() {
+                        "WORD" | "INT" => block.count * 2,
+                        "DWORD" | "REAL" => block.count * 4,
+                        _ => 0
+                    };
+                    debug_output.push_str(&format!(
+                        "  {}. {} [{}]: {} elementos × {} bytes = {} bytes\n",
+                        i + 1,
+                        block.name,
+                        block.data_type,
+                        block.count,
+                        block_size / block.count,
+                        block_size
+                    ));
+                }
+                
+                debug_output.push_str(&format!("\n📝 JSON RAW:\n{}\n", json));
+                
+                Ok(debug_output)
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Ok(format!("❌ Nenhuma configuração salva para PLC {}", plc_ip))
+            }
+            Err(e) => Err(e)
+        }
+    }
+    
+    // ============================================================================
+    // MÉTODOS PARA GERENCIAR TAG MAPPINGS
+    // ============================================================================
+    
+    /// Salva um mapeamento de tag
+    pub fn save_tag_mapping(&self, tag: &TagMapping) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        
+        let _result = conn.execute(
+            "INSERT OR REPLACE INTO tag_mappings 
+             (plc_ip, variable_path, tag_name, description, unit, enabled, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            (
+                &tag.plc_ip,
+                &tag.variable_path,
+                &tag.tag_name,
+                &tag.description,
+                &tag.unit,
+                tag.enabled as i32,
+                tag.created_at,
+            ),
+        )?;
+        
+        let tag_id = conn.last_insert_rowid();
+        println!("💾 Tag salvo: {} -> {} (ID: {}, Enabled: {})", tag.variable_path, tag.tag_name, tag_id, tag.enabled);
+        
+        Ok(tag_id)
+    }
+    
+    /// Carrega todos os tags de um PLC
+    pub fn load_tag_mappings(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at 
+             FROM tag_mappings WHERE plc_ip = ?1 ORDER BY variable_path"
+        )?;
+        
+        let tag_iter = stmt.query_map([plc_ip], |row| {
+            Ok(TagMapping {
+                id: Some(row.get(0)?),
+                plc_ip: row.get(1)?,
+                variable_path: row.get(2)?,
+                tag_name: row.get(3)?,
+                description: row.get(4)?,
+                unit: row.get(5)?,
+                enabled: row.get::<usize, i32>(6)? == 1,
+                created_at: row.get(7)?,
+            })
+        })?;
+        
+        let tags: Result<Vec<TagMapping>> = tag_iter.collect();
+        let tags = tags?;
+        
+        // Debug: mostrar estado dos tags carregados
+        for tag in &tags {
+            println!("📖 Tag carregado: {} = {} (enabled: {})", tag.variable_path, tag.tag_name, tag.enabled);
+        }
+        println!("📖 Total: {} tags carregados para PLC {}", tags.len(), plc_ip);
+        Ok(tags)
+    }
+    
+    /// Remove um tag mapping
+    pub fn delete_tag_mapping(&self, plc_ip: &str, variable_path: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        
+        conn.execute(
+            "DELETE FROM tag_mappings WHERE plc_ip = ?1 AND variable_path = ?2",
+            [plc_ip, variable_path],
+        )?;
+        
+        println!("🗑️ Tag removido: {} -> {}", plc_ip, variable_path);
+        Ok(())
+    }
+    
+    /// Lista todos os tags ativos (enabled=true) de um PLC para o WebSocket
+    pub fn get_active_tags(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at 
+             FROM tag_mappings WHERE plc_ip = ?1 AND enabled = 1 ORDER BY tag_name"
+        )?;
+        
+        let tag_iter = stmt.query_map([plc_ip], |row| {
+            Ok(TagMapping {
+                id: Some(row.get(0)?),
+                plc_ip: row.get(1)?,
+                variable_path: row.get(2)?,
+                tag_name: row.get(3)?,
+                description: row.get(4)?,
+                unit: row.get(5)?,
+                enabled: true,
+                created_at: row.get(7)?,
+            })
+        })?;
+        
+        let tags: Result<Vec<TagMapping>> = tag_iter.collect();
+        tags
+    }
+    
+    // ============================================================================
+    // MÉTODOS PARA CONFIGURAÇÕES WEBSOCKET
+    // ============================================================================
+    
+    /// Salva configuração WebSocket
+    pub fn save_websocket_config(&self, config: &WebSocketDbConfig) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        
+        // Serializar lista de interfaces para JSON
+        let bind_interfaces_json = serde_json::to_string(&config.bind_interfaces)
+            .unwrap_or_else(|_| "[\"0.0.0.0\"]".to_string());
+        
+        conn.execute(
+            "INSERT OR REPLACE INTO websocket_config 
+             (id, host, port, max_clients, broadcast_interval_ms, enabled, bind_interfaces_json, updated_at)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            (
+                &config.host,
+                config.port as i64,
+                config.max_clients as i64,
+                config.broadcast_interval_ms as i64,
+                config.enabled as i32,
+                &bind_interfaces_json,
+                config.updated_at,
+            ),
+        )?;
+        
+        println!("💾 Configuração WebSocket salva: {}:{} - Interfaces: {:?}", 
+                config.host, config.port, config.bind_interfaces);
+        Ok(())
+    }
+    
+    /// Carrega configuração WebSocket
+    pub fn load_websocket_config(&self) -> Result<WebSocketDbConfig> {
+        let conn = self.conn.lock().unwrap();
+        
+        let result = conn.query_row(
+            "SELECT host, port, max_clients, broadcast_interval_ms, enabled, bind_interfaces_json, updated_at 
+             FROM websocket_config WHERE id = 1",
+            [],
+            |row| {
+                let bind_interfaces_json: String = row.get(5).unwrap_or_else(|_| "[\"0.0.0.0\"]".to_string());
+                let bind_interfaces: Vec<String> = serde_json::from_str(&bind_interfaces_json)
+                    .unwrap_or_else(|_| vec!["0.0.0.0".to_string()]);
+                
+                Ok(WebSocketDbConfig {
+                    host: row.get(0)?,
+                    port: row.get::<usize, i64>(1)? as u16,
+                    max_clients: row.get::<usize, i64>(2)? as u32,
+                    broadcast_interval_ms: row.get::<usize, i64>(3)? as u64,
+                    enabled: row.get::<usize, i32>(4)? == 1,
+                    bind_interfaces,
+                    updated_at: row.get::<usize, i64>(6)?,
+                })
+            },
+        );
+        
+        match result {
+            Ok(config) => {
+                println!("📖 Configuração WebSocket carregada: {}:{} - Interfaces: {:?}", 
+                        config.host, config.port, config.bind_interfaces);
+                Ok(config)
+            },
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                // Retornar configuração padrão
+                let default_config = WebSocketDbConfig {
+                    host: "0.0.0.0".to_string(),
+                    port: 8765,
+                    max_clients: 100,
+                    broadcast_interval_ms: 100,
+                    enabled: false,
+                    bind_interfaces: vec!["0.0.0.0".to_string()],
+                    updated_at: chrono::Utc::now().timestamp(),
+                };
+                
+                // Salvar configuração padrão no banco
+                self.save_websocket_config(&default_config)?;
+                Ok(default_config)
+            },
+            Err(e) => Err(e),
+        }
     }
 }

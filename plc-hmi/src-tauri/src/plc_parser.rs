@@ -48,10 +48,9 @@ fn parse_with_config(raw_data: &[u8], blocks: &[DataBlockConfig]) -> Vec<PlcVari
                     format!("{}", val)
                 }
                 "DINT" => {
-                    let val = ((raw_data[offset] as i32) << 24) |
-                             ((raw_data[offset + 1] as i32) << 16) |
-                             ((raw_data[offset + 2] as i32) << 8) |
-                             (raw_data[offset + 3] as i32);
+                    let bytes = [raw_data[offset], raw_data[offset + 1], 
+                                raw_data[offset + 2], raw_data[offset + 3]];
+                    let val = i32::from_be_bytes(bytes);
                     format!("{}", val)
                 }
                 "REAL" => {
@@ -72,14 +71,11 @@ fn parse_with_config(raw_data: &[u8], blocks: &[DataBlockConfig]) -> Vec<PlcVari
                     format!("{}", val)
                 }
                 "LINT" => {
-                    let val = ((raw_data[offset] as i64) << 56) |
-                             ((raw_data[offset + 1] as i64) << 48) |
-                             ((raw_data[offset + 2] as i64) << 40) |
-                             ((raw_data[offset + 3] as i64) << 32) |
-                             ((raw_data[offset + 4] as i64) << 24) |
-                             ((raw_data[offset + 5] as i64) << 16) |
-                             ((raw_data[offset + 6] as i64) << 8) |
-                             (raw_data[offset + 7] as i64);
+                    let bytes = [raw_data[offset], raw_data[offset + 1], 
+                                raw_data[offset + 2], raw_data[offset + 3],
+                                raw_data[offset + 4], raw_data[offset + 5],
+                                raw_data[offset + 6], raw_data[offset + 7]];
+                    let val = i64::from_be_bytes(bytes);
                     format!("{}", val)
                 }
                 "LREAL" => {

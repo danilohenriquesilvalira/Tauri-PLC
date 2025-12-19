@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
+use dashmap::DashMap; // HashMap concorrente sem locks!
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use crate::database::Database;
@@ -52,7 +53,7 @@ pub struct TcpServer {
     blacklisted_ips: Arc<RwLock<HashSet<String>>>, // IPs que não podem reconectar
     ip_to_id: Arc<RwLock<HashMap<String, u64>>>, // Mapeamento permanente IP → ID
     bytes_received: Arc<RwLock<HashMap<String, u64>>>, // Contador de bytes por IP
-    latest_data: Arc<RwLock<HashMap<String, PlcDataPacket>>>, // Últimos dados recebidos por IP
+    latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 SEM LOCKS! Acesso concorrente livre
     database: Option<Arc<Database>>, // Banco de dados para configurações
 }
 
@@ -70,7 +71,7 @@ impl TcpServer {
             blacklisted_ips: Arc::new(RwLock::new(HashSet::new())),
             ip_to_id: Arc::new(RwLock::new(HashMap::new())),
             bytes_received: Arc::new(RwLock::new(HashMap::new())),
-            latest_data: Arc::new(RwLock::new(HashMap::new())),
+            latest_data: Arc::new(DashMap::new()), // 🚀 DashMap = zero locks!
             database,
         }
     }
@@ -386,12 +387,15 @@ impl TcpServer {
     }
 
     pub async fn get_plc_data(&self, ip: &str) -> Option<PlcDataPacket> {
-        let data_map = self.latest_data.read().await;
-        data_map.get(ip).cloned()
+        // 🚀 DashMap: acesso direto sem locks!
+        self.latest_data.get(ip).map(|entry| entry.value().clone())
     }
 
     pub async fn get_all_plc_data(&self) -> HashMap<String, PlcDataPacket> {
-        self.latest_data.read().await.clone()
+        // 🚀 DashMap: acesso direto sem locks!
+        self.latest_data.iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect()
     }
 }
 
@@ -401,15 +405,33 @@ async fn handle_client_connection(
     ip: String,
     is_running: Arc<AtomicBool>,
     _bytes_received: Arc<RwLock<HashMap<String, u64>>>,
-    latest_data: Arc<RwLock<HashMap<String, PlcDataPacket>>>,
+    latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 DashMap!
     app_handle: tauri::AppHandle,
     database: Option<Arc<Database>>
 ) -> u64 {
     let mut buffer = [0; 1024];
+    let mut accumulator: Vec<u8> = Vec::new(); // 📦 Buffer para acumular fragmentos
+    let mut expected_size: Option<usize> = None; // 🎯 Tamanho esperado da configuração
     let mut total_bytes = 0u64;
     let mut packet_count = 0u64;
     let mut last_emit_time = std::time::Instant::now();
     let mut bytes_since_last_emit = 0u64;
+    
+    // 🔍 Carregar configuração salva para saber quantos bytes esperar
+    if let Some(db) = database.as_ref() {
+        match db.load_plc_structure(&ip) {
+            Ok(Some(structure)) => {
+                expected_size = Some(structure.total_size);
+                println!("🎯 PLC {}: Esperando {} bytes por pacote (configuração salva)", ip, structure.total_size);
+            }
+            Ok(None) => {
+                println!("⚠️ PLC {}: Sem configuração salva, aceitando qualquer tamanho", ip);
+            }
+            Err(e) => {
+                println!("⚠️ PLC {}: Erro ao carregar configuração ({}), aceitando qualquer tamanho", ip, e);
+            }
+        }
+    }
     
     loop {
         // Verificar se servidor ainda está rodando
@@ -428,71 +450,104 @@ async fn handle_client_connection(
             }
             Ok(Ok(n)) => {
                 total_bytes += n as u64;
-                packet_count += 1;
                 bytes_since_last_emit += n as u64;
                 
-                println!("📥 Dados recebidos de {} (ID: {}): {} bytes", ip, conn_id, n);
+                let now = chrono::Local::now().format("%H:%M:%S%.3f");
+                println!("📥 [{}] Fragmento de {} (ID: {}): {} bytes", now, ip, conn_id, n);
                 
-                // Timestamp de recepção TCP (nanosegundos)
-                let tcp_received_ns = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
+                // 📦 Adicionar fragmento ao acumulador
+                accumulator.extend_from_slice(&buffer[0..n]);
                 
-                // Parse e armazena os dados recebidos
-                let parsed = crate::plc_parser::parse_plc_data(&buffer[0..n], &ip, database.as_ref());
+                // 🎯 Verificar se temos pacote completo
+                let should_parse = if let Some(expected) = expected_size {
+                    // Com configuração: esperar pelo tamanho exato
+                    if accumulator.len() >= expected {
+                        println!("✅ [{}] PLC {}: Pacote completo! {} bytes acumulados (esperado: {})", 
+                                 now, ip, accumulator.len(), expected);
+                        true
+                    } else {
+                        println!("⏳ [{}] PLC {}: Acumulando... {}/{} bytes", 
+                                 now, ip, accumulator.len(), expected);
+                        false
+                    }
+                } else {
+                    // Sem configuração: parsear cada fragmento (comportamento antigo)
+                    println!("⚠️ [{}] PLC {}: Sem configuração salva, parseando fragmento de {} bytes", 
+                             now, ip, n);
+                    true
+                };
                 
-                // Adicionar métricas de transferência
-                let backend_processed_ns = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
-                
-                {
-                    let mut data_map = latest_data.write().await;
-                    data_map.insert(ip.clone(), parsed.clone());
-                }
-                
-                // Calcular tempo de processamento TCP→Backend (microsegundos)
-                let processing_time_us = (backend_processed_ns - tcp_received_ns) / 1000;
-                
-                // Emite evento com dados parseados + métricas de tempo
-                let _ = app_handle.emit("plc-data-received", serde_json::json!({
-                    "ip": parsed.ip,
-                    "timestamp": parsed.timestamp,
-                    "raw_data": parsed.raw_data,
-                    "size": parsed.size,
-                    "variables": parsed.variables,
-                    "tcp_received_ns": tcp_received_ns,
-                    "backend_processed_ns": backend_processed_ns,
-                    "processing_time_us": processing_time_us
-                }));
-                
-                // Emitir estatísticas a cada 1 segundo para calcular taxa
-                let elapsed = last_emit_time.elapsed();
-                if elapsed.as_secs_f64() >= 1.0 {
-                    // Calcular bytes por segundo
-                    let bytes_per_second = (bytes_since_last_emit as f64 / elapsed.as_secs_f64()) as u64;
+                if should_parse {
+                    packet_count += 1;
                     
-                    let _ = app_handle.emit("plc-data-stats", serde_json::json!({
-                        "ip": ip,
-                        "id": conn_id,
-                        "bytesPerSecond": bytes_per_second,
-                        "packets": packet_count,
-                        "totalBytes": total_bytes,
-                        "transferRate": format!("{:.2} KB/s", bytes_per_second as f64 / 1024.0),
-                        "industrialMetrics": {
-                            "packetFrequency": (packet_count as f64 / elapsed.as_secs_f64()) as u64,
-                            "avgPacketSize": if packet_count > 0 { total_bytes / packet_count } else { 0 },
-                            "dataIntegrity": "OK"
-                        }
+                    // Timestamp de recepção TCP (nanosegundos)
+                    let tcp_received_ns = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos();
+                    
+                    // Parse dados acumulados
+                    let data_to_parse = if accumulator.is_empty() { 
+                        &buffer[0..n] 
+                    } else { 
+                        &accumulator[..] 
+                    };
+                    
+                    let parsed = crate::plc_parser::parse_plc_data(data_to_parse, &ip, database.as_ref());
+                    
+                    // Adicionar métricas de transferência
+                    let backend_processed_ns = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos();
+                    
+                    // 🚀 DashMap: inserção direta sem locks!
+                    latest_data.insert(ip.clone(), parsed.clone());
+                    
+                    // Calcular tempo de processamento TCP→Backend (microsegundos)
+                    let processing_time_us = (backend_processed_ns - tcp_received_ns) / 1000;
+                    
+                    // Emite evento com dados parseados + métricas de tempo
+                    let _ = app_handle.emit("plc-data-received", serde_json::json!({
+                        "ip": parsed.ip,
+                        "timestamp": parsed.timestamp,
+                        "raw_data": parsed.raw_data,
+                        "size": parsed.size,
+                        "variables": parsed.variables,
+                        "tcp_received_ns": tcp_received_ns,
+                        "backend_processed_ns": backend_processed_ns,
+                        "processing_time_us": processing_time_us
                     }));
                     
-                    println!("📊 PLC {} (ID: {}): {} bytes/s", ip, conn_id, bytes_per_second);
+                    // 🧹 Limpar acumulador após parsear
+                    accumulator.clear();
                     
-                    // Reset contadores
-                    bytes_since_last_emit = 0;
-                    last_emit_time = std::time::Instant::now();
+                    // Emitir estatísticas a cada 1 segundo para calcular taxa
+                    let elapsed = last_emit_time.elapsed();
+                    if elapsed.as_secs_f64() >= 1.0 {
+                        // Calcular bytes por segundo
+                        let bytes_per_second = (bytes_since_last_emit as f64 / elapsed.as_secs_f64()) as u64;
+                        
+                        let _ = app_handle.emit("plc-data-stats", serde_json::json!({
+                            "ip": ip,
+                            "id": conn_id,
+                            "bytesPerSecond": bytes_per_second,
+                            "packets": packet_count,
+                            "totalBytes": total_bytes,
+                            "transferRate": format!("{:.2} KB/s", bytes_per_second as f64 / 1024.0),
+                            "industrialMetrics": {
+                                "packetFrequency": (packet_count as f64 / elapsed.as_secs_f64()) as u64,
+                                "avgPacketSize": if packet_count > 0 { total_bytes / packet_count } else { 0 },
+                                "dataIntegrity": "OK"
+                            }
+                        }));
+                        
+                        println!("📊 PLC {} (ID: {}): {} bytes/s", ip, conn_id, bytes_per_second);
+                        
+                        // Reset contadores
+                        bytes_since_last_emit = 0;
+                        last_emit_time = std::time::Instant::now();
+                    }
                 }
                 
                 // Responder com ACK simples

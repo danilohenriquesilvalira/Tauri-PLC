@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Settings, Plus, Trash2, Save, X } from 'lucide-react';
+import { Settings, Save, X, Copy, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface DataBlockConfig {
   data_type: string;
@@ -14,216 +14,378 @@ interface PlcStructureModalProps {
   onSaved: () => void;
 }
 
-const dataTypes = [
-  { value: 'BYTE', label: 'BYTE (1 byte)', size: 1 },
-  { value: 'WORD', label: 'WORD (2 bytes)', size: 2 },
-  { value: 'INT', label: 'INT (2 bytes)', size: 2 },
-  { value: 'DWORD', label: 'DWORD (4 bytes)', size: 4 },
-  { value: 'DINT', label: 'DINT (4 bytes)', size: 4 },
-  { value: 'REAL', label: 'REAL (4 bytes)', size: 4 },
-  { value: 'LWORD', label: 'LWORD (8 bytes)', size: 8 },
-  { value: 'LINT', label: 'LINT (8 bytes)', size: 8 },
-  { value: 'LREAL', label: 'LREAL (8 bytes)', size: 8 },
-];
-
 export const PlcStructureModal: React.FC<PlcStructureModalProps> = ({ plcIp, onClose, onSaved }) => {
-  const [blocks, setBlocks] = useState<DataBlockConfig[]>([
-    { data_type: 'WORD', count: 65, name: 'Word' }
-  ]);
+  const [structureText, setStructureText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string>('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
 
-  const addBlock = () => {
-    setBlocks([...blocks, { data_type: 'WORD', count: 1, name: `Block${blocks.length + 1}` }]);
+  // Carregar configuração existente ao abrir
+  useEffect(() => {
+    loadExistingConfig();
+  }, [plcIp]);
+
+  const loadExistingConfig = async () => {
+    try {
+      setLoading(true);
+      const config = await invoke<any>('load_plc_structure', { plcIp });
+      
+      if (config && config.blocks && config.blocks.length > 0) {
+        // Converter blocks para texto
+        const text = config.blocks
+          .map((b: DataBlockConfig) => `${b.name}[0..${b.count - 1}]`)
+          .join('\n');
+        setStructureText(text);
+      } else {
+        // Exemplo padrão
+        setStructureText('Word[0..64]\nInt[0..64]\nReal[0..64]\nReal2[0..64]');
+      }
+    } catch (err) {
+      console.log('Nenhuma configuração existente, usando exemplo padrão');
+      setStructureText('Word[0..64]\nInt[0..64]\nReal[0..64]\nReal2[0..64]');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeBlock = (index: number) => {
-    setBlocks(blocks.filter((_, i) => i !== index));
+  // Parseia a estrutura do texto com validação robusta
+  const parseStructure = (text: string): DataBlockConfig[] => {
+    const blocks: DataBlockConfig[] = [];
+    const lines = text.trim().split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
+      
+      // Formato: Nome[0..64]
+      let match = trimmed.match(/^(\w+)\[0\.\.(\d+)\]$/i);
+      if (match) {
+        const name = match[1];
+        const lastIndex = parseInt(match[2]);
+        const count = lastIndex + 1;
+        
+        // Detectar tipo pelo nome
+        const nameLower = name.toLowerCase();
+        let type = 'WORD';
+        if (nameLower.includes('byte')) type = 'BYTE';
+        else if (nameLower.includes('dword') || nameLower.includes('dint')) type = 'DWORD';
+        else if (nameLower.includes('int')) type = 'INT';
+        else if (nameLower.includes('real')) type = 'REAL';
+        else if (nameLower.includes('word')) type = 'WORD';
+        
+        blocks.push({ data_type: type, count, name });
+        continue;
+      }
+      
+      // Formato: Nome Array[0..64] of Type
+      match = trimmed.match(/^(\w+)\s+Array\[0\.\.(\d+)\]\s+of\s+(\w+)$/i);
+      if (match) {
+        const name = match[1];
+        const lastIndex = parseInt(match[2]);
+        const count = lastIndex + 1;
+        const type = match[3].toUpperCase();
+        blocks.push({ data_type: type, count, name });
+        continue;
+      }
+      
+      // Formato simples: WORD 65
+      match = trimmed.match(/^(\w+)\s+(\d+)$/i);
+      if (match) {
+        const nameOrType = match[1].toUpperCase();
+        const count = parseInt(match[2]);
+        
+        const knownTypes = ['BYTE', 'WORD', 'INT', 'DWORD', 'DINT', 'REAL', 'LWORD', 'LINT', 'LREAL'];
+        if (knownTypes.includes(nameOrType)) {
+          blocks.push({ data_type: nameOrType, count, name: nameOrType });
+        } else {
+          const nameLower = nameOrType.toLowerCase();
+          let type = 'WORD';
+          if (nameLower.includes('byte')) type = 'BYTE';
+          else if (nameLower.includes('dword') || nameLower.includes('dint')) type = 'DWORD';
+          else if (nameLower.includes('int')) type = 'INT';
+          else if (nameLower.includes('real')) type = 'REAL';
+          blocks.push({ data_type: type, count, name: nameOrType });
+        }
+      }
+    }
+    
+    return blocks;
   };
 
-  const updateBlock = (index: number, field: keyof DataBlockConfig, value: string | number) => {
-    const newBlocks = [...blocks];
-    newBlocks[index] = { ...newBlocks[index], [field]: value };
-    setBlocks(newBlocks);
-  };
-
-  const calculateTotalSize = () => {
+  const calculateTotalSize = (blocks: DataBlockConfig[]): number => {
+    const sizes: Record<string, number> = {
+      'BYTE': 1, 'WORD': 2, 'INT': 2, 'DWORD': 4, 'DINT': 4, 
+      'REAL': 4, 'LWORD': 8, 'LINT': 8, 'LREAL': 8,
+    };
+    
     return blocks.reduce((total, block) => {
-      const typeInfo = dataTypes.find(t => t.value === block.data_type);
-      return total + (typeInfo ? typeInfo.size * block.count : 0);
+      const size = sizes[block.data_type] || 0;
+      return total + (size * block.count);
     }, 0);
   };
-
-  const handleSave = async () => {
-    if (blocks.length === 0) {
-      setError('Adicione pelo menos um bloco de dados');
+  
+  // Atualiza preview quando o texto muda
+  useEffect(() => {
+    if (!structureText.trim()) {
+      setPreview('Digite ou cole a estrutura do PLC para ver o preview...');
+      setHasUnsavedChanges(false);
       return;
     }
 
-    setSaving(true);
-    setError(null);
-
     try {
-      const result = await invoke<string>('save_plc_structure', {
+      const blocks = parseStructure(structureText);
+      if (blocks.length === 0) {
+        setPreview('⚠️ Nenhum bloco válido detectado.\n\nFormatos aceitos:\n• Word[0..64]\n• Word Array[0..64] of Word\n• WORD 65');
+        setError('Formato inválido');
+        return;
+      }
+      
+      const totalSize = calculateTotalSize(blocks);
+      const lines = blocks.map(b => {
+        const sizes: Record<string, number> = {
+          'BYTE': 1, 'WORD': 2, 'INT': 2, 'DWORD': 4, 'DINT': 4, 
+          'REAL': 4, 'LWORD': 8, 'LINT': 8, 'LREAL': 8,
+        };
+        const size = sizes[b.data_type] || 0;
+        return `  ${b.name}: ${b.data_type} × ${b.count} = ${b.count * size} bytes`;
+      });
+      
+      setPreview(`✅ Estrutura válida!\n\nBlocos detectados:\n${lines.join('\n')}\n\n📦 Total: ${totalSize} bytes (${blocks.length} blocos)`);
+      setError(null);
+      setHasUnsavedChanges(true);
+    } catch (err) {
+      setPreview('❌ Erro ao processar estrutura');
+      setError(String(err));
+    }
+  }, [structureText]);
+
+  const handleSave = async () => {
+    try {
+      const blocks = parseStructure(structureText);
+      
+      if (blocks.length === 0) {
+        setError('Nenhum bloco válido encontrado. Verifique o formato!');
+        return;
+      }
+
+      setSaving(true);
+      setError(null);
+
+      await invoke('save_plc_structure', {
         plcIp,
         blocks
       });
-      console.log(result);
+      
+      console.log(`✅ Configuração salva para ${plcIp}`);
+      setHasUnsavedChanges(false);
       onSaved();
       onClose();
     } catch (err) {
-      setError(String(err));
+      console.error('Erro ao salvar:', err);
+      setError(`Falha ao salvar: ${String(err)}`);
     } finally {
       setSaving(false);
     }
   };
 
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowConfirmClose(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const confirmClose = () => {
+    setShowConfirmClose(false);
+    onClose();
+  };
+
+  const cancelClose = () => {
+    setShowConfirmClose(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#212E3E]"></div>
+            <span className="text-[#212E3E]">Carregando configuração...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a2332] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#212E3E] to-[#2a3f5f] p-6 flex items-center justify-between">
+      <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Header - Compacto e limpo */}
+        <div className="bg-[#212E3E] px-6 py-4 flex items-center justify-between border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-[#28FF52]" />
+            <div className="w-10 h-10 bg-[#28FF52] rounded-lg flex items-center justify-center">
+              <Settings size={20} className="text-[#212E3E]" />
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Configurar Estrutura de Dados</h2>
-              <p className="text-sm text-gray-400 mt-1">PLC: {plcIp}</p>
+              <h2 className="text-lg font-bold text-white">Configurar Estrutura de Dados</h2>
+              <p className="text-xs text-gray-400">PLC: {plcIp} • Configuração de blocos</p>
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            onClick={handleClose}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
           >
-            <X className="w-6 h-6" />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Info Banner */}
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-blue-400 mb-2">📋 Como configurar:</h3>
-            <ol className="text-xs text-gray-300 space-y-1 list-decimal list-inside">
-              <li>Adicione cada array/bloco que o PLC envia na ordem correta</li>
-              <li>Defina o tipo de dados (WORD, INT, REAL, etc.)</li>
-              <li>Informe a quantidade de elementos (ex: 65 para Array[0..64])</li>
-              <li>Dê um nome descritivo para identificar cada bloco</li>
-            </ol>
-          </div>
-
-          {/* Blocks */}
-          <div className="space-y-3">
-            {blocks.map((block, index) => (
-              <div key={index} className="bg-[#212E3E] rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-sm font-medium text-gray-400">Bloco {index + 1}</span>
-                  <button
-                    onClick={() => removeBlock(index)}
-                    className="ml-auto text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Tipo */}
+        {/* Conteúdo do Modal */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Coluna Esquerda: Input (3 colunas) */}
+            <div className="lg:col-span-3 space-y-4">
+              <div className="bg-[#F1F4F4] rounded-lg border border-[#BECACC] p-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-[#212E3E] mt-0.5" />
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Tipo de Dados</label>
-                    <select
-                      value={block.data_type}
-                      onChange={(e) => updateBlock(index, 'data_type', e.target.value)}
-                      className="w-full bg-[#1a2332] text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-[#28FF52] focus:outline-none"
-                    >
-                      {dataTypes.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Quantidade */}
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Quantidade</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={block.count}
-                      onChange={(e) => updateBlock(index, 'count', parseInt(e.target.value) || 1)}
-                      className="w-full bg-[#1a2332] text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-[#28FF52] focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Nome */}
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Nome</label>
-                    <input
-                      type="text"
-                      value={block.name}
-                      onChange={(e) => updateBlock(index, 'name', e.target.value)}
-                      placeholder="ex: Word, Real, Int"
-                      className="w-full bg-[#1a2332] text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-[#28FF52] focus:outline-none"
-                    />
+                    <h3 className="text-sm font-bold text-[#212E3E]">Cole a estrutura do TIA Portal</h3>
+                    <p className="text-xs text-[#7C9599] mt-1">
+                      Copie diretamente do seu programa e cole aqui!
+                    </p>
                   </div>
                 </div>
-
-                {/* Tamanho Calculado */}
-                <div className="mt-2 text-xs text-gray-400">
-                  Tamanho: {dataTypes.find(t => t.value === block.data_type)?.size || 0} × {block.count} = {' '}
-                  <span className="text-[#28FF52]">
-                    {(dataTypes.find(t => t.value === block.data_type)?.size || 0) * block.count} bytes
-                  </span>
+                
+                <div className="bg-white rounded p-2 font-mono text-xs space-y-1 mt-2 border border-[#BECACC]">
+                  <div className="text-[#212E3E]">Word[0..64]</div>
+                  <div className="text-[#212E3E]">Int[0..64]</div>
+                  <div className="text-[#212E3E]">Real[0..64]</div>
+                </div>
+                
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-[#7C9599]">
+                    <span className="font-semibold text-[#212E3E]">Formatos:</span>
+                    <code className="ml-2 bg-white px-1.5 py-0.5 rounded text-[#212E3E] border border-[#BECACC]">Word[0..64]</code>
+                    <code className="ml-1 bg-white px-1.5 py-0.5 rounded text-[#212E3E] border border-[#BECACC]">WORD 65</code>
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Add Block Button */}
-          <button
-            onClick={addBlock}
-            className="w-full bg-[#212E3E] hover:bg-[#2a3f5f] text-[#28FF52] rounded-lg p-3 flex items-center justify-center gap-2 transition-colors border border-gray-700"
-          >
-            <Plus className="w-5 h-5" />
-            Adicionar Bloco
-          </button>
+              <div>
+                <label className="text-sm font-bold text-[#212E3E] mb-2 block">
+                  Estrutura do PLC:
+                </label>
+                <textarea
+                  value={structureText}
+                  onChange={(e) => setStructureText(e.target.value)}
+                  placeholder="Word[0..64]&#10;Int[0..64]&#10;Real[0..64]&#10;Real2[0..64]"
+                  className="w-full h-64 bg-white text-[#212E3E] rounded-lg p-4 font-mono text-sm border border-[#BECACC] focus:border-[#212E3E] focus:ring-2 focus:ring-[#212E3E]/20 focus:outline-none resize-none"
+                />
+                <p className="text-xs text-[#7C9599] mt-2">
+                  💡 Uma linha por array. O tipo é detectado automaticamente!
+                </p>
+              </div>
 
-          {/* Total Size */}
-          <div className="bg-[#212E3E] rounded-lg p-4 border border-[#28FF52]/30">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-300">Tamanho Total Esperado:</span>
-              <span className="text-xl font-bold text-[#28FF52]">{calculateTotalSize()} bytes</span>
+              <button
+                onClick={() => setStructureText('Word[0..64]\nInt[0..64]\nReal[0..64]\nReal2[0..64]')}
+                className="w-full bg-white hover:bg-[#F1F4F4] text-[#212E3E] rounded-lg p-2.5 flex items-center justify-center gap-2 transition-colors text-sm font-semibold border border-[#BECACC]"
+              >
+                <Copy className="w-4 h-4" />
+                Usar Exemplo
+              </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              O PLC deve enviar exatamente {calculateTotalSize()} bytes para corresponder a esta configuração
-            </p>
+
+            {/* Coluna Direita: Preview (2 colunas) */}
+            <div className="lg:col-span-2">
+              <label className="text-sm font-bold text-[#212E3E] mb-2 block flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-[#212E3E]" />
+                Preview
+              </label>
+              <div className="bg-[#F1F4F4] rounded-lg p-4 border border-[#BECACC] h-[450px] overflow-y-auto">
+                <pre className="text-xs text-[#212E3E] whitespace-pre-wrap font-mono leading-relaxed">
+                  {preview}
+                </pre>
+              </div>
+            </div>
           </div>
 
-          {/* Error */}
+          {/* Error Alert */}
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="mt-4 bg-red-50 border border-[#E32C2C] rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-[#E32C2C] flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-[#E32C2C]">Erro ao processar</h4>
+                <p className="text-sm text-[#212E3E] mt-1">{error}</p>
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="bg-[#212E3E] p-4 flex items-center justify-end gap-3 border-t border-gray-700">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || blocks.length === 0}
-            className="px-6 py-2 bg-[#28FF52] hover:bg-[#20cc42] text-[#212E3E] rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Salvando...' : 'Salvar Configuração'}
-          </button>
+        <div className="bg-white border-t border-[#BECACC] p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-[#7C9599]">
+            {hasUnsavedChanges && (
+              <>
+                <AlertCircle className="w-4 h-4 text-[#7C9599]" />
+                <span className="font-medium">Alterações não salvas</span>
+              </>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClose}
+              className="px-5 py-2.5 bg-white hover:bg-[#F1F4F4] text-[#212E3E] rounded-lg transition-colors font-medium border border-[#BECACC]"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !structureText.trim() || !!error}
+              className="px-6 py-2.5 bg-[#212E3E] hover:bg-[#1a2332] text-[#28FF52] rounded-lg font-bold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Salvando...' : 'Salvar Configuração'}
+            </button>
+          </div>
         </div>
+
+        {/* Modal de Confirmação */}
+        {showConfirmClose && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10" onClick={cancelClose}>
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4 border border-[#BECACC]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="bg-[#F1F4F4] p-2 rounded-lg">
+                  <AlertCircle className="w-6 h-6 text-[#7C9599]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#212E3E] mb-1">Alterações não salvas</h3>
+                  <p className="text-sm text-[#7C9599]">
+                    Você tem alterações que ainda não foram salvas. Deseja realmente fechar sem salvar?
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={cancelClose}
+                  className="px-4 py-2 bg-[#212E3E] hover:bg-[#1a2332] text-[#28FF52] rounded-lg font-semibold transition-colors"
+                >
+                  Continuar Editando
+                </button>
+                <button
+                  onClick={confirmClose}
+                  className="px-4 py-2 bg-[#E32C2C] hover:bg-[#c92626] text-white rounded-lg font-semibold transition-colors"
+                >
+                  Fechar Sem Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

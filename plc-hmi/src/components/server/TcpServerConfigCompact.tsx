@@ -135,77 +135,9 @@ export const TcpServerConfigCompact: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Status Compacto */}
-      <div className="bg-white rounded-lg shadow p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Server className="text-blue-600" size={18} />
-            <div>
-              <h2 className="text-base font-semibold text-gray-800">TCP Server</h2>
-              <div className="flex items-center gap-3 text-xs">
-                <span className={`flex items-center gap-1 ${
-                  isServerRunning ? 'text-green-600' : 'text-gray-500'
-                }`}>
-                  <CheckCircle size={12} />
-                  {isServerRunning ? `Porta ${serverPort}` : 'Parado'}
-                </span>
-                <span className={`flex items-center gap-1 ${
-                  isPlcConnected ? 'text-green-600' : 'text-gray-500'
-                }`}>
-                  {isPlcConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-                  {isPlcConnected ? 'Conectado' : 'Desconectado'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {!isServerRunning ? (
-              <>
-                <input
-                  type="number"
-                  value={serverPort}
-                  onChange={(e) => setServerPort(parseInt(e.target.value))}
-                  className="w-16 px-1.5 py-1 border border-gray-300 rounded text-xs"
-                  placeholder="8502"
-                />
-                <button
-                  onClick={handleStartServer}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs flex items-center gap-1"
-                >
-                  <Play size={12} />
-                  Iniciar
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={handleStopServer}
-                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs flex items-center gap-1"
-              >
-                <Square size={12} />
-                Parar
-              </button>
-            )}
-            <button
-              onClick={autoScanNetwork}
-              disabled={isScanning}
-              className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-all ${
-                isScanning 
-                  ? 'bg-blue-500 text-white cursor-wait' 
-                  : 'bg-gray-600 hover:bg-gray-700 text-white'
-              }`}
-            >
-              <RefreshCw size={12} className={isScanning ? 'animate-spin' : ''} />
-              {isScanning ? 'Escaneando...' : 'Scan'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabela Moderna de PLCs Conectados */}
+    <div className="space-y-5">
+      {/* Configurações de PLC - Foco em conexões e gerenciamento */}
       <PlcConnectionTable />
-
     </div>
   );
 };

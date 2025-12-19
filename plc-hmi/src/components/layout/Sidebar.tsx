@@ -5,7 +5,8 @@ import {
   Settings,
   Menu,
   ChevronLeft,
-  Database
+  Database,
+  Server
 } from 'lucide-react';
 import logoDanilo from '../../assets/Logo_Danilo.svg';
 
@@ -25,6 +26,7 @@ export type SidebarProps = {
 const menuItems: MenuItem[] = [
   { id: 'home', label: 'Início', icon: <Home size={20} /> },
   { id: 'monitor', label: 'Monitoramento', icon: <Gauge size={20} /> },
+  { id: 'services', label: 'Serviços', icon: <Server size={20} /> },
   { id: 'settings', label: 'Configurações', icon: <Settings size={20} /> },
 ];
 

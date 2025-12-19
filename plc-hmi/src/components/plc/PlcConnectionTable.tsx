@@ -14,9 +14,12 @@ import {
   BarChart3,
   Search,
   Settings,
+  Tags,
+  Database,
 } from 'lucide-react';
 import PlcIcon from '../../assets/Plc.svg';
 import { PlcStructureModal } from './PlcStructureModal';
+import { TagConfigurationModal } from './TagConfigurationModal';
 
 interface ConnectedPlc {
   id: number;
@@ -58,6 +61,8 @@ export const PlcConnectionTable: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStructureModalOpen, setIsStructureModalOpen] = useState(false);
   const [structureModalPlcIp, setStructureModalPlcIp] = useState<string | null>(null);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [tagModalPlcIp, setTagModalPlcIp] = useState<string | null>(null);
   const [dataTypeFilter, setDataTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(15); // 15 itens por página para preencher modal
@@ -383,14 +388,14 @@ export const PlcConnectionTable: React.FC = () => {
             </p>
           </div>
           {connectionStats && (
-            <div className="flex gap-4">
-              <div className="text-right">
-                <div className="text-2xl font-bold text-[#28FF52]">{connectionStats.active_connections}</div>
-                <div className="text-xs text-gray-500">Ativos</div>
+            <div className="flex gap-3">
+              <div className="bg-[#F1F4F4] rounded-lg px-5 py-3 border border-[#BECACC] text-center">
+                <div className="text-2xl font-bold text-[#212E3E] leading-none mb-1">{connectionStats.active_connections}</div>
+                <div className="text-xs font-semibold text-[#7C9599] uppercase tracking-wide">Ativos</div>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-[#212E3E]">{connectionStats.total_connections}</div>
-                <div className="text-xs text-gray-500">Total</div>
+              <div className="bg-[#F1F4F4] rounded-lg px-5 py-3 border border-[#BECACC] text-center">
+                <div className="text-2xl font-bold text-[#212E3E] leading-none mb-1">{connectionStats.total_connections}</div>
+                <div className="text-xs font-semibold text-[#7C9599] uppercase tracking-wide">Total</div>
               </div>
             </div>
           )}
@@ -456,6 +461,26 @@ export const PlcConnectionTable: React.FC = () => {
                     >
                       <BarChart3 size={18} />
                     </button>
+                    <button
+                      onClick={() => {
+                        setTagModalPlcIp(plc.ip);
+                        setIsTagModalOpen(true);
+                      }}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-[#28FF52]/20 text-[#212E3E] transition-all duration-200"
+                      title="Configurar Tags"
+                    >
+                      <Tags size={18} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStructureModalPlcIp(plc.ip);
+                        setIsStructureModalOpen(true);
+                      }}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-[#28FF52]/20 text-[#212E3E] transition-all duration-200"
+                      title="Configurar estrutura de dados"
+                    >
+                      <Settings size={18} />
+                    </button>
                   </div>
                 </div>
 
@@ -504,25 +529,12 @@ export const PlcConnectionTable: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Botão de Ação */}
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Botão Configurar */}
-                  <button
-                    onClick={() => {
-                      setStructureModalPlcIp(plc.ip);
-                      setIsStructureModalOpen(true);
-                    }}
-                    className="py-2.5 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
-                  >
-                    <Settings size={16} />
-                    Configurar
-                  </button>
-                  
-                  {/* Botão Conectar/Desconectar */}
+                {/* Botão de Conexão */}
+                <div className="w-full">
                   {plc.status === 'blocked' || plc.status === 'disconnected' ? (
                     <button
                       onClick={() => handleConnectPlc(plc)}
-                      className="py-2.5 px-4 bg-[#28FF52] hover:bg-[#20dd45] text-[#212E3E] rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-[#28FF52]/20"
+                      className="w-full py-2.5 px-4 bg-[#212E3E] hover:bg-[#2a3f52] text-white rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-[#212E3E]/20"
                     >
                       <CheckCircle size={16} />
                       Conectar
@@ -530,7 +542,7 @@ export const PlcConnectionTable: React.FC = () => {
                   ) : (
                     <button
                       onClick={() => handleDisconnectPlc(plc)}
-                      className="py-2.5 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                      className="w-full py-2.5 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
                     >
                       <XCircle size={16} />
                       Desconectar
@@ -557,28 +569,32 @@ export const PlcConnectionTable: React.FC = () => {
       {/* Modal de Dados do PLC */}
       {isModalOpen && plcData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {/* Header do Modal */}
-            <div className="bg-gradient-to-r from-[#212E3E] to-[#2a3f52] p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1">Análise de Dados PLC</h2>
-                  <p className="text-sm text-gray-300">IP: {selectedPlcIp} • Tamanho: {plcData.size} bytes • {new Date(plcData.timestamp * 1000).toLocaleTimeString()}</p>
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header - Compacto e limpo */}
+            <div className="bg-[#212E3E] px-6 py-4 flex items-center justify-between border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#28FF52] rounded-lg flex items-center justify-center">
+                  <Database size={20} className="text-[#212E3E]" />
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <X size={24} />
-                </button>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Análise de Dados PLC</h2>
+                  <p className="text-xs text-gray-400">IP: {selectedPlcIp} • {plcData.size} bytes • {new Date(plcData.timestamp * 1000).toLocaleTimeString()}</p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Conteúdo do Modal - COMPACTO E MODERNO */}
+            {/* Conteúdo do Modal */}
             <div className="flex flex-col">
               
               {/* Controles: Busca + Filtros */}
-              <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
+              <div className="p-4 border-b border-[#BECACC] bg-[#F1F4F4] space-y-3">
                 {/* Barra de Busca */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -590,9 +606,9 @@ export const PlcConnectionTable: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
-                      setCurrentPage(1); // Reset página ao buscar
+                      setCurrentPage(1);
                     }}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#212E3E] focus:border-transparent"
+                    className="block w-full pl-10 pr-3 py-2 border border-[#BECACC] rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#212E3E] focus:border-transparent bg-white"
                   />
                 </div>
                 
@@ -602,14 +618,6 @@ export const PlcConnectionTable: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     {(() => {
                       const types = Array.from(new Set(plcData.variables.map(v => v.data_type)));
-                      const typeColors = {
-                        'WORD': 'bg-blue-500', 
-                        'INT': 'bg-purple-500',
-                        'REAL': 'bg-emerald-500',
-                        'DWORD': 'bg-orange-500',
-                        'BYTE': 'bg-gray-500',
-                        'BIT': 'bg-green-500',
-                      };
                       
                       return ['ALL', ...types].map(type => {
                         const count = type === 'ALL' 
@@ -617,19 +625,18 @@ export const PlcConnectionTable: React.FC = () => {
                           : plcData.variables.filter(v => v.data_type === type).length;
                         
                         const isActive = dataTypeFilter === (type === 'ALL' ? 'all' : type.toLowerCase());
-                        const colorClass = typeColors[type as keyof typeof typeColors] || 'bg-gray-500';
                         
                         return (
                           <button
                             key={type}
                             onClick={() => {
                               setDataTypeFilter(type === 'ALL' ? 'all' : type.toLowerCase());
-                              setCurrentPage(1); // Reset página ao filtrar
+                              setCurrentPage(1);
                             }}
-                            className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                               isActive
-                                ? `${colorClass} text-white shadow-sm`
-                                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                                ? 'bg-[#212E3E] text-[#28FF52] shadow-sm'
+                                : 'bg-white text-[#212E3E] hover:bg-[#E6EBEC] border border-[#BECACC]'
                             }`}
                           >
                             {type} ({count})
@@ -640,32 +647,34 @@ export const PlcConnectionTable: React.FC = () => {
                   </div>
                   
                   {/* Info compacta */}
-                  <div className="text-xs text-gray-500 flex-shrink-0">
-                    {plcData.size} bytes • {plcData.variables.length} variáveis
+                  <div className="text-xs text-[#7C9599] flex items-center gap-2">
+                    <span className="font-semibold text-[#212E3E]">{plcData.variables.length}</span> variáveis
+                    <span className="text-[#BECACC]">•</span>
+                    <span className="font-semibold text-[#212E3E]">{plcData.size}</span> bytes
                   </div>
                 </div>
               </div>
 
-              {/* Tabela com altura fixa para padronizar */}
+              {/* Tabela com altura fixa */}
               <div className="overflow-auto bg-white" style={{height: '450px'}}>
                   <table className="min-w-full table-fixed">
-                    <thead className="bg-gray-50 sticky top-0 border-b border-gray-200">
+                    <thead className="bg-[#F1F4F4] sticky top-0 border-b border-[#BECACC]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-24">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-[#212E3E] uppercase tracking-wide w-24">
                           Nome
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-32">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-[#212E3E] uppercase tracking-wide w-32">
                           Valor
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-20">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-[#212E3E] uppercase tracking-wide w-20">
                           Tipo
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-28">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-[#212E3E] uppercase tracking-wide w-28">
                           Hex
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[#E6EBEC]">
                       {(() => {
                         // Aplicar filtros: tipo + busca
                         const filteredData = plcData.variables.filter(v => {
@@ -682,17 +691,17 @@ export const PlcConnectionTable: React.FC = () => {
                         
                         return paginatedData.map((variable, index) => {
                           const typeColors = {
-                            'BYTE': 'text-gray-600 bg-gray-50',
-                            'BIT': 'text-green-700 bg-green-50',
-                            'WORD': 'text-blue-700 bg-blue-50', 
-                            'INT': 'text-purple-700 bg-purple-50',
-                            'DWORD': 'text-orange-700 bg-orange-50',
-                            'DINT': 'text-red-700 bg-red-50',
-                            'REAL': 'text-emerald-700 bg-emerald-50',
-                            'STRING': 'text-amber-700 bg-amber-50'
+                            'BYTE': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'BIT': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'WORD': 'text-[#212E3E] bg-[#E6EBEC]', 
+                            'INT': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'DWORD': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'DINT': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'REAL': 'text-[#212E3E] bg-[#E6EBEC]',
+                            'STRING': 'text-[#212E3E] bg-[#E6EBEC]'
                           };
                           
-                          const colorClass = typeColors[variable.data_type as keyof typeof typeColors] || 'text-gray-600 bg-gray-50';
+                          const colorClass = typeColors[variable.data_type as keyof typeof typeColors] || 'text-[#212E3E] bg-[#E6EBEC]';
                           
                           // Calcular hex apenas se for numérico
                           let hexValue = '-';
@@ -716,19 +725,19 @@ export const PlcConnectionTable: React.FC = () => {
                           
                           return (
                             <tr key={`${variable.data_type}-${variable.name}-${startIndex + index}`} 
-                                className="hover:bg-blue-50 transition-colors">
-                              <td className="px-4 py-2.5 font-mono text-sm font-medium text-gray-900 truncate">
+                                className="hover:bg-[#F1F4F4] transition-colors">
+                              <td className="px-4 py-2.5 font-mono text-sm font-semibold text-[#212E3E] truncate">
                                 {variable.name}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-sm text-gray-900 truncate max-w-0">
+                              <td className="px-4 py-2.5 font-mono text-sm text-[#212E3E] truncate max-w-0">
                                 <div className="truncate">{variable.value}</div>
                               </td>
                               <td className="px-4 py-2.5">
-                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-md ${colorClass}`}>
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${colorClass}`}>
                                   {variable.data_type}
                                 </span>
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-gray-500 truncate">
+                              <td className="px-4 py-2.5 font-mono text-xs text-[#7C9599] truncate">
                                 {hexValue}
                               </td>
                             </tr>
@@ -822,21 +831,25 @@ export const PlcConnectionTable: React.FC = () => {
       {/* Modal de Métricas em Tempo Real */}
       {isMetricsModalOpen && selectedMetricsPlc && trafficHistory.get(selectedMetricsPlc) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsMetricsModalOpen(false)}>
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {/* Header do Modal */}
-            <div className="bg-gradient-to-r from-[#212E3E] to-[#2a3f52] p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1">Métricas de Tráfego TCP</h2>
-                  <p className="text-sm text-gray-300">PLC: {selectedMetricsPlc} • Dados em tempo real • Janela: 1 minuto</p>
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header - Compacto e limpo */}
+            <div className="bg-[#212E3E] px-6 py-4 flex items-center justify-between border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#28FF52] rounded-lg flex items-center justify-center">
+                  <BarChart3 size={20} className="text-[#212E3E]" />
                 </div>
-                <button
-                  onClick={() => setIsMetricsModalOpen(false)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <X size={24} />
-                </button>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Métricas de Tráfego TCP</h2>
+                  <p className="text-xs text-gray-400">PLC: {selectedMetricsPlc} • Tempo real • Janela: 1min</p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsMetricsModalOpen(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+              >
+                <X size={20} />
+              </button>
             </div>
 
             {/* Conteúdo do Modal */}
@@ -863,29 +876,29 @@ export const PlcConnectionTable: React.FC = () => {
                 return (
                   <div className="space-y-6">
                     {/* Métricas Essenciais TCP */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-[#F1F4F4] rounded-lg p-5 border border-[#BECACC]">
                         <div className="text-3xl font-bold text-[#212E3E] mb-1">{formatBytes(latestData.bytesPerSecond)}</div>
-                        <div className="text-sm text-gray-500">Taxa Atual</div>
+                        <div className="text-xs font-semibold text-[#7C9599] uppercase tracking-wide">Taxa Atual</div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="bg-[#F1F4F4] rounded-lg p-5 border border-[#BECACC]">
                         <div className="text-3xl font-bold text-[#212E3E] mb-1">{latestData.packetsPerSecond || latestData.packets || 0}</div>
-                        <div className="text-sm text-gray-500">Pacotes/s</div>
+                        <div className="text-xs font-semibold text-[#7C9599] uppercase tracking-wide">Pacotes/s</div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="bg-[#F1F4F4] rounded-lg p-5 border border-[#BECACC]">
                         <div className="text-3xl font-bold text-[#212E3E] mb-1">{formatBytes(avgBytes)}</div>
-                        <div className="text-sm text-gray-500">Média (1min)</div>
+                        <div className="text-xs font-semibold text-[#7C9599] uppercase tracking-wide">Média (1min)</div>
                       </div>
                     </div>
 
                     {/* Gráfico de Linha Profissional */}
-                    <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                      <div className="mb-6">
-                        <h3 className="text-xl font-bold text-[#212E3E]">Tráfego TCP em Tempo Real</h3>
-                        <p className="text-sm text-gray-500">Dados reais do PLC • Últimos 60 segundos</p>
+                    <div className="bg-white rounded-lg border border-[#BECACC] p-6">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-[#212E3E]">Tráfego TCP em Tempo Real</h3>
+                        <p className="text-xs text-[#7C9599]">Dados reais do PLC • Últimos 60 segundos</p>
                       </div>
                       
-                      <div className="relative bg-white rounded-lg border border-gray-100 p-4">
+                      <div className="relative bg-[#F1F4F4] rounded-lg border border-[#E6EBEC] p-4">
                         <svg viewBox="0 0 1000 400" className="w-full h-80">
                           {/* Grid profissional */}
                           <defs>
@@ -1087,6 +1100,22 @@ export const PlcConnectionTable: React.FC = () => {
           onSaved={() => {
             // Recarregar dados do PLC após salvar configuração
             console.log('✅ Configuração salva para PLC', structureModalPlcIp);
+          }}
+        />
+      )}
+
+      {/* Modal de Configuração de Tags */}
+      {isTagModalOpen && tagModalPlcIp && (
+        <TagConfigurationModal
+          plcIp={tagModalPlcIp}
+          onClose={() => {
+            setIsTagModalOpen(false);
+            setTagModalPlcIp(null);
+          }}
+          onSaved={() => {
+            console.log('✅ Tags configurados para PLC', tagModalPlcIp);
+            setIsTagModalOpen(false);
+            setTagModalPlcIp(null);
           }}
         />
       )}
