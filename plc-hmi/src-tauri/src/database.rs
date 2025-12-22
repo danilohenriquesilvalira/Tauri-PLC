@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataBlockConfig {
@@ -28,6 +28,8 @@ pub struct TagMapping {
     pub unit: Option<String>,     // Ex: "°C", "bar", "rpm"
     pub enabled: bool,
     pub created_at: i64,
+    pub collect_mode: Option<String>, // "on_change" ou "interval"
+    pub collect_interval_s: Option<i64>, // Intervalo em segundos, se aplicável
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,21 +48,38 @@ pub struct Database {
 }
 
 impl Database {
+        /// Retorna uma lista de todos os PLCs conhecidos (apenas IPs)
+        pub fn get_all_known_plcs(&self) -> Result<Vec<String>> {
+            self.list_configured_plcs()
+        }
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
         // SEMPRE usar o banco configurado primeiro
         let db_path = std::path::PathBuf::from("D:\\Banco_SQLITE\\plc_hmi.db");
-        
         // Criar diretório se não existir
         if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).expect("Falha ao criar diretório do banco");
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                    "operation": "create_dir",
+                    "message": format!("Falha ao criar diretório do banco: {}", e),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }));
+                return Err(rusqlite::Error::InvalidPath(parent.to_path_buf()));
+            }
         }
-        
         println!("📁 Banco de dados FIXO: {:?}", db_path);
-        
-        let conn = Connection::open(db_path)?;
-        
+        let conn = match Connection::open(db_path) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                    "operation": "open_db",
+                    "message": format!("Falha ao abrir banco: {}", e),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }));
+                return Err(e);
+            }
+        };
         // Criar tabelas se não existirem
-        conn.execute(
+        if let Err(e) = conn.execute(
             "CREATE TABLE IF NOT EXISTS plc_structures (
                 plc_ip TEXT PRIMARY KEY,
                 config_json TEXT NOT NULL,
@@ -68,10 +87,15 @@ impl Database {
                 last_updated INTEGER NOT NULL
             )",
             [],
-        )?;
-        
-        // Tabela para mapeamento de tags
-        conn.execute(
+        ) {
+            let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                "operation": "create_table_plc_structures",
+                "message": format!("Erro ao criar tabela plc_structures: {}", e),
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
+            return Err(e);
+        }
+        if let Err(e) = conn.execute(
             "CREATE TABLE IF NOT EXISTS tag_mappings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 plc_ip TEXT NOT NULL,
@@ -81,14 +105,40 @@ impl Database {
                 unit TEXT,
                 enabled INTEGER DEFAULT 1,
                 created_at INTEGER NOT NULL,
+                collect_mode TEXT,
+                collect_interval_s INTEGER,
                 UNIQUE(plc_ip, variable_path),
                 FOREIGN KEY(plc_ip) REFERENCES plc_structures(plc_ip)
             )",
             [],
-        )?;
-        
-        // Tabela para configurações WebSocket
-        conn.execute(
+        ) {
+                    // Migração automática: garantir que as colunas collect_mode e collect_interval_s existam
+                    let mut stmt = conn.prepare("PRAGMA table_info(tag_mappings)")?;
+                    let columns: Vec<String> = stmt.query_map([], |row| row.get(1))?.filter_map(Result::ok).collect();
+                    if !columns.iter().any(|c| c == "collect_mode") {
+                        match conn.execute("ALTER TABLE tag_mappings ADD COLUMN collect_mode TEXT", []) {
+                            Ok(_) => println!("[MIGRATION] Coluna 'collect_mode' adicionada à tabela tag_mappings."),
+                            Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_mode': {}", e),
+                        }
+                    } else {
+                        println!("[MIGRATION] Coluna 'collect_mode' já existe.");
+                    }
+                    if !columns.iter().any(|c| c == "collect_interval_s") {
+                        match conn.execute("ALTER TABLE tag_mappings ADD COLUMN collect_interval_s INTEGER", []) {
+                            Ok(_) => println!("[MIGRATION] Coluna 'collect_interval_s' adicionada à tabela tag_mappings."),
+                            Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_interval_s': {}", e),
+                        }
+                    } else {
+                        println!("[MIGRATION] Coluna 'collect_interval_s' já existe.");
+                    }
+            let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                "operation": "create_table_tag_mappings",
+                "message": format!("Erro ao criar tabela tag_mappings: {}", e),
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
+            return Err(e);
+        }
+        if let Err(e) = conn.execute(
             "CREATE TABLE IF NOT EXISTS websocket_config (
                 id INTEGER PRIMARY KEY,
                 host TEXT NOT NULL DEFAULT '0.0.0.0',
@@ -100,16 +150,20 @@ impl Database {
                 updated_at INTEGER NOT NULL
             )",
             [],
-        )?;
-        
+        ) {
+            let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                "operation": "create_table_websocket_config",
+                "message": format!("Erro ao criar tabela websocket_config: {}", e),
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
+            return Err(e);
+        }
         // Migração para adicionar coluna bind_interfaces_json se não existir
         let _ = conn.execute(
             "ALTER TABLE websocket_config ADD COLUMN bind_interfaces_json TEXT NOT NULL DEFAULT '[\"0.0.0.0\"]'",
             [],
         );
-        
         println!("✅ Banco de dados SQLite inicializado");
-        
         Ok(Database {
             conn: Mutex::new(conn),
         })
@@ -118,11 +172,14 @@ impl Database {
     /// Salva a configuração de estrutura de um PLC
     pub fn save_plc_structure(&self, config: &PlcStructureConfig) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        
-        let config_json = serde_json::to_string(&config.blocks)
-            .expect("Falha ao serializar configuração");
-        
-        conn.execute(
+        let config_json = match serde_json::to_string(&config.blocks) {
+            Ok(json) => json,
+            Err(e) => {
+                // Não temos app_handle aqui, então apenas retornamos o erro
+                return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(e)));
+            }
+        };
+        if let Err(e) = conn.execute(
             "INSERT OR REPLACE INTO plc_structures (plc_ip, config_json, total_size, last_updated)
              VALUES (?1, ?2, ?3, ?4)",
             (
@@ -131,11 +188,12 @@ impl Database {
                 config.total_size as i64,
                 config.last_updated,
             ),
-        )?;
-        
+        ) {
+            // Não temos app_handle aqui, então não emitimos
+            return Err(e);
+        }
         println!("💾 Configuração salva para PLC {}: {} bytes, {} blocos", 
                  config.plc_ip, config.total_size, config.blocks.len());
-        
         // 🔍 DEBUG AUTOMÁTICO: Mostrar o que foi salvo
         println!("🔍 DEBUG - Estrutura salva:");
         for (i, block) in config.blocks.iter().enumerate() {
@@ -150,7 +208,6 @@ impl Database {
                 block.count * size_per_element);
         }
         println!("📝 JSON: {}", config_json);
-        
         Ok(())
     }
     
@@ -277,8 +334,8 @@ impl Database {
         
         let _result = conn.execute(
             "INSERT OR REPLACE INTO tag_mappings 
-             (plc_ip, variable_path, tag_name, description, unit, enabled, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+             (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             (
                 &tag.plc_ip,
                 &tag.variable_path,
@@ -287,6 +344,8 @@ impl Database {
                 &tag.unit,
                 tag.enabled as i32,
                 tag.created_at,
+                &tag.collect_mode,
+                &tag.collect_interval_s,
             ),
         )?;
         
@@ -301,10 +360,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at 
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
              FROM tag_mappings WHERE plc_ip = ?1 ORDER BY variable_path"
         )?;
-        
+
         let tag_iter = stmt.query_map([plc_ip], |row| {
             Ok(TagMapping {
                 id: Some(row.get(0)?),
@@ -315,6 +374,8 @@ impl Database {
                 unit: row.get(5)?,
                 enabled: row.get::<usize, i32>(6)? == 1,
                 created_at: row.get(7)?,
+                collect_mode: row.get(8).ok(),
+                collect_interval_s: row.get(9).ok(),
             })
         })?;
         
@@ -347,10 +408,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at 
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
              FROM tag_mappings WHERE plc_ip = ?1 AND enabled = 1 ORDER BY tag_name"
         )?;
-        
+
         let tag_iter = stmt.query_map([plc_ip], |row| {
             Ok(TagMapping {
                 id: Some(row.get(0)?),
@@ -361,6 +422,8 @@ impl Database {
                 unit: row.get(5)?,
                 enabled: true,
                 created_at: row.get(7)?,
+                collect_mode: row.get(8).ok(),
+                collect_interval_s: row.get(9).ok(),
             })
         })?;
         

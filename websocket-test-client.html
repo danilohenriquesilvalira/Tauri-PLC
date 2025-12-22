@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client - EDP PLC System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2332 0%, #2a3f52 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            color: #28FF52;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+
+        .connection-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .connection-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .connection-controls input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .connection-controls input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-connect {
+            background: #28FF52;
+            color: #1a2332;
+        }
+
+        .btn-connect:hover {
+            background: #20d944;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 255, 82, 0.4);
+        }
+
+        .btn-disconnect {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .btn-disconnect:hover {
+            background: #cc0000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-indicator.connected {
+            background: rgba(40, 255, 82, 0.2);
+            color: #28FF52;
+            border: 1px solid #28FF52;
+        }
+
+        .status-indicator.disconnected {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected .status-dot {
+            background: #28FF52;
+        }
+
+        .status-indicator.disconnected .status-dot {
+            background: #ff4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #28FF52;
+        }
+
+        .data-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .data-panel h2 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #28FF52;
+        }
+
+        .data-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .data-display::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .data-display::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .data-display::-webkit-scrollbar-thumb {
+            background: rgba(40, 255, 82, 0.5);
+            border-radius: 4px;
+        }
+
+        .data-display::-webkit-scrollbar-thumb:hover {
+            background: rgba(40, 255, 82, 0.7);
+        }
+
+        .message-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid #28FF52;
+        }
+
+        .message-time {
+            color: #28FF52;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .message-content {
+            color: #fff;
+        }
+
+        .json-key {
+            color: #8be9fd;
+        }
+
+        .json-string {
+            color: #50fa7b;
+        }
+
+        .json-number {
+            color: #bd93f9;
+        }
+
+        .json-boolean {
+            color: #ff79c6;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .clear-btn {
+            margin-top: 16px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 WebSocket Test Client</h1>
+            <p>Cliente de teste para monitoramento em tempo real do sistema PLC EDP</p>
+        </div>
+
+        <!-- Connection Panel -->
+        <div class="connection-panel">
+            <div class="connection-controls">
+                <input type="text" id="wsUrl" placeholder="WebSocket URL" value="ws://localhost:8765">
+                <button class="btn btn-connect" id="connectBtn" onclick="connect()">Conectar</button>
+                <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnect()" disabled>Desconectar</button>
+                <div class="status-indicator disconnected" id="statusIndicator">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Desconectado</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Mensagens Recebidas</div>
+                <div class="stat-value" id="msgCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Taxa de Atualização</div>
+                <div class="stat-value" id="updateRate">0 Hz</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Tempo Conectado</div>
+                <div class="stat-value" id="uptime">0s</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Última Mensagem</div>
+                <div class="stat-value" id="lastMsg" style="font-size: 16px; color: rgba(255,255,255,0.7);">—</div>
+            </div>
+        </div>
+
+        <!-- Data Display Panel -->
+        <div class="data-panel">
+            <h2>📊 Dados em Tempo Real</h2>
+            <div class="data-display" id="dataDisplay">
+                <div class="no-data">Aguardando conexão...</div>
+            </div>
+            <button class="clear-btn" onclick="clearData()">Limpar Histórico</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let messageCount = 0;
+        let startTime = null;
+        let lastMessageTime = null;
+        let messageHistory = [];
+        let uptimeInterval = null;
+        let rateInterval = null;
+        let messagesLastSecond = 0;
+
+        const wsUrlInput = document.getElementById('wsUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const dataDisplay = document.getElementById('dataDisplay');
+        const msgCountEl = document.getElementById('msgCount');
+        const updateRateEl = document.getElementById('updateRate');
+        const uptimeEl = document.getElementById('uptime');
+        const lastMsgEl = document.getElementById('lastMsg');
+
+        function connect() {
+            const url = wsUrlInput.value.trim();
+            
+            if (!url) {
+                alert('Por favor, insira uma URL WebSocket válida!');
+                return;
+            }
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    console.log('✅ Conectado ao WebSocket!');
+                    statusIndicator.className = 'status-indicator connected';
+                    statusText.textContent = 'Conectado';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    wsUrlInput.disabled = true;
+                    
+                    startTime = Date.now();
+                    messageCount = 0;
+                    messagesLastSecond = 0;
+                    
+                    // Iniciar contador de uptime
+                    uptimeInterval = setInterval(updateUptime, 1000);
+                    
+                    // Calcular taxa de mensagens por segundo
+                    rateInterval = setInterval(() => {
+                        updateRateEl.textContent = `${messagesLastSecond} Hz`;
+                        messagesLastSecond = 0;
+                    }, 1000);
+                    
+                    addSystemMessage('Conexão estabelecida com sucesso!', 'success');
+                };
+
+                ws.onmessage = (event) => {
+                    messageCount++;
+                    messagesLastSecond++;
+                    lastMessageTime = new Date();
+                    
+                    msgCountEl.textContent = messageCount;
+                    lastMsgEl.textContent = formatTime(lastMessageTime);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        displayMessage(data);
+                    } catch (error) {
+                        displayRawMessage(event.data);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('❌ Erro WebSocket:', error);
+                    addSystemMessage('Erro de conexão!', 'error');
+                };
+
+                ws.onclose = () => {
+                    console.log('🔌 WebSocket desconectado');
+                    handleDisconnect();
+                };
+
+            } catch (error) {
+                console.error('❌ Erro ao conectar:', error);
+                alert('Erro ao conectar: ' + error.message);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+            handleDisconnect();
+        }
+
+        function handleDisconnect() {
+            statusIndicator.className = 'status-indicator disconnected';
+            statusText.textContent = 'Desconectado';
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            wsUrlInput.disabled = false;
+            
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+            
+            if (rateInterval) {
+                clearInterval(rateInterval);
+                rateInterval = null;
+            }
+            
+            updateRateEl.textContent = '0 Hz';
+            addSystemMessage('Conexão encerrada', 'info');
+        }
+
+        function displayMessage(data) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-item';
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = formatTime(new Date());
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+            
+            messageDiv.appendChild(timeDiv);
+            messageDiv.appendChild(contentDiv);
+            
+            // Remover mensagem "Aguardando conexão..."
+            const noData = dataDisplay.querySelector('.no-data');
+            if (noData) {
+                noData.remove();
+            }
+            
+            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
+            
+            // Limitar a 50 mensagens no histórico
+            while (dataDisplay.children.length > 50) {
+                dataDisplay.removeChild(dataDisplay.lastChild);
+            }
+        }
+
+        function displayRawMessage(data) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-item';
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = formatTime(new Date());
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = data;
+            
+            messageDiv.appendChild(timeDiv);
+            messageDiv.appendChild(contentDiv);
+            
+            const noData = dataDisplay.querySelector('.no-data');
+            if (noData) {
+                noData.remove();
+            }
+            
+            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
+            
+            while (dataDisplay.children.length > 50) {
+                dataDisplay.removeChild(dataDisplay.lastChild);
+            }
+        }
+
+        function addSystemMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-item';
+            messageDiv.style.borderLeftColor = type === 'success' ? '#28FF52' : type === 'error' ? '#ff4444' : '#8be9fd';
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = formatTime(new Date());
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = `[SISTEMA] ${message}`;
+            
+            messageDiv.appendChild(timeDiv);
+            messageDiv.appendChild(contentDiv);
+            
+            const noData = dataDisplay.querySelector('.no-data');
+            if (noData) {
+                noData.remove();
+            }
+            
+            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
+        }
+
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+        }
+
+        function updateUptime() {
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                
+                if (hours > 0) {
+                    uptimeEl.textContent = `${hours}h ${minutes}m ${seconds}s`;
+                } else if (minutes > 0) {
+                    uptimeEl.textContent = `${minutes}m ${seconds}s`;
+                } else {
+                    uptimeEl.textContent = `${seconds}s`;
+                }
+            }
+        }
+
+        function clearData() {
+            dataDisplay.innerHTML = '<div class="no-data">Histórico limpo. Aguardando novas mensagens...</div>';
+        }
+
+        // Auto-conectar se Enter for pressionado no input
+        wsUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !connectBtn.disabled) {
+                connect();
+            }
+        });
+    </script>
+</body>
+</html>

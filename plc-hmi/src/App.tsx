@@ -7,6 +7,7 @@ import { ServicesPage } from './pages/ServicesPage';
 import { PlcMonitoring } from './components/plc/PlcMonitoring';
 import { TcpServerConfigCompact } from './components/server/TcpServerConfigCompact';
 import { FirstRunSetup } from './components/setup/FirstRunSetup';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 function App() {
   const [activeMenuItem, setActiveMenuItem] = useState('home');
@@ -64,30 +65,32 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-edp-neutral-white-wash">
-      {/* Sidebar */}
-      <Sidebar 
-        activeItem={activeMenuItem}
-        onItemClick={setActiveMenuItem}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+    <NotificationProvider>
+      <div className="flex h-screen overflow-hidden bg-edp-neutral-white-wash">
+        {/* Sidebar */}
+        <Sidebar 
+          activeItem={activeMenuItem}
+          onItemClick={setActiveMenuItem}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
 
-      {/* Conteúdo Principal */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <Header titulo={pageTitle} nomeUsuario="Operador" />
+        {/* Conteúdo Principal */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <Header titulo={pageTitle} nomeUsuario="Operador" />
 
-        {/* Área de Conteúdo */}
-        <main className="flex-1 overflow-y-auto p-8">
-          {/* Renderizar conteúdo baseado no menu ativo */}
-          {activeMenuItem === 'home' && <HomePage />}
-          {activeMenuItem === 'monitor' && <PlcMonitoring />}
-          {activeMenuItem === 'services' && <ServicesPage />}
-          {activeMenuItem === 'settings' && <TcpServerConfigCompact />}
-        </main>
+          {/* Área de Conteúdo */}
+          <main className="flex-1 overflow-y-auto p-8">
+            {/* Renderizar conteúdo baseado no menu ativo */}
+            {activeMenuItem === 'home' && <HomePage />}
+            {activeMenuItem === 'monitor' && <PlcMonitoring />}
+            {activeMenuItem === 'services' && <ServicesPage />}
+            {activeMenuItem === 'settings' && <TcpServerConfigCompact />}
+          </main>
+        </div>
       </div>
-    </div>
+    </NotificationProvider>
   );
 }
 

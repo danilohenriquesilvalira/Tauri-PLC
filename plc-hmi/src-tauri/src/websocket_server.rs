@@ -1,7 +1,8 @@
 use dashmap::DashMap;
+use std::sync::Mutex;
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, IpAddr};
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -79,6 +80,7 @@ pub struct WebSocketServer {
     broadcast_sender: Option<broadcast::Sender<String>>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
     broadcast_handle: Option<tokio::task::JoinHandle<()>>,
+    interval_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
 
 impl WebSocketServer {
@@ -103,6 +105,7 @@ impl WebSocketServer {
             broadcast_sender: None,
             server_handle: None,
             broadcast_handle: None,
+            interval_handles: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -262,7 +265,7 @@ impl WebSocketServer {
         println!("🟢 Tentando bind em {} endereços: {:?}", bind_addresses.len(), bind_addresses);
 
         // Tentar fazer bind em cada endereço
-        for bind_addr in bind_addresses {
+        for bind_addr in bind_addresses.iter() {
             println!("🟢 Tentando bind em: {}", bind_addr);
             match TcpListener::bind(&bind_addr).await {
                 Ok(listener) => {
@@ -289,6 +292,13 @@ impl WebSocketServer {
 
         // Marcar como rodando
         self.is_running.store(true, Ordering::SeqCst);
+
+        // Emitir evento de servidor iniciado
+        let _ = self.app_handle.emit("websocket-server-started", serde_json::json!({
+            "status": "started",
+            "addresses": bound_addresses,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        }));
 
         // Clonar dados necessários para as tasks
         let is_running = self.is_running.clone();
@@ -392,89 +402,85 @@ impl WebSocketServer {
         let database = self.database.clone();
         let tcp_server = self.tcp_server.clone();
         let is_running = self.is_running.clone();
-        let interval_ms = self.config.broadcast_interval_ms;
 
-        println!("🚀 PASSO 2: WebSocket COM TAGS do PLC!");
+        println!("🚀 PASSO 2: WebSocket COM AGENDAMENTO POR GRUPO DE INTERVALO!");
 
-        let broadcast_task = tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_millis(interval_ms));
-            let mut counter = 0u64;
+        // 1. Carregar todos os tags ativos de todos os PLCs e agrupar por intervalo
+        use std::collections::HashMap;
+        let mut interval_groups: HashMap<u64, Vec<(String, String, String)>> = HashMap::new();
+        let plc_list = database.get_all_known_plcs().unwrap_or_default();
+        for plc_ip in plc_list {
+            let tags = database.get_active_tags(&plc_ip).unwrap_or_default();
+            for tag in tags {
+                if tag.collect_mode.as_deref() == Some("interval") {
+                    let interval_s = tag.collect_interval_s.unwrap_or(1) as u64;
+                    interval_groups.entry(interval_s)
+                        .or_insert_with(Vec::new)
+                        .push((plc_ip.clone(), tag.variable_path.clone(), tag.tag_name.clone()));
+                }
+            }
+        }
 
-            while is_running.load(Ordering::SeqCst) {
-                interval.tick().await;
-                counter += 1;
-                let now = chrono::Local::now().format("%H:%M:%S%.3f");
-
-                let mut all_tags_data = std::collections::HashMap::new();
-
-                // 🚀 PASSO 2: LER DADOS DO TCP (DashMap = SEM LOCKS!)
-                if let Some(tcp_server_ref) = &tcp_server {
-                    // Tentar pegar dados do TCP - COM TIMEOUT para segurança
-                    match tokio::time::timeout(
-                        Duration::from_millis(100),
-                        tcp_server_ref.read()
-                    ).await {
-                        Ok(tcp_guard) => {
+        // 2. Para cada grupo de intervalo, criar uma única task
+        if let Some(tcp_server_ref) = &tcp_server {
+            let tcp_server_ref = tcp_server_ref.clone();
+            let is_running = is_running.clone();
+            let mut handles = Vec::new();
+            for (interval_s, tag_list) in interval_groups {
+                let broadcast_tx = broadcast_tx.clone();
+                let tcp_server_ref = tcp_server_ref.clone();
+                let is_running = is_running.clone();
+                let handle = tokio::spawn(async move {
+                    let mut interval = time::interval(Duration::from_secs(interval_s));
+                    while is_running.load(Ordering::SeqCst) {
+                        interval.tick().await;
+                        if let Ok(tcp_guard) = tokio::time::timeout(Duration::from_millis(100), tcp_server_ref.read()).await {
                             if let Some(tcp_server_instance) = tcp_guard.as_ref() {
-                                // ✅ DashMap = acesso direto sem lock!
                                 let all_plc_data = tcp_server_instance.get_all_plc_data().await;
-                                drop(tcp_guard); // 🔓 Liberar imediatamente!
-
-                                // Processar PLCs FORA do lock
-                                for (plc_ip, plc_data) in all_plc_data {
-                                    // Buscar tags ativos para este PLC
-                                    match database.get_active_tags(&plc_ip) {
-                                        Ok(active_tags) => {
-                                            for tag in active_tags {
-                                                // Encontrar variável correspondente
-                                                if let Some(variable) = plc_data.variables.iter()
-                                                    .find(|v| v.name == tag.variable_path) {
-                                                    
-                                                    // Parse do valor
-                                                    let parsed_value = Self::parse_variable_value(&variable.value, &variable.data_type);
-                                                    all_tags_data.insert(tag.tag_name.clone(), parsed_value);
-                                                }
-                                            }
+                                let mut tag_data = HashMap::new();
+                                for (plc_ip, variable_path, tag_name) in &tag_list {
+                                    if let Some(plc_data) = all_plc_data.get(plc_ip) {
+                                        if let Some(variable) = plc_data.variables.iter().find(|v| v.name == *variable_path) {
+                                            tag_data.insert(tag_name.clone(), variable.value.clone());
                                         }
-                                        Err(e) => {
-                                            println!("⚠️ [{}] Erro ao buscar tags para {}: {}", now, plc_ip, e);
-                                        }
+                                    }
+                                }
+                                if !tag_data.is_empty() {
+                                    let message = serde_json::to_string(&tag_data).unwrap_or_else(|_| "{}".to_string());
+                                    if broadcast_tx.receiver_count() > 0 {
+                                        let _ = broadcast_tx.send(message);
                                     }
                                 }
                             }
                         }
-                        Err(_) => {
-                            println!("⚠️ [{}] Timeout ao acessar TCP - pulando ciclo #{}", now, counter);
-                        }
                     }
-                }
-
-                // Enviar APENAS os tags cadastrados (formato limpo!)
-                if !all_tags_data.is_empty() {
-                    // ✅ SÓ OS TAGS - nada mais!
-                    let message = serde_json::to_string(&all_tags_data)
-                        .unwrap_or_else(|_| "{}".to_string());
-                    
-                    println!("📡 [{}] WebSocket enviando {} tags: {} bytes", 
-                        now, all_tags_data.len(), message.len());
-
-                    // Broadcast para clientes conectados
-                    if broadcast_tx.receiver_count() > 0 {
-                        let _ = broadcast_tx.send(message);
-                    }
-                } else {
-                    // Sem tags = não envia nada (silencioso)
-                    if counter % 10 == 0 {
-                        println!("⚠️ [{}] Nenhum tag cadastrado - broadcast #{}", now, counter);
-                    }
-                }
+                });
+                handles.push(handle);
             }
-
-            println!("🛑 Broadcast loop finalizado");
-        });
-
-        self.broadcast_handle = Some(broadcast_task);
+            // Salvar os handles para poder cancelar depois
+            let mut guard = self.interval_handles.lock().unwrap();
+            *guard = handles;
+        }
         Ok(())
+    }
+
+    /// Para e reinicia as tasks de broadcast de intervalos, recarregando os tags do banco
+    pub async fn reload_tag_groups(&mut self) -> Result<(), String> {
+        // Parar tasks antigas
+        {
+            let mut guard = self.interval_handles.lock().unwrap();
+            for handle in guard.iter() {
+                let handle: &tokio::task::JoinHandle<()> = handle;
+                handle.abort();
+            }
+            guard.clear();
+        }
+        // Recriar tasks com os grupos atualizados
+        if let Some(broadcast_tx) = &self.broadcast_sender {
+            self.start_broadcasting(broadcast_tx.clone()).await
+        } else {
+            Err("Broadcast sender não inicializado".to_string())
+        }
     }
 
     fn parse_variable_value(value: &str, data_type: &str) -> serde_json::Value {
@@ -592,6 +598,12 @@ impl WebSocketServer {
         // Fechar todas as conexões
         self.connected_clients.clear();
         self.active_connections.store(0, Ordering::SeqCst);
+
+        // Emitir evento de servidor parado
+        let _ = self.app_handle.emit("websocket-server-stopped", serde_json::json!({
+            "status": "stopped",
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        }));
 
         println!("🛑 WebSocket server parado");
         

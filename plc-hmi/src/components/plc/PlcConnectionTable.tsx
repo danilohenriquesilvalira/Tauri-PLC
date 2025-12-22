@@ -48,42 +48,78 @@ interface PlcDataPacket {
 }
 
 export const PlcConnectionTable: React.FC = () => {
-  const {
-    isServerRunning,
-    connectionStats,
-    disconnectFromPlc,
-    allowPlcReconnect,
-  } = useTcpServer();
+    // Estado para PLCs com tags desativadas
+    const [plcsWithDisabledTags, setPlcsWithDisabledTags] = useState<Set<string>>(new Set());
+    const [knownPlcs, setKnownPlcs] = useState<Map<string, ConnectedPlc>>(new Map());
+    const [selectedPlcIp, setSelectedPlcIp] = useState<string | null>(null);
+    const [plcData, setPlcData] = useState<PlcDataPacket | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isStructureModalOpen, setIsStructureModalOpen] = useState(false);
+    const [structureModalPlcIp, setStructureModalPlcIp] = useState<string | null>(null);
+    const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+    const [tagModalPlcIp, setTagModalPlcIp] = useState<string | null>(null);
+    const [dataTypeFilter, setDataTypeFilter] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(15); // 15 itens por página para preencher modal
+    const [searchTerm, setSearchTerm] = useState('');
+    // Estados para modal de métricas
+    const [isMetricsModalOpen, setIsMetricsModalOpen] = useState(false);
+    const [selectedMetricsPlc, setSelectedMetricsPlc] = useState<string | null>(null);
+    const [trafficHistory, setTrafficHistory] = useState<Map<string, Array<{
+      timestamp: number, 
+      bytesPerSecond: number, 
+      packets?: number,
+      packetsPerSecond?: number,
+      throughput?: number,
+      packetSize?: number,
+      jitter?: number,
+      utilization?: number,
+      dataIntegrity?: string,
+      timeLabel?: string
+    }>>>(new Map());
+    const [hoveredPoint, setHoveredPoint] = useState<{x: number, y: number, data: any} | null>(null);
 
-  const [knownPlcs, setKnownPlcs] = useState<Map<string, ConnectedPlc>>(new Map());
-  const [selectedPlcIp, setSelectedPlcIp] = useState<string | null>(null);
-  const [plcData, setPlcData] = useState<PlcDataPacket | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isStructureModalOpen, setIsStructureModalOpen] = useState(false);
-  const [structureModalPlcIp, setStructureModalPlcIp] = useState<string | null>(null);
-  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
-  const [tagModalPlcIp, setTagModalPlcIp] = useState<string | null>(null);
-  const [dataTypeFilter, setDataTypeFilter] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15); // 15 itens por página para preencher modal
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // Estados para modal de métricas
-  const [isMetricsModalOpen, setIsMetricsModalOpen] = useState(false);
-  const [selectedMetricsPlc, setSelectedMetricsPlc] = useState<string | null>(null);
-  const [trafficHistory, setTrafficHistory] = useState<Map<string, Array<{
-    timestamp: number, 
-    bytesPerSecond: number, 
-    packets?: number,
-    packetsPerSecond?: number,
-    throughput?: number,
-    packetSize?: number,
-    jitter?: number,
-    utilization?: number,
-    dataIntegrity?: string,
-    timeLabel?: string
-  }>>>(new Map());
-  const [hoveredPoint, setHoveredPoint] = useState<{x: number, y: number, data: any} | null>(null);
+    const {
+      isServerRunning,
+      connectionStats,
+      disconnectFromPlc,
+      allowPlcReconnect,
+    } = useTcpServer();
+
+    // Função para checar tags desativadas de um PLC
+    const checkDisabledTags = async (plcIp: string) => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const tags = await invoke<any[]>('load_tag_mappings', { plcIp });
+        const hasDisabled = tags.some(tag => tag.enabled === false);
+        setPlcsWithDisabledTags(prev => {
+          const updated = new Set(prev);
+          if (hasDisabled) updated.add(plcIp);
+          else updated.delete(plcIp);
+          return updated;
+        });
+      } catch {}
+    };
+
+
+    // Checar tags desativadas ao abrir modal de tags
+    useEffect(() => {
+      if (isTagModalOpen && tagModalPlcIp) {
+        checkDisabledTags(tagModalPlcIp);
+      }
+      // Listener para atualização imediata após salvar/alterar tag
+      const handler = (e: any) => {
+        if (e.detail && e.detail.plcIp) checkDisabledTags(e.detail.plcIp);
+      };
+      window.addEventListener('plc-tags-updated', handler);
+      return () => window.removeEventListener('plc-tags-updated', handler);
+    }, [isTagModalOpen, tagModalPlcIp]);
+
+    // Checar todos PLCs ao montar
+    useEffect(() => {
+      Array.from(knownPlcs.values()).forEach(plc => checkDisabledTags(plc.ip));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [knownPlcs.size]);
 
   // Listener para atualizar bytes em tempo real
   useEffect(() => {
@@ -466,8 +502,12 @@ export const PlcConnectionTable: React.FC = () => {
                         setTagModalPlcIp(plc.ip);
                         setIsTagModalOpen(true);
                       }}
-                      className="p-2 rounded-lg bg-gray-100 hover:bg-[#28FF52]/20 text-[#212E3E] transition-all duration-200"
-                      title="Configurar Tags"
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        plcsWithDisabledTags.has(plc.ip)
+                          ? 'bg-red-100 border-2 border-red-500 text-red-700 animate-pulse'
+                          : 'bg-gray-100 hover:bg-[#28FF52]/20 text-[#212E3E]'
+                      }`}
+                      title={plcsWithDisabledTags.has(plc.ip) ? 'Há tags desativadas neste PLC' : 'Configurar Tags'}
                     >
                       <Tags size={18} />
                     </button>

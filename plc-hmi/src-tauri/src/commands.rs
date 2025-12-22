@@ -1,3 +1,17 @@
+#[tauri::command]
+pub async fn reload_websocket_tag_groups(
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<String, String> {
+    let mut ws_guard = websocket_state.write().await;
+    match ws_guard.as_mut() {
+        Some(server) => {
+            server.reload_tag_groups().await?;
+            Ok("WebSocket tag groups reloaded".to_string())
+        }
+        None => Err("WebSocket server não está rodando".to_string())
+    }
+}
+use tauri::Emitter;
 use crate::tcp_server::{TcpServer, ConnectionStats};
 use crate::database::{Database, PlcStructureConfig, DataBlockConfig, TagMapping};
 use crate::websocket_server::{WebSocketServer, WebSocketConfig, WebSocketStats, NetworkInterface};
@@ -349,7 +363,8 @@ pub async fn debug_show_plc_structure(
 pub async fn save_tag_mapping(
     tag: TagMapping,
     db: State<'_, Arc<Database>>,
-    _websocket_state: State<'_, WebSocketServerState>,
+    websocket_state: State<'_, WebSocketServerState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let mut tag_to_save = tag;
     tag_to_save.created_at = chrono::Utc::now().timestamp();
@@ -359,14 +374,36 @@ pub async fn save_tag_mapping(
     
     match db.save_tag_mapping(&tag_to_save) {
         Ok(tag_id) => {
-            // Se o tag foi salvo com sucesso e está ativo, notificar WebSocket
+            // Emitir evento Tauri para frontend: tag-status-changed
+            let _ = app_handle.emit(
+                "tag-status-changed",
+                serde_json::json!({
+                    "tag_name": tag_to_save.tag_name,
+                    "plc_ip": tag_to_save.plc_ip,
+                    "enabled": tag_to_save.enabled
+                })
+            );
+            // Emitir evento Tauri para frontend: tag-created (notificação robusta)
+            let _ = app_handle.emit(
+                "tag-created",
+                serde_json::json!({
+                    "id": tag_id,
+                    "plc_ip": tag_to_save.plc_ip,
+                    "variable_path": tag_to_save.variable_path,
+                    "tag_name": tag_to_save.tag_name,
+                    "description": tag_to_save.description,
+                    "unit": tag_to_save.unit,
+                    "enabled": tag_to_save.enabled,
+                    "created_at": tag_to_save.created_at,
+                    "collect_mode": tag_to_save.collect_mode,
+                    "collect_interval_s": tag_to_save.collect_interval_s
+                })
+            );
+            // Sempre recarregar grupos de tags do WebSocket
+            let _ = reload_websocket_tag_groups(websocket_state).await;
             if tag_to_save.enabled {
                 println!("🔄 Tag '{}' ativado, WebSocket será notificado automaticamente no próximo ciclo", tag_to_save.tag_name);
-                
-                // O WebSocket já vai pegar automaticamente na próxima consulta do banco
-                // Não precisa fazer nada especial aqui, apenas confirmar que foi salvo
             }
-            
             Ok(format!("Tag '{}' salvo com ID {} - {}", 
                 tag_to_save.tag_name, 
                 tag_id,
@@ -391,10 +428,12 @@ pub async fn delete_tag_mapping(
     plc_ip: String,
     variable_path: String,
     db: State<'_, Arc<Database>>,
+    websocket_state: State<'_, WebSocketServerState>,
 ) -> Result<String, String> {
     db.delete_tag_mapping(&plc_ip, &variable_path)
         .map_err(|e| format!("Erro ao deletar tag: {}", e))?;
-    
+    // Sempre recarregar grupos de tags do WebSocket
+    let _ = reload_websocket_tag_groups(websocket_state).await;
     Ok(format!("Tag {} removido", variable_path))
 }
 

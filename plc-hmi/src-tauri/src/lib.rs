@@ -1,3 +1,4 @@
+use tauri::Emitter;
 mod tcp_server;
 mod commands;
 mod plc_parser;
@@ -15,6 +16,11 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
+            // Emitir evento de inicialização do backend Tauri
+            let _ = app.emit("tauri-started", serde_json::json!({
+              "status": "started",
+              "timestamp": chrono::Utc::now().to_rfc3339()
+            }));
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

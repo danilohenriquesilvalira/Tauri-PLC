@@ -1,5 +1,6 @@
 import React from 'react';
-import { Bell, User, Settings, LogOut } from 'lucide-react';
+import { User, Settings, LogOut } from 'lucide-react';
+import { NotificationDropdown } from './NotificationDropdown';
 
 export type HeaderProps = {
   titulo?: string;
@@ -23,10 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Ações do usuário */}
         <div className="flex items-center gap-4">
           {/* Notificações */}
-          <button className="relative p-2 text-edp-slate hover:text-edp-marine rounded-lg transition-edp transform hover:scale-110 active:scale-95">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-edp-electric rounded-full animate-pulse"></span>
-          </button>
+          <NotificationDropdown />
 
           {/* Configurações */}
           <button className="p-2 text-edp-slate hover:text-edp-marine rounded-lg transition-edp transform hover:scale-110 active:scale-95">

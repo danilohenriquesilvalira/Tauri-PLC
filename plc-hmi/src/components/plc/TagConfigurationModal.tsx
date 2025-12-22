@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Save, X, Plus, Trash2, Eye, AlertCircle, CheckCircle, Tag, Hash, FileText, Ruler, Power, Search } from 'lucide-react';
+import { Save, X, Plus, Trash2, Eye, AlertCircle, CheckCircle, Tag, Power, Pencil } from 'lucide-react';
 
 interface TagMapping {
   id?: number;
@@ -11,6 +11,8 @@ interface TagMapping {
   unit?: string;           // Ex: "°C", "bar", "rpm"
   enabled: boolean;
   created_at: number;
+  collect_mode?: 'on_change' | 'interval';
+  collect_interval_s?: number;
 }
 
 interface TagConfigurationModalProps {
@@ -32,12 +34,53 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     description: '',
     unit: '',
     enabled: true,
+    collect_mode: 'on_change',
+    collect_interval_s: 1,
   });
   const [showAddForm, setShowAddForm] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [previewingTag, setPreviewingTag] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
+  const [editingTag, setEditingTag] = useState<TagMapping | null>(null);
+  const [editTagData, setEditTagData] = useState<Partial<TagMapping> | null>(null);
+  const handleEditTag = (tag: TagMapping) => {
+    setEditingTag(tag);
+    setEditTagData({ ...tag });
+    setShowAddForm(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTag(null);
+    setEditTagData(null);
+  };
+
+  const handleSaveEditTag = async () => {
+    if (!editTagData || !editTagData.variable_path || !editTagData.tag_name) {
+      setError('Variável e nome do tag são obrigatórios');
+      return;
+    }
+    try {
+      setSaving(true);
+      setError(null);
+      const tagToSave: TagMapping = {
+        ...editingTag,
+        ...editTagData,
+      } as TagMapping;
+      await invoke('save_tag_mapping', { tag: tagToSave });
+      await loadData();
+      setEditingTag(null);
+      setEditTagData(null);
+      setHasUnsavedChanges(true);
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp: tagToSave.plc_ip } }));
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Carregar dados existentes
   useEffect(() => {
@@ -99,6 +142,10 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       
       // Recarregar tags
       await loadData();
+      // Atualizar destaque do botão de tags imediatamente
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
+      }
       
       // Resetar formulário
       setNewTag({
@@ -124,6 +171,9 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       setError(null);
       await invoke('delete_tag_mapping', { plcIp, variablePath });
       await loadData();
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
+      }
       setHasUnsavedChanges(true);
     } catch (err) {
       setError(String(err));
@@ -136,6 +186,13 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       const updatedTag = { ...tag, enabled: !tag.enabled };
       await invoke('save_tag_mapping', { tag: updatedTag });
       await loadData();
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp: tag.plc_ip } }));
+      }
+        // Notificação persistente ao desativar
+        if (!tag.enabled) {
+          window.dispatchEvent(new CustomEvent('tag-disabled-notification', { detail: { tagName: tag.tag_name, plcIp: tag.plc_ip } }));
+        }
       setHasUnsavedChanges(true);
     } catch (err) {
       setError(String(err));
@@ -269,7 +326,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   <X size={18} />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
                 {/* Variável */}
                 <div>
                   <label className="block text-xs font-semibold text-[#212E3E] mb-2 uppercase tracking-wide">
@@ -329,6 +386,37 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   />
                 </div>
 
+                {/* Modo de Coleta */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#212E3E] mb-2 uppercase tracking-wide">
+                    Modo de Coleta
+                  </label>
+                  <select
+                    value={newTag.collect_mode}
+                    onChange={e => setNewTag({ ...newTag, collect_mode: e.target.value as 'on_change' | 'interval' })}
+                    className="w-full px-3 py-2 border border-[#BECACC] rounded-lg text-sm focus:ring-2 focus:ring-[#212E3E] focus:border-transparent bg-white"
+                  >
+                    <option value="on_change">Apenas se mudar</option>
+                    <option value="interval">Por ciclo</option>
+                  </select>
+                </div>
+                {/* Intervalo de Coleta */}
+                {newTag.collect_mode === 'interval' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#212E3E] mb-2 uppercase tracking-wide">
+                      Intervalo (s)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={newTag.collect_interval_s || 1}
+                      onChange={e => setNewTag({ ...newTag, collect_interval_s: Number(e.target.value) })}
+                      className="w-full px-3 py-2 border border-[#BECACC] rounded-lg text-sm focus:ring-2 focus:ring-[#212E3E] focus:border-transparent bg-white"
+                    />
+                  </div>
+                )}
+
                 {/* Botões */}
                 <div className="flex items-end gap-2">
                   <button
@@ -372,22 +460,18 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   <div className="flex items-center gap-4">
                     {/* Indicador de status */}
                     <div className={`w-1 h-16 rounded-full ${tag.enabled ? 'bg-[#212E3E]' : 'bg-[#BECACC]'}`}></div>
-                    
                     {/* Conteúdo principal */}
                     <div className="flex-1 grid grid-cols-4 gap-4">
-                      
                       {/* Variável */}
                       <div>
                         <div className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Variável</div>
                         <div className="font-mono text-sm font-bold text-[#212E3E]">{tag.variable_path}</div>
                       </div>
-                      
                       {/* Tag Name */}
                       <div>
                         <div className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Tag</div>
                         <div className="text-sm font-bold text-[#212E3E]">{tag.tag_name}</div>
                       </div>
-                      
                       {/* Descrição */}
                       <div>
                         <div className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Descrição</div>
@@ -400,7 +484,6 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                           )}
                         </div>
                       </div>
-                      
                       {/* Status */}
                       <div>
                         <div className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Status</div>
@@ -413,7 +496,6 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                         </span>
                       </div>
                     </div>
-                    
                     {/* Ações */}
                     <div className="flex items-center gap-2">
                       {/* Toggle */}
@@ -428,7 +510,15 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                       >
                         <Power size={16} />
                       </button>
-                      
+                      {/* Editar */}
+                      <button
+                        onClick={() => handleEditTag(tag)}
+                        className="p-2.5 rounded-lg transition-all bg-[#E6EBEC] hover:bg-[#212E3E] text-[#212E3E] hover:text-[#28FF52] flex items-center justify-center"
+                        title="Editar"
+                        aria-label="Editar"
+                      >
+                        <Pencil size={16} />
+                      </button>
                       {/* Preview */}
                       <button
                         onClick={() => handlePreviewTag(tag)}
@@ -441,7 +531,6 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                       >
                         <Eye size={16} />
                       </button>
-                      
                       {/* Excluir */}
                       <button
                         onClick={() => handleDeleteTag(tag.plc_ip, tag.variable_path)}
@@ -456,6 +545,68 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
               ))
             )}
           </div>
+          {/* Formulário de Edição */}
+          {editingTag && editTagData && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
+              <div className="bg-white rounded-2xl w-full max-w-md mx-auto shadow-2xl border border-[#BECACC] p-0 overflow-hidden animate-fade-in">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-[#212E3E]">
+                  <h4 className="font-semibold text-white text-base">Editar Tag <span className="text-[#28FF52]">{editingTag.tag_name}</span></h4>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="text-gray-300 hover:text-white p-2 rounded-lg transition-colors"
+                    title="Fechar edição"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <form className="grid grid-cols-1 gap-3 p-4">
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Variável</label>
+                      <input type="text" value={editTagData.variable_path} readOnly className="px-2 py-1 border border-[#BECACC] rounded bg-gray-100 text-gray-500 text-xs" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Nome</label>
+                      <input type="text" value={editTagData.tag_name} readOnly className="px-2 py-1 border border-[#BECACC] rounded bg-gray-100 text-gray-500 text-xs" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Descrição</label>
+                      <input type="text" value={editTagData.description} onChange={e => setEditTagData({ ...editTagData, description: e.target.value })} className="px-2 py-1 border border-[#BECACC] rounded text-xs" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Unidade</label>
+                      <input type="text" value={editTagData.unit} onChange={e => setEditTagData({ ...editTagData, unit: e.target.value })} className="px-2 py-1 border border-[#BECACC] rounded text-xs" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Modo</label>
+                      <select value={editTagData.collect_mode} onChange={e => setEditTagData({ ...editTagData, collect_mode: e.target.value as 'on_change' | 'interval' })} className="px-2 py-1 border border-[#BECACC] rounded text-xs">
+                        <option value="on_change">Apenas se mudar</option>
+                        <option value="interval">Por ciclo</option>
+                      </select>
+                    </div>
+                    {editTagData.collect_mode === 'interval' && (
+                      <div className="flex-1 flex flex-col gap-1">
+                        <label className="text-xs font-semibold text-[#212E3E] uppercase tracking-wide">Intervalo (s)</label>
+                        <input type="number" min={1} max={60} value={editTagData.collect_interval_s || 1} onChange={e => setEditTagData({ ...editTagData, collect_interval_s: Number(e.target.value) })} className="px-2 py-1 border border-[#BECACC] rounded text-xs" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" onClick={handleSaveEditTag} disabled={saving} className="flex-1 bg-[#212E3E] hover:bg-[#1a2332] text-[#28FF52] px-2 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow">
+                      <Save size={14} /> {saving ? 'Salvando...' : 'Salvar'}
+                    </button>
+                    <button type="button" onClick={handleCancelEdit} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-2 rounded-lg text-xs font-semibold transition-all shadow flex items-center justify-center">
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* Preview de Tag Específico */}
           {previewData && (
