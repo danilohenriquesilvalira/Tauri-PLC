@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Instalar dependências PostgreSQL Rust",
+			"type": "shell",
+			"command": "cargo add sqlx --features postgres,runtime-tokio-native-tls",
+			"group": "build"
+		}
+	]
+}

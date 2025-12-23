@@ -125,12 +125,23 @@ export const useNotifications = () => {
         if (enabled === false) {
           addTagDisabledNotification(tag_name, plc_ip);
         } else {
-          removeTagDisabledNotification(tag_name, plc_ip);
-          addNotification({
-            type: 'success',
-            title: 'Tag Reativado',
-            message: `O tag "${tag_name}" foi reativado no PLC ${plc_ip}.`,
-            plcIp: plc_ip
+          // Remover a notificação de desativado e adicionar a de reativado no topo, preservando ordem
+          setState(prevState => {
+            const filtered = prevState.notifications.filter(n =>
+              !(n.title === 'Tag Desativado' && n.message.includes(tag_name) && (n.plcIp || '') === (plc_ip || ''))
+            );
+            const newNotification: Notification = {
+              id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              type: 'success',
+              title: 'Tag Reativado',
+              message: `O tag "${tag_name}" foi reativado no PLC ${plc_ip}.`,
+              plcIp: plc_ip,
+              timestamp: new Date(),
+              read: false
+            };
+            const newNotifications = [newNotification, ...filtered].slice(0, 50);
+            const unreadCount = newNotifications.filter(n => !n.read).length;
+            return { notifications: newNotifications, unreadCount };
           });
         }
       }
@@ -138,7 +149,7 @@ export const useNotifications = () => {
     return () => {
       unlisten.then(f => f && f());
     };
-  }, [addTagDisabledNotification, removeTagDisabledNotification, addNotification]);
+  }, [addTagDisabledNotification]);
 
   // Carregar eventos de PLC e tags do banco ao iniciar
   useEffect(() => {
@@ -350,6 +361,81 @@ export const useNotifications = () => {
           }
         }
       }, 120000); // Check a cada 2 minutos
+
+      // 🗃️ POSTGRESQL EVENTOS
+      unsubscribes.push(await listen('postgres-config-saved', (event: any) => {
+        const { host, port, user, database } = event.payload || {};
+        addNotification({
+          type: 'success',
+          title: 'Configuração PostgreSQL Salva',
+          message: `Dados de conexão salvos: ${user}@${host}:${port}/${database} - Configuração persistida no SQLite local`
+        });
+      }));
+      
+      unsubscribes.push(await listen('postgres-config-error', (event: any) => {
+        const { operation, error } = event.payload || {};
+        addNotification({
+          type: 'error',
+          title: 'Erro PostgreSQL',
+          message: `Falha na operação '${operation || 'desconhecida'}': ${error || 'Erro não especificado'}`
+        });
+      }));
+      
+      unsubscribes.push(await listen('postgres-connection-success', (event: any) => {
+        const { host, port, user, database } = event.payload || {};
+        addNotification({
+          type: 'success',
+          title: 'PostgreSQL Conectado',
+          message: `Teste de conexão bem-sucedido: ${user}@${host}:${port}/${database} - Servidor PostgreSQL está respondendo`
+        });
+      }));
+      
+      unsubscribes.push(await listen('postgres-connection-error', (event: any) => {
+        const { host, port, operation, error } = event.payload || {};
+        addNotification({
+          type: 'error',
+          title: 'Erro de Conexão PostgreSQL',
+          message: `Falha ao conectar em ${host}:${port} (${operation || 'teste'}): ${error || 'Erro de rede ou credenciais'}`
+        });
+      }));
+      
+      // Eventos de gerenciamento de bancos de dados
+      unsubscribes.push(await listen('postgres-database-created', (event: any) => {
+        const { host, port, database } = event.payload || {};
+        addNotification({
+          type: 'success',
+          title: 'Banco de Dados Criado',
+          message: `Banco '${database}' criado com sucesso em ${host}:${port} - Pronto para uso no sistema`
+        });
+      }));
+      
+      unsubscribes.push(await listen('postgres-database-dropped', (event: any) => {
+        const { database } = event.payload || {};
+        addNotification({
+          type: 'warning',
+          title: 'Banco de Dados Excluído',
+          message: `Banco '${database}' foi excluído permanentemente do servidor PostgreSQL`
+        });
+      }));
+      
+      unsubscribes.push(await listen('postgres-database-error', (event: any) => {
+        const { operation, database, error } = event.payload || {};
+        addNotification({
+          type: 'error',
+          title: 'Erro de Gerenciamento PostgreSQL',
+          message: `Falha na operação '${operation || 'desconhecida'}' no banco '${database || 'desconhecido'}': ${error || 'Erro não especificado'}`
+        });
+      }));
+      
+      // Eventos de inspeção de banco de dados
+      unsubscribes.push(await listen('postgres-database-inspected', (event: any) => {
+        const { database, tables_count } = event.payload || {};
+        addNotification({
+          type: 'success',
+          title: 'Banco Inspecionado',
+          message: `Estrutura do banco '${database}' analisada com sucesso - ${tables_count} tabelas encontradas`
+        });
+      }));
     };
     setupEventListeners().catch(console.error);
     return () => {

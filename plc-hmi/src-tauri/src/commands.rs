@@ -20,6 +20,8 @@ use crate::config::{ConfigManager, AppConfig};
 use tauri::{AppHandle, State};
 use tokio::sync::RwLock;
 use std::sync::Arc;
+use serde::Deserialize;
+use sqlx::Connection;
 
 pub type TcpServerState = Arc<RwLock<Option<TcpServer>>>;
 pub type WebSocketServerState = Arc<RwLock<Option<WebSocketServer>>>;
@@ -372,9 +374,13 @@ pub async fn save_tag_mapping(
     // Debug: verificar dados que chegaram do frontend
     println!("🔍 Backend: Tag recebido do frontend - enabled: {}", tag_to_save.enabled);
     
+    // Verificar se o tag já existe (por plc_ip + variable_path)
+    let tag_exists = db.load_tag_mappings(&tag_to_save.plc_ip)
+        .map(|tags| tags.iter().any(|t| t.variable_path == tag_to_save.variable_path))
+        .unwrap_or(false);
     match db.save_tag_mapping(&tag_to_save) {
         Ok(tag_id) => {
-            // Emitir evento Tauri para frontend: tag-status-changed
+            // Sempre emitir status-changed
             let _ = app_handle.emit(
                 "tag-status-changed",
                 serde_json::json!({
@@ -383,22 +389,24 @@ pub async fn save_tag_mapping(
                     "enabled": tag_to_save.enabled
                 })
             );
-            // Emitir evento Tauri para frontend: tag-created (notificação robusta)
-            let _ = app_handle.emit(
-                "tag-created",
-                serde_json::json!({
-                    "id": tag_id,
-                    "plc_ip": tag_to_save.plc_ip,
-                    "variable_path": tag_to_save.variable_path,
-                    "tag_name": tag_to_save.tag_name,
-                    "description": tag_to_save.description,
-                    "unit": tag_to_save.unit,
-                    "enabled": tag_to_save.enabled,
-                    "created_at": tag_to_save.created_at,
-                    "collect_mode": tag_to_save.collect_mode,
-                    "collect_interval_s": tag_to_save.collect_interval_s
-                })
-            );
+            // Só emitir tag-created se for realmente novo
+            if !tag_exists {
+                let _ = app_handle.emit(
+                    "tag-created",
+                    serde_json::json!({
+                        "id": tag_id,
+                        "plc_ip": tag_to_save.plc_ip,
+                        "variable_path": tag_to_save.variable_path,
+                        "tag_name": tag_to_save.tag_name,
+                        "description": tag_to_save.description,
+                        "unit": tag_to_save.unit,
+                        "enabled": tag_to_save.enabled,
+                        "created_at": tag_to_save.created_at,
+                        "collect_mode": tag_to_save.collect_mode,
+                        "collect_interval_s": tag_to_save.collect_interval_s
+                    })
+                );
+            }
             // Sempre recarregar grupos de tags do WebSocket
             let _ = reload_websocket_tag_groups(websocket_state).await;
             if tag_to_save.enabled {
@@ -688,4 +696,591 @@ pub async fn fix_websocket_broadcast_interval(
     
     println!("🔧 Broadcast interval CORRIGIDO: {}ms → 1000ms", old_interval);
     Ok(format!("✅ Broadcast interval corrigido: {}ms → 1000ms (sistema agora estável)", old_interval))
+}
+
+use crate::database::PostgresConfig;
+
+#[tauri::command]
+pub async fn save_postgres_config(
+    config: PostgresConfig,
+    db: State<'_, Arc<Database>>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    match db.save_postgres_config(&config) {
+        Ok(_) => {
+            // Emitir evento de configuração salva
+            let _ = app_handle.emit(
+                "postgres-config-saved",
+                serde_json::json!({
+                    "host": config.host,
+                    "port": config.port,
+                    "user": config.user,
+                    "database": config.database,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                })
+            );
+            Ok("Configuração PostgreSQL salva com sucesso".to_string())
+        },
+        Err(e) => {
+            // Emitir evento de erro
+            let _ = app_handle.emit(
+                "postgres-config-error",
+                serde_json::json!({
+                    "operation": "save_config",
+                    "error": format!("{}", e),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                })
+            );
+            Err(format!("Erro ao salvar configuração: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn load_postgres_config(
+    db: State<'_, Arc<Database>>,
+) -> Result<Option<PostgresConfig>, String> {
+    db.load_postgres_config()
+        .map_err(|e| format!("Erro ao carregar configuração: {}", e))
+}
+
+#[derive(Deserialize)]
+pub struct PostgresTestConfig {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+#[tauri::command]
+pub async fn test_postgres_connection(
+    config: PostgresTestConfig,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    use tokio_postgres::{NoTls, Config};
+    
+    println!("🔍 Tentando conectar no PostgreSQL com tokio-postgres: {}:{}@{}/{}", 
+             config.user, config.port, config.host, config.database);
+    
+    // Usar tokio-postgres diretamente para evitar problemas de encoding do sqlx
+    let mut pg_config = Config::new();
+    pg_config
+        .host(&config.host)
+        .port(config.port)
+        .user(&config.user)
+        .password(&config.password)
+        .dbname(&config.database)
+        .application_name("plc-hmi");
+    
+    match pg_config.connect(NoTls).await {
+        Ok((client, connection)) => {
+            println!("✅ Conexão tokio-postgres estabelecida!");
+            
+            // Spawnar a conexão em background
+            let handle = tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            
+            // Testar uma query simples
+            match client.query("SELECT 1 as test", &[]).await {
+                Ok(rows) => {
+                    println!("✅ Query executada! Resultado: {} linhas", rows.len());
+                    handle.abort(); // Limpar conexão
+                    
+                    // Emitir evento de teste bem-sucedido
+                    let _ = app_handle.emit(
+                        "postgres-connection-success",
+                        serde_json::json!({
+                            "host": config.host,
+                            "port": config.port,
+                            "user": config.user,
+                            "database": config.database,
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        })
+                    );
+                    
+                    Ok("✅ Conexão PostgreSQL funcionando perfeitamente!".to_string())
+                },
+                Err(e) => {
+                    println!("❌ Erro na query: {}", e);
+                    handle.abort();
+                    
+                    // Emitir evento de erro na query
+                    let _ = app_handle.emit(
+                        "postgres-connection-error",
+                        serde_json::json!({
+                            "host": config.host,
+                            "port": config.port,
+                            "operation": "test_query",
+                            "error": format!("{}", e),
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        })
+                    );
+                    
+                    Err(format!("❌ Conexão OK mas erro na query: {}", e))
+                }
+            }
+        },
+        Err(e) => {
+            let error_msg = e.to_string();
+            println!("❌ Erro de conexão tokio-postgres: {}", error_msg);
+            
+            // Fallback para sqlx se tokio-postgres também falhar
+            println!("🔄 Tentando fallback com sqlx...");
+            
+            let url = format!(
+                "postgresql://{}:{}@{}:{}/{}",
+                config.user, config.password, config.host, config.port, config.database
+            );
+            
+            match sqlx::postgres::PgConnection::connect(&url).await {
+                Ok(mut conn) => {
+                    match sqlx::query("SELECT 1").fetch_one(&mut conn).await {
+                        Ok(_) => Ok("✅ Conexão PostgreSQL (sqlx fallback) funcionando!".to_string()),
+                        Err(e) => Err(format!("❌ Erro no fallback: {}", e))
+                    }
+                },
+                Err(sqlx_error) => {
+                    // Mensagens amigáveis baseadas nos dois erros
+                    if error_msg.contains("password") || sqlx_error.to_string().contains("password") {
+                        Err("❌ Falha na autenticação: Verifique usuário e senha".to_string())
+                    } else if error_msg.contains("database") || sqlx_error.to_string().contains("database") {
+                        Err(format!("❌ Database '{}' não encontrada", config.database))
+                    } else if error_msg.contains("Connection refused") || sqlx_error.to_string().contains("Connection refused") {
+                        Err("❌ PostgreSQL não está rodando na porta especificada".to_string())
+                    } else if error_msg.contains("role") || sqlx_error.to_string().contains("role") {
+                        Err(format!("❌ Usuário '{}' não existe", config.user))
+                    } else {
+                        Err(format!("❌ Erro de conexão: {} | Fallback: {}", error_msg, sqlx_error))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Validar nome de banco (segurança)
+fn validate_database_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("Nome do banco não pode estar vazio".to_string());
+    }
+    
+    if name.len() > 63 {
+        return Err("Nome do banco não pode ter mais de 63 caracteres".to_string());
+    }
+    
+    // Apenas letras, números e underscore
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err("Nome do banco pode conter apenas letras, números e underscore".to_string());
+    }
+    
+    // Não pode começar com número
+    if name.chars().next().unwrap().is_ascii_digit() {
+        return Err("Nome do banco não pode começar com número".to_string());
+    }
+    
+    // Palavras reservadas do PostgreSQL
+    let reserved = ["postgres", "template0", "template1", "user", "admin", "root", "system"];
+    if reserved.contains(&name.to_lowercase().as_str()) {
+        return Err("Nome do banco não pode ser uma palavra reservada".to_string());
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_postgres_database(
+    config: PostgresTestConfig,
+    database_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    use tokio_postgres::{NoTls, Config};
+    
+    // Validar nome do banco
+    validate_database_name(&database_name)?;
+    
+    println!("🔧 Criando banco de dados '{}' no PostgreSQL...", database_name);
+    
+    // Conectar na database padrão 'postgres' para criar nova database
+    let mut pg_config = Config::new();
+    pg_config
+        .host(&config.host)
+        .port(config.port)
+        .user(&config.user)
+        .password(&config.password)
+        .dbname("postgres") // Conecta na DB padrão para criar nova
+        .application_name("plc-hmi");
+    
+    match pg_config.connect(NoTls).await {
+        Ok((client, connection)) => {
+            println!("✅ Conectado ao PostgreSQL para criar banco");
+            
+            let handle = tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            
+            // Usar query preparada para segurança (evitar SQL injection)
+            let create_query = format!("CREATE DATABASE \"{}\"", database_name);
+            
+            match client.batch_execute(&create_query).await {
+                Ok(_) => {
+                    println!("✅ Banco '{}' criado com sucesso!", database_name);
+                    handle.abort();
+                    
+                    // Emitir evento de sucesso
+                    let _ = app_handle.emit(
+                        "postgres-database-created",
+                        serde_json::json!({
+                            "host": config.host,
+                            "port": config.port,
+                            "database": database_name,
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        })
+                    );
+                    
+                    Ok(format!("Banco de dados '{}' criado com sucesso!", database_name))
+                },
+                Err(e) => {
+                    println!("❌ Erro ao criar banco: {}", e);
+                    handle.abort();
+                    
+                    let error_msg = e.to_string();
+                    if error_msg.contains("already exists") {
+                        Err(format!("O banco '{}' já existe", database_name))
+                    } else if error_msg.contains("permission denied") {
+                        Err("Usuário não tem permissão para criar bancos".to_string())
+                    } else {
+                        // Emitir evento de erro
+                        let _ = app_handle.emit(
+                            "postgres-database-error",
+                            serde_json::json!({
+                                "operation": "create_database",
+                                "database": database_name,
+                                "error": error_msg,
+                                "timestamp": chrono::Utc::now().to_rfc3339()
+                            })
+                        );
+                        
+                        Err(format!("Erro ao criar banco: {}", error_msg))
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            println!("❌ Erro de conexão: {}", e);
+            Err(format!("Não foi possível conectar ao PostgreSQL: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn list_postgres_databases(
+    config: PostgresTestConfig,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<String>, String> {
+    use tokio_postgres::{NoTls, Config};
+    
+    println!("📋 Listando bancos de dados no PostgreSQL...");
+    
+    let mut pg_config = Config::new();
+    pg_config
+        .host(&config.host)
+        .port(config.port)
+        .user(&config.user)
+        .password(&config.password)
+        .dbname("postgres")
+        .application_name("plc-hmi");
+    
+    match pg_config.connect(NoTls).await {
+        Ok((client, connection)) => {
+            let handle = tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            
+            // Query para listar bancos (excluindo templates)
+            let query = "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname";
+            
+            match client.query(query, &[]).await {
+                Ok(rows) => {
+                    let databases: Vec<String> = rows
+                        .iter()
+                        .map(|row| row.get::<_, String>(0))
+                        .collect();
+                    
+                    println!("✅ Encontrados {} bancos", databases.len());
+                    handle.abort();
+                    
+                    Ok(databases)
+                },
+                Err(e) => {
+                    println!("❌ Erro ao listar bancos: {}", e);
+                    handle.abort();
+                    Err(format!("Erro ao listar bancos: {}", e))
+                }
+            }
+        },
+        Err(e) => {
+            println!("❌ Erro de conexão: {}", e);
+            Err(format!("Não foi possível conectar ao PostgreSQL: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn drop_postgres_database(
+    config: PostgresTestConfig,
+    database_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    use tokio_postgres::{NoTls, Config};
+    
+    // Validações de segurança
+    validate_database_name(&database_name)?;
+    
+    // Não permitir excluir bancos críticos
+    let protected_dbs = ["postgres", "template0", "template1"];
+    if protected_dbs.contains(&database_name.as_str()) {
+        return Err("Não é possível excluir bancos do sistema".to_string());
+    }
+    
+    println!("🗑️ Excluindo banco de dados '{}'...", database_name);
+    
+    let mut pg_config = Config::new();
+    pg_config
+        .host(&config.host)
+        .port(config.port)
+        .user(&config.user)
+        .password(&config.password)
+        .dbname("postgres")
+        .application_name("plc-hmi");
+    
+    match pg_config.connect(NoTls).await {
+        Ok((client, connection)) => {
+            let handle = tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            
+            let drop_query = format!("DROP DATABASE \"{}\"", database_name);
+            
+            match client.batch_execute(&drop_query).await {
+                Ok(_) => {
+                    println!("✅ Banco '{}' excluído com sucesso!", database_name);
+                    handle.abort();
+                    
+                    // Emitir evento de sucesso
+                    let _ = app_handle.emit(
+                        "postgres-database-dropped",
+                        serde_json::json!({
+                            "database": database_name,
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        })
+                    );
+                    
+                    Ok(format!("Banco de dados '{}' excluído com sucesso!", database_name))
+                },
+                Err(e) => {
+                    println!("❌ Erro ao excluir banco: {}", e);
+                    handle.abort();
+                    
+                    let error_msg = e.to_string();
+                    if error_msg.contains("does not exist") {
+                        Err(format!("O banco '{}' não existe", database_name))
+                    } else if error_msg.contains("being accessed") {
+                        Err(format!("O banco '{}' está sendo usado por outras conexões", database_name))
+                    } else {
+                        Err(format!("Erro ao excluir banco: {}", error_msg))
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            println!("❌ Erro de conexão: {}", e);
+            Err(format!("Não foi possível conectar ao PostgreSQL: {}", e))
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct DatabaseTable {
+    pub name: String,
+    pub row_count: Option<u64>,
+    pub columns: Vec<DatabaseColumn>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct DatabaseColumn {
+    pub name: String,
+    pub data_type: String,
+    pub is_nullable: bool,
+    pub is_primary_key: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct DatabaseInspection {
+    pub database_name: String,
+    pub tables: Vec<DatabaseTable>,
+    pub total_tables: usize,
+}
+
+#[tauri::command]
+pub async fn inspect_postgres_database(
+    config: PostgresTestConfig,
+    database_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<DatabaseInspection, String> {
+    use tokio_postgres::{NoTls, Config};
+    
+    // Validações de segurança
+    validate_database_name(&database_name)?;
+    
+    println!("🔍 Inspecionando estrutura do banco '{}'...", database_name);
+    
+    let mut pg_config = Config::new();
+    pg_config
+        .host(&config.host)
+        .port(config.port)
+        .user(&config.user)
+        .password(&config.password)
+        .dbname(&database_name)
+        .application_name("plc-hmi");
+    
+    match pg_config.connect(NoTls).await {
+        Ok((client, connection)) => {
+            let handle = tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            
+            // Query para obter lista de tabelas
+            let tables_query = "
+                SELECT 
+                    table_name
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            ";
+            
+            match client.query(tables_query, &[]).await {
+                Ok(table_rows) => {
+                    let mut tables: Vec<DatabaseTable> = Vec::new();
+                    
+                    for table_row in table_rows {
+                        let table_name: String = table_row.get(0);
+                        
+                        // Obter colunas da tabela
+                        let columns_query = "
+                            SELECT 
+                                c.column_name,
+                                c.data_type,
+                                c.is_nullable,
+                                COALESCE(pk.is_primary, false) as is_primary_key
+                            FROM information_schema.columns c
+                            LEFT JOIN (
+                                SELECT 
+                                    kc.column_name,
+                                    true as is_primary
+                                FROM information_schema.table_constraints tc
+                                JOIN information_schema.key_column_usage kc 
+                                    ON tc.constraint_name = kc.constraint_name
+                                    AND tc.table_schema = kc.table_schema
+                                WHERE tc.constraint_type = 'PRIMARY KEY'
+                                AND tc.table_name = $1
+                                AND tc.table_schema = 'public'
+                            ) pk ON c.column_name = pk.column_name
+                            WHERE c.table_name = $1
+                            AND c.table_schema = 'public'
+                            ORDER BY c.ordinal_position
+                        ";
+                        
+                        let mut columns: Vec<DatabaseColumn> = Vec::new();
+                        match client.query(columns_query, &[&table_name]).await {
+                            Ok(column_rows) => {
+                                println!("📊 Tabela '{}': {} colunas encontradas", table_name, column_rows.len());
+                                for column_row in column_rows {
+                                    let column = DatabaseColumn {
+                                        name: column_row.get(0),
+                                        data_type: column_row.get(1),
+                                        is_nullable: column_row.get::<_, String>(2) == "YES",
+                                        is_primary_key: column_row.get(3),
+                                    };
+                                    println!("  📝 Coluna: {} ({}) - PK: {} - NULL: {}", 
+                                        column.name, column.data_type, column.is_primary_key, column.is_nullable);
+                                    columns.push(column);
+                                }
+                            },
+                            Err(e) => {
+                                println!("⚠️ Erro ao obter colunas da tabela {}: {}", table_name, e);
+                            }
+                        }
+                        
+                        // Contar linhas da tabela (com limite para performance)
+                        let count_query = format!("SELECT COUNT(*) FROM \"{}\" LIMIT 1000000", table_name);
+                        let row_count = match client.query(&count_query, &[]).await {
+                            Ok(count_rows) => {
+                                if let Some(row) = count_rows.get(0) {
+                                    Some(row.get::<_, i64>(0) as u64)
+                                } else {
+                                    None
+                                }
+                            },
+                            Err(_) => None,
+                        };
+                        
+                        tables.push(DatabaseTable {
+                            name: table_name,
+                            row_count,
+                            columns,
+                        });
+                    }
+                    
+                    let inspection = DatabaseInspection {
+                        database_name: database_name.clone(),
+                        tables: tables.clone(),
+                        total_tables: tables.len(),
+                    };
+                    
+                    println!("✅ Estrutura do banco '{}' inspecionada: {} tabelas encontradas", database_name, tables.len());
+                    handle.abort();
+                    
+                    // Emitir evento de sucesso
+                    let _ = app_handle.emit(
+                        "postgres-database-inspected",
+                        serde_json::json!({
+                            "database": database_name,
+                            "tables_count": tables.len(),
+                            "timestamp": chrono::Utc::now().to_rfc3339()
+                        })
+                    );
+                    
+                    Ok(inspection)
+                },
+                Err(e) => {
+                    println!("❌ Erro ao inspecionar banco: {}", e);
+                    handle.abort();
+                    
+                    let error_msg = e.to_string();
+                    if error_msg.contains("does not exist") {
+                        Err(format!("O banco '{}' não existe", database_name))
+                    } else {
+                        Err(format!("Erro ao inspecionar banco: {}", error_msg))
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            println!("❌ Erro de conexão: {}", e);
+            Err(format!("Não foi possível conectar ao banco '{}': {}", database_name, e))
+        }
+    }
 }

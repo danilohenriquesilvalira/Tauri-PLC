@@ -47,7 +47,58 @@ pub struct Database {
     conn: Mutex<Connection>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostgresConfig {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+    pub updated_at: i64,
+}
+
 impl Database {
+    // Salva configuração do PostgreSQL no SQLite
+    pub fn save_postgres_config(&self, config: &PostgresConfig) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS postgres_config (
+                id INTEGER PRIMARY KEY,
+                host TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                user TEXT NOT NULL,
+                password TEXT NOT NULL,
+                database TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            [],
+        )?;
+        conn.execute("DELETE FROM postgres_config", [])?;
+        conn.execute(
+            "INSERT INTO postgres_config (host, port, user, password, database, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            (&config.host, config.port, &config.user, &config.password, &config.database, config.updated_at),
+        )?;
+        Ok(())
+    }
+
+    // Carrega configuração do PostgreSQL do SQLite
+    pub fn load_postgres_config(&self) -> Result<Option<PostgresConfig>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT host, port, user, password, database, updated_at FROM postgres_config LIMIT 1")?;
+        let mut rows = stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(PostgresConfig {
+                host: row.get(0)?,
+                port: row.get(1)?,
+                user: row.get(2)?,
+                password: row.get(3)?,
+                database: row.get(4)?,
+                updated_at: row.get(5)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
         /// Retorna uma lista de todos os PLCs conhecidos (apenas IPs)
         pub fn get_all_known_plcs(&self) -> Result<Vec<String>> {
             self.list_configured_plcs()

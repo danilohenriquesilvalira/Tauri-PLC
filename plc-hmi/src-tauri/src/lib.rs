@@ -1,3 +1,4 @@
+
 use tauri::Emitter;
 mod tcp_server;
 mod commands;
@@ -5,6 +6,7 @@ mod plc_parser;
 mod database;
 mod websocket_server;
 mod config;
+mod postgres;
 
 use commands::{TcpServerState, WebSocketServerState};
 use database::Database;
@@ -80,6 +82,13 @@ pub fn run() {
       commands::save_websocket_config,
       commands::load_websocket_config,
       commands::fix_websocket_broadcast_interval,
+      commands::save_postgres_config,
+      commands::load_postgres_config,
+      commands::test_postgres_connection,
+      commands::create_postgres_database,
+      commands::list_postgres_databases,
+      commands::drop_postgres_database,
+      commands::inspect_postgres_database,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

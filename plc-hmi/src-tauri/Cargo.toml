@@ -33,3 +33,6 @@ tokio-tungstenite = "0.21"
 tungstenite = "0.21"
 futures-util = "0.3"
 dashmap = "5.5"
+sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid"] }
+postgres = "0.19"
+tokio-postgres = "0.7"

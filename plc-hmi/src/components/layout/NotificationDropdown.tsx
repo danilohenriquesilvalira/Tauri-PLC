@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, CheckCheck, Trash2, AlertCircle, Info, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, AlertCircle, Info, AlertTriangle, CheckCircle, X, Database, Server, Save, Search } from 'lucide-react';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import type { Notification } from '../../hooks/useNotifications';
 
@@ -7,7 +7,38 @@ export const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAll } = useNotificationContext();
 
-  const getIconForType = (type: Notification['type']) => {
+  const getIconForType = (type: Notification['type'], title?: string) => {
+    // Ícones específicos para PostgreSQL
+    if (title && title.toLowerCase().includes('postgresql')) {
+      switch (type) {
+        case 'success': return <Database size={16} className="text-edp-electric" />;
+        case 'error': return <Database size={16} className="text-edp-semantic-red" />;
+        case 'info': return <Database size={16} className="text-edp-marine" />;
+        case 'warning': return <Database size={16} className="text-edp-semantic-yellow" />;
+      }
+    }
+    
+    // Ícones para inspeção de banco
+    if (title && title.toLowerCase().includes('inspecionado')) {
+      return <Search size={16} className="text-edp-electric" />;
+    }
+    
+    // Ícones para configurações salvas
+    if (title && (title.includes('Salva') || title.includes('Salvando'))) {
+      return <Save size={16} className={type === 'success' ? "text-edp-electric" : "text-edp-marine"} />;
+    }
+    
+    // Ícones para servidores/conexões
+    if (title && (title.includes('Conectado') || title.includes('Servidor') || title.includes('Conexão'))) {
+      switch (type) {
+        case 'success': return <Server size={16} className="text-edp-electric" />;
+        case 'error': return <Server size={16} className="text-edp-semantic-red" />;
+        case 'info': return <Server size={16} className="text-edp-marine" />;
+        case 'warning': return <Server size={16} className="text-edp-semantic-yellow" />;
+      }
+    }
+    
+    // Ícones padrão
     switch (type) {
       case 'error': return <AlertCircle size={16} className="text-edp-semantic-red" />;
       case 'warning': return <AlertTriangle size={16} className="text-edp-semantic-yellow" />;
@@ -36,6 +67,9 @@ export const NotificationDropdown: React.FC = () => {
   };
 
   const hasNotifications = notifications.length > 0;
+
+  // Ordena as notificações por timestamp decrescente (mais recente primeiro)
+  const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <div className="relative">
@@ -116,7 +150,7 @@ export const NotificationDropdown: React.FC = () => {
                 </div>
               ) : (
                 <div className="py-2">
-                  {notifications.map((notification) => (
+                  {sortedNotifications.map((notification) => (
                     <div 
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
@@ -127,7 +161,7 @@ export const NotificationDropdown: React.FC = () => {
                       <div className="flex items-start gap-3">
                         {/* Ícone do tipo */}
                         <div className="flex-shrink-0 mt-0.5">
-                          {getIconForType(notification.type)}
+                          {getIconForType(notification.type, notification.title)}
                         </div>
                         
                         {/* Conteúdo */}
@@ -177,10 +211,10 @@ export const NotificationDropdown: React.FC = () => {
             </div>
 
             {/* Footer (se houver muitas notificações) */}
-            {notifications.length >= 10 && (
+            {sortedNotifications.length >= 10 && (
               <div className="px-4 py-2 border-t border-edp-marine/20 bg-edp-neutral-white-wash rounded-b-lg">
                 <p className="text-xs text-edp-slate text-center">
-                  Mostrando {Math.min(notifications.length, 50)} de {notifications.length} notificações
+                  Mostrando {Math.min(sortedNotifications.length, 50)} de {sortedNotifications.length} notificações
                 </p>
               </div>
             )}

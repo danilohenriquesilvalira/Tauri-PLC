@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { WebSocketNetworkConfig } from '../components/websocket/WebSocketNetworkConfig';
+import { PostgresConfigModal } from '../components/Admin';
 
 interface TcpServerStats {
   active_connections: number;
@@ -41,6 +42,7 @@ export const ServicesPage: React.FC = () => {
   const [wsRunning, setWsRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showNetworkConfig, setShowNetworkConfig] = useState(false);
+  const [showPostgresConfig, setShowPostgresConfig] = useState(false);
 
   // Carregar estatísticas iniciais
   useEffect(() => {
@@ -192,7 +194,22 @@ export const ServicesPage: React.FC = () => {
       ],
       onStart: () => {},
       onStop: () => {}
-    }
+    },
+    {
+      id: 'postgres',
+      name: 'PostgreSQL',
+      description: 'Banco de dados robusto',
+      port: '5432',
+      icon: Database,
+      isRunning: true,
+      status: 'Configurável',
+      metrics: [
+        { label: 'Tipo', value: 'PostgreSQL' },
+        { label: 'Configuração', value: 'Avançada' }
+      ],
+      onStart: () => {},
+      onStop: () => {}
+    },
   ];
 
   const activeServices = services.filter(s => s.isRunning).length;
@@ -424,7 +441,7 @@ export const ServicesPage: React.FC = () => {
                       {/* Botão de configuração com separação */}
                       <div className="w-px h-8 bg-gray-200"></div>
                       
-                      {/* Botão de configuração - Router para WebSocket, Settings para outros */}
+                      {/* Botão de configuração - Router para WebSocket, Settings para PostgreSQL */}
                       {service.id === 'websocket' ? (
                         <button 
                           onClick={() => setShowNetworkConfig(true)}
@@ -433,8 +450,20 @@ export const ServicesPage: React.FC = () => {
                         >
                           <Router size={16} />
                         </button>
+                      ) : service.id === 'postgres' ? (
+                        <button 
+                          onClick={() => setShowPostgresConfig(true)}
+                          className="p-2.5 text-gray-400 hover:text-[#212E3E] hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-90"
+                          title="Configurar PostgreSQL"
+                        >
+                          <Settings size={16} />
+                        </button>
                       ) : (
-                        <button className="p-2.5 text-gray-400 hover:text-[#212E3E] hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-90">
+                        <button 
+                          className="p-2.5 text-gray-300 cursor-not-allowed rounded-lg"
+                          disabled
+                          title="Configuração não disponível"
+                        >
                           <Settings size={16} />
                         </button>
                       )}
@@ -470,6 +499,12 @@ export const ServicesPage: React.FC = () => {
           setWsRunning(true);
           loadInitialStats(); // Recarregar stats
         }}
+      />
+
+      {/* Modal de Configuração do PostgreSQL */}
+      <PostgresConfigModal
+        isVisible={showPostgresConfig}
+        onClose={() => setShowPostgresConfig(false)}
       />
     </div>
   );

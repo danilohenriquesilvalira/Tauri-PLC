@@ -416,6 +416,8 @@ async fn handle_client_connection(
     let mut packet_count = 0u64;
     let mut last_emit_time = std::time::Instant::now();
     let mut bytes_since_last_emit = 0u64;
+    // Timeout de inatividade: fecha conexão se não receber pacote válido por 60s
+    let mut last_valid_packet = std::time::Instant::now();
     
     // 🔍 Carregar configuração salva para saber quantos bytes esperar
     if let Some(db) = database.as_ref() {
@@ -439,9 +441,18 @@ async fn handle_client_connection(
             println!("🛑 Fechando conexão {} pois servidor parou", ip);
             break;
         }
-        
+        // Timeout de inatividade: se passou de 300s sem pacote válido, fecha conexão
+        if last_valid_packet.elapsed().as_secs() > 300 {
+            println!("⏰ Timeout de inatividade: fechando conexão {} (ID: {}) após 300s sem pacote válido", ip, conn_id);
+            let _ = app_handle.emit("tcp-inactive-timeout", serde_json::json!({
+                "ip": ip,
+                "id": conn_id,
+                "reason": "Sem pacote válido por 300s - PLC pode estar em busy state"
+            }));
+            break;
+        }
         match tokio::time::timeout(
-            tokio::time::Duration::from_secs(30), // 30s timeout
+            tokio::time::Duration::from_secs(120), // 120s timeout - PLC pode demorar mais
             socket.read(&mut buffer)
         ).await {
             Ok(Ok(0)) => {
@@ -451,13 +462,10 @@ async fn handle_client_connection(
             Ok(Ok(n)) => {
                 total_bytes += n as u64;
                 bytes_since_last_emit += n as u64;
-                
                 let now = chrono::Local::now().format("%H:%M:%S%.3f");
                 println!("📥 [{}] Fragmento de {} (ID: {}): {} bytes", now, ip, conn_id, n);
-                
                 // 📦 Adicionar fragmento ao acumulador
                 accumulator.extend_from_slice(&buffer[0..n]);
-                
                 // 🎯 Verificar se temos pacote completo
                 let should_parse = if let Some(expected) = expected_size {
                     // Com configuração: esperar pelo tamanho exato
@@ -476,8 +484,8 @@ async fn handle_client_connection(
                              now, ip, n);
                     true
                 };
-                
                 if should_parse {
+                    last_valid_packet = std::time::Instant::now(); // Atualiza tempo do último pacote válido
                     packet_count += 1;
                     
                     // Timestamp de recepção TCP (nanosegundos)
@@ -550,18 +558,36 @@ async fn handle_client_connection(
                     }
                 }
                 
-                // Responder com ACK simples
-                if let Err(_) = socket.write_all(b"OK\n").await {
-                    println!("❌ Erro ao enviar ACK para {}", ip);
+                // Responder com ACK simples e imediato
+                if let Err(e) = socket.write_all(b"OK\n").await {
+                    println!("❌ Erro ao enviar ACK para {}: {}", ip, e);
+                    let _ = app_handle.emit("tcp-ack-error", serde_json::json!({
+                        "ip": ip,
+                        "id": conn_id,
+                        "error": e.to_string()
+                    }));
                     break;
                 }
+                // Garantir envio imediato do ACK
+                let _ = socket.flush().await;
             }
             Ok(Err(e)) => {
                 println!("❌ Erro de leitura de {} (ID: {}): {}", ip, conn_id, e);
+                let _ = app_handle.emit("tcp-read-error", serde_json::json!({
+                    "ip": ip,
+                    "id": conn_id,
+                    "error": e.to_string()
+                }));
                 break;
             }
             Err(_) => {
-                println!("⏰ Timeout na conexão {} (ID: {})", ip, conn_id);
+                println!("⏰ Timeout de leitura (120s) na conexão {} (ID: {}) - PLC pode estar ocupado", ip, conn_id);
+                let _ = app_handle.emit("tcp-read-timeout", serde_json::json!({
+                    "ip": ip,
+                    "id": conn_id,
+                    "timeout_seconds": 120,
+                    "reason": "PLC não enviou dados dentro do timeout de leitura"
+                }));
                 break;
             }
         }
