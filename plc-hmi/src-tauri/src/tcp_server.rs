@@ -416,8 +416,10 @@ async fn handle_client_connection(
     let mut packet_count = 0u64;
     let mut last_emit_time = std::time::Instant::now();
     let mut bytes_since_last_emit = 0u64;
-    // Timeout de inatividade: fecha conexão se não receber pacote válido por 60s
+    // Timeout de inatividade: fecha conexão se não receber pacote válido por 300s
     let mut last_valid_packet = std::time::Instant::now();
+    let mut last_fragment_time = std::time::Instant::now();
+    let mut _fragment_timeout_logged = false;
     
     // 🔍 Carregar configuração salva para saber quantos bytes esperar
     if let Some(db) = database.as_ref() {
@@ -440,6 +442,31 @@ async fn handle_client_connection(
         if !is_running.load(Ordering::SeqCst) {
             println!("🛑 Fechando conexão {} pois servidor parou", ip);
             break;
+        }
+        
+        // Verificar fragmentos pendentes no acumulador (timeout de 30s para fragmento incompleto)
+        if !accumulator.is_empty() && last_fragment_time.elapsed().as_secs() > 30 {
+            if !_fragment_timeout_logged {
+                println!("⚠️ FRAGMENTO INCOMPLETO: {} tem {} bytes acumulados por {}s - PLC parou de enviar?", 
+                    ip, accumulator.len(), last_fragment_time.elapsed().as_secs());
+                let _ = app_handle.emit("tcp-fragment-timeout", serde_json::json!({
+                    "ip": ip,
+                    "id": conn_id,
+                    "accumulated_bytes": accumulator.len(),
+                    "expected_bytes": expected_size.unwrap_or(0),
+                    "timeout_seconds": last_fragment_time.elapsed().as_secs()
+                }));
+                _fragment_timeout_logged = true;
+            }
+            
+            // Após 60s, limpar acumulador e continuar
+            if last_fragment_time.elapsed().as_secs() > 60 {
+                println!("🧹 Limpando acumulador de {} após 60s - {} bytes descartados", ip, accumulator.len());
+                accumulator.clear();
+                _fragment_timeout_logged = false;
+                // Reset fragment time para evitar warning
+                last_fragment_time = std::time::Instant::now();
+            }
         }
         // Timeout de inatividade: se passou de 300s sem pacote válido, fecha conexão
         if last_valid_packet.elapsed().as_secs() > 300 {
@@ -464,6 +491,11 @@ async fn handle_client_connection(
                 bytes_since_last_emit += n as u64;
                 let now = chrono::Local::now().format("%H:%M:%S%.3f");
                 println!("📥 [{}] Fragmento de {} (ID: {}): {} bytes", now, ip, conn_id, n);
+                
+                // Atualizar tempo do último fragmento
+                last_fragment_time = std::time::Instant::now();
+                _fragment_timeout_logged = false;
+                
                 // 📦 Adicionar fragmento ao acumulador
                 accumulator.extend_from_slice(&buffer[0..n]);
                 // 🎯 Verificar se temos pacote completo
@@ -527,6 +559,13 @@ async fn handle_client_connection(
                         "processing_time_us": processing_time_us
                     }));
                     
+                    // 🚀 NOVO: Emitir evento específico para CACHE do WebSocket
+                    let _ = app_handle.emit("websocket-cache-update", serde_json::json!({
+                        "plc_ip": parsed.ip,
+                        "variables": parsed.variables,
+                        "timestamp": parsed.timestamp
+                    }));
+                    
                     // 🧹 Limpar acumulador após parsear
                     accumulator.clear();
                     
@@ -535,6 +574,15 @@ async fn handle_client_connection(
                     if elapsed.as_secs_f64() >= 1.0 {
                         // Calcular bytes por segundo
                         let bytes_per_second = (bytes_since_last_emit as f64 / elapsed.as_secs_f64()) as u64;
+                        
+                        // Heartbeat: emitir sinal de vida da conexão
+                        let _ = app_handle.emit("tcp-connection-heartbeat", serde_json::json!({
+                            "ip": ip,
+                            "id": conn_id,
+                            "last_packet_age_seconds": last_valid_packet.elapsed().as_secs(),
+                            "accumulator_size": accumulator.len(),
+                            "connection_health": if last_valid_packet.elapsed().as_secs() < 30 { "healthy" } else { "stale" }
+                        }));
                         
                         let _ = app_handle.emit("plc-data-stats", serde_json::json!({
                             "ip": ip,

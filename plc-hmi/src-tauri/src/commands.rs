@@ -981,7 +981,7 @@ pub async fn create_postgres_database(
 #[tauri::command]
 pub async fn list_postgres_databases(
     config: PostgresTestConfig,
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
 ) -> Result<Vec<String>, String> {
     use tokio_postgres::{NoTls, Config};
     

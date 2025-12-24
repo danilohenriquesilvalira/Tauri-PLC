@@ -5,12 +5,13 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, RwLock};
 use tokio::time;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+use std::collections::HashMap;
 
 use crate::database::Database;
 use crate::tcp_server::TcpServer;
@@ -57,6 +58,30 @@ pub struct WebSocketStats {
     pub broadcast_rate_hz: f64,
 }
 
+// 🚀 SISTEMA DE CACHE INTELIGENTE PARA PERFORMANCE MÁXIMA
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedTagValue {
+    pub tag_name: String,
+    pub plc_ip: String,
+    pub value: String,
+    pub data_type: String,
+    pub timestamp_ns: u128,
+    pub collect_mode: String,
+    pub interval_s: u64,
+    pub last_sent: u128, // Último envio para WebSocket
+    pub changed: bool,   // Se o valor mudou desde última leitura
+}
+
+#[derive(Debug)]
+pub struct SmartCache {
+    // Cache principal: tag_name -> dados
+    tag_cache: Arc<DashMap<String, CachedTagValue>>,
+    // Grupos de intervalos: interval_s -> lista de tag_names
+    interval_groups: Arc<RwLock<HashMap<u64, Vec<String>>>>,
+    // Controle de mudanças para tags em modo "change"
+    change_tracking: Arc<DashMap<String, String>>, // tag_name -> last_value
+}
+
 #[derive(Debug, Clone)]
 pub struct ConnectedClient {
     pub id: u64,
@@ -81,6 +106,95 @@ pub struct WebSocketServer {
     server_handle: Option<tokio::task::JoinHandle<()>>,
     broadcast_handle: Option<tokio::task::JoinHandle<()>>,
     interval_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    smart_cache: Arc<SmartCache>, // 🚀 CACHE INTELIGENTE
+    cache_updater_handle: Option<tokio::task::JoinHandle<()>>, // Task para atualizar cache
+}
+
+impl SmartCache {
+    pub fn new() -> Self {
+        Self {
+            tag_cache: Arc::new(DashMap::new()),
+            interval_groups: Arc::new(RwLock::new(HashMap::new())),
+            change_tracking: Arc::new(DashMap::new()),
+        }
+    }
+    
+    // Atualizar cache com dados do TCP (chamado apenas quando há novos dados TCP)
+    pub async fn update_from_tcp(&self, plc_ip: &str, variables: &[crate::tcp_server::PlcVariable], database: &Database) {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        
+        // Obter tags ativos deste PLC
+        if let Ok(tags) = database.get_active_tags(plc_ip) {
+            for tag in tags {
+                // Encontrar variável correspondente
+                if let Some(variable) = variables.iter().find(|v| v.name == tag.variable_path) {
+                    let tag_key = format!("{}:{}", plc_ip, tag.tag_name);
+                    
+                    // Verificar mudança para tags em modo "change"
+                    let mut value_changed = true;
+                    if tag.collect_mode.as_deref() == Some("change") {
+                        if let Some(last_value) = self.change_tracking.get(&tag_key) {
+                            value_changed = last_value.value() != &variable.value;
+                        }
+                        self.change_tracking.insert(tag_key.clone(), variable.value.clone());
+                    }
+                    
+                    // Atualizar cache
+                    let cached = CachedTagValue {
+                        tag_name: tag.tag_name.clone(),
+                        plc_ip: plc_ip.to_string(),
+                        value: variable.value.clone(),
+                        data_type: variable.data_type.clone(),
+                        timestamp_ns: now,
+                        collect_mode: tag.collect_mode.unwrap_or_default(),
+                        interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
+                        last_sent: 0, // Será atualizado quando enviado
+                        changed: value_changed,
+                    };
+                    
+                    self.tag_cache.insert(tag_key, cached);
+                }
+            }
+        }
+    }
+    
+    // Obter tags que precisam ser enviados baseado no intervalo
+    pub async fn get_tags_for_broadcast(&self, interval_s: u64) -> HashMap<String, String> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let mut result = HashMap::new();
+        let mut keys_to_update = Vec::new();
+        
+        // Primeira passagem: identificar tags que precisam ser enviados
+        for entry in self.tag_cache.iter() {
+            let cached = entry.value();
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000 // Convert to seconds
+            } else {
+                0 // Se timestamp for menor, considerar como 0
+            };
+            
+            let should_send = match cached.collect_mode.as_str() {
+                "change" => cached.changed && time_since_last >= interval_s as u128,
+                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                _ => false,
+            };
+            
+            if should_send {
+                result.insert(cached.tag_name.clone(), cached.value.clone());
+                keys_to_update.push(entry.key().clone());
+            }
+        }
+        
+        // Segunda passagem: atualizar timestamps dos tags enviados
+        for key in keys_to_update {
+            if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
+                cached_mut.last_sent = now;
+                cached_mut.changed = false;
+            }
+        }
+        
+        result
+    }
 }
 
 impl WebSocketServer {
@@ -106,6 +220,8 @@ impl WebSocketServer {
             server_handle: None,
             broadcast_handle: None,
             interval_handles: Arc::new(std::sync::Mutex::new(Vec::new())),
+            smart_cache: Arc::new(SmartCache::new()),
+            cache_updater_handle: None,
         }
     }
 
@@ -392,75 +508,138 @@ impl WebSocketServer {
             self.server_handle = Some(first_handle);
         }
 
-        // Iniciar broadcasting
-        self.start_broadcasting(broadcast_tx).await?;
+        // Iniciar sistema inteligente de cache + broadcasting
+        self.start_smart_broadcasting(broadcast_tx).await?;
 
         Ok(format!("WebSocket server rodando em: {}", bound_addresses.join(", ")))
     }
 
-    async fn start_broadcasting(&mut self, broadcast_tx: broadcast::Sender<String>) -> Result<(), String> {
+    // 🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios TCP
+    async fn start_smart_broadcasting(&mut self, broadcast_tx: broadcast::Sender<String>) -> Result<(), String> {
         let database = self.database.clone();
         let tcp_server = self.tcp_server.clone();
         let is_running = self.is_running.clone();
+        let smart_cache = self.smart_cache.clone();
 
-        println!("🚀 PASSO 2: WebSocket COM AGENDAMENTO POR GRUPO DE INTERVALO!");
+        println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
 
-        // 1. Carregar todos os tags ativos de todos os PLCs e agrupar por intervalo
-        use std::collections::HashMap;
-        let mut interval_groups: HashMap<u64, Vec<(String, String, String)>> = HashMap::new();
-        let plc_list = database.get_all_known_plcs().unwrap_or_default();
-        for plc_ip in plc_list {
-            let tags = database.get_active_tags(&plc_ip).unwrap_or_default();
-            for tag in tags {
-                if tag.collect_mode.as_deref() == Some("interval") {
-                    let interval_s = tag.collect_interval_s.unwrap_or(1) as u64;
-                    interval_groups.entry(interval_s)
-                        .or_insert_with(Vec::new)
-                        .push((plc_ip.clone(), tag.variable_path.clone(), tag.tag_name.clone()));
-                }
-            }
-        }
-
-        // 2. Para cada grupo de intervalo, criar uma única task
-        if let Some(tcp_server_ref) = &tcp_server {
-            let tcp_server_ref = tcp_server_ref.clone();
-            let is_running = is_running.clone();
-            let mut handles = Vec::new();
-            for (interval_s, tag_list) in interval_groups {
-                let broadcast_tx = broadcast_tx.clone();
-                let tcp_server_ref = tcp_server_ref.clone();
-                let is_running = is_running.clone();
-                let handle = tokio::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(interval_s));
-                    while is_running.load(Ordering::SeqCst) {
-                        interval.tick().await;
-                        if let Ok(tcp_guard) = tokio::time::timeout(Duration::from_millis(100), tcp_server_ref.read()).await {
-                            if let Some(tcp_server_instance) = tcp_guard.as_ref() {
-                                let all_plc_data = tcp_server_instance.get_all_plc_data().await;
-                                let mut tag_data = HashMap::new();
-                                for (plc_ip, variable_path, tag_name) in &tag_list {
-                                    if let Some(plc_data) = all_plc_data.get(plc_ip) {
-                                        if let Some(variable) = plc_data.variables.iter().find(|v| v.name == *variable_path) {
-                                            tag_data.insert(tag_name.clone(), variable.value.clone());
-                                        }
-                                    }
-                                }
-                                if !tag_data.is_empty() {
-                                    let message = serde_json::to_string(&tag_data).unwrap_or_else(|_| "{}".to_string());
-                                    if broadcast_tx.receiver_count() > 0 {
-                                        let _ = broadcast_tx.send(message);
-                                    }
-                                }
+        // TASK 1: CACHE UPDATER - Escuta eventos TCP (ZERO acesso direto ao TCP)
+        let is_running_cache = is_running.clone();
+        let smart_cache_updater = smart_cache.clone();
+        let database_updater = database.clone();
+        let app_handle_cache = self.app_handle.clone();
+        
+        let cache_handle = tokio::spawn(async move {
+            use tauri::Listener;
+            
+            // Escutar evento do TCP - ZERO deadlocks!
+            let _unlisten_id = app_handle_cache.listen("websocket-cache-update", move |event| {
+                let payload = event.payload();
+                if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
+                    let plc_ip = data["plc_ip"].as_str().unwrap_or("");
+                    if let Some(variables_array) = data["variables"].as_array() {
+                        // Converter para PlcVariable
+                        let mut variables = Vec::new();
+                        for var in variables_array {
+                            if let (Some(name), Some(value), Some(data_type)) = (
+                                var["name"].as_str(),
+                                var["value"].as_str(), 
+                                var["data_type"].as_str()
+                            ) {
+                                variables.push(crate::tcp_server::PlcVariable {
+                                    name: name.to_string(),
+                                    value: value.to_string(),
+                                    data_type: data_type.to_string(),
+                                    unit: var["unit"].as_str().map(|s| s.to_string()),
+                                });
                             }
                         }
+                        
+                        // Atualizar cache via evento - SEM locks!
+                        let smart_cache_clone = smart_cache_updater.clone();
+                        let database_clone = database_updater.clone();
+                        let plc_ip_clone = plc_ip.to_string();
+                        
+                        tokio::spawn(async move {
+                            smart_cache_clone.update_from_tcp(&plc_ip_clone, &variables, &database_clone).await;
+                        });
                     }
-                });
-                handles.push(handle);
+                }
+            });
+            
+            // Manter listener ativo
+            while is_running_cache.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
-            // Salvar os handles para poder cancelar depois
-            let mut guard = self.interval_handles.lock().unwrap();
-            *guard = handles;
+            
+            // Nota: unlisten é um ID, não uma função no Tauri v2
+            println!("Cache listener finalizado (ID: {})", _unlisten_id);
+        });
+        
+        self.cache_updater_handle = Some(cache_handle);
+
+        // TASK 2: BROADCASTING INTELIGENTE - Usa apenas cache (zero acesso TCP)
+        let smart_cache_broadcast = smart_cache.clone();
+        let is_running_broadcast = is_running.clone();
+        
+        // Criar tasks para cada intervalo (1s a 10s)
+        let mut handles = Vec::new();
+        for interval_s in 1..=10u64 {
+            let broadcast_tx_clone = broadcast_tx.clone();
+            let smart_cache_clone = smart_cache_broadcast.clone();
+            let is_running_clone = is_running_broadcast.clone();
+            
+            let handle = tokio::spawn(async move {
+                let mut interval_timer = time::interval(Duration::from_secs(interval_s));
+                while is_running_clone.load(Ordering::SeqCst) {
+                    interval_timer.tick().await;
+                    
+                    // ✅ SEGURO: Acesso APENAS ao cache, zero TCP!
+                    let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                    
+                    if !tag_data.is_empty() {
+                        let message = serde_json::to_string(&tag_data).unwrap_or_else(|_| "{}".to_string());
+                        if broadcast_tx_clone.receiver_count() > 0 {
+                            let _ = broadcast_tx_clone.send(message);
+                        }
+                        println!("📡 Broadcast grupo {}s: {} tags enviados", interval_s, tag_data.len());
+                    }
+                }
+            });
+            
+            handles.push(handle);
         }
+        
+        // TASK 3: BROADCASTING PARA TAGS EM MODO "CHANGE"
+        let broadcast_tx_change = broadcast_tx.clone();
+        let smart_cache_change = smart_cache.clone();
+        let is_running_change = is_running.clone();
+        
+        let change_handle = tokio::spawn(async move {
+            let mut interval = time::interval(Duration::from_millis(100)); // Verifica mudanças a cada 100ms
+            while is_running_change.load(Ordering::SeqCst) {
+                interval.tick().await;
+                
+                // ✅ SEGURO: Acesso APENAS ao cache para detectar mudanças
+                let changed_tags = smart_cache_change.get_tags_for_broadcast(0).await; // 0 = modo change
+                
+                if !changed_tags.is_empty() {
+                    let message = serde_json::to_string(&changed_tags).unwrap_or_else(|_| "{}".to_string());
+                    if broadcast_tx_change.receiver_count() > 0 {
+                        let _ = broadcast_tx_change.send(message);
+                    }
+                    println!("🔄 Change broadcast: {} tags alterados", changed_tags.len());
+                }
+            }
+        });
+        
+        handles.push(change_handle);
+        
+        // Salvar handles
+        let mut guard = self.interval_handles.lock().unwrap();
+        *guard = handles;
+        
+        println!("✅ Sistema inteligente iniciado: 1 acesso TCP + {} tasks de broadcast", 11);
         Ok(())
     }
 
@@ -477,7 +656,7 @@ impl WebSocketServer {
         }
         // Recriar tasks com os grupos atualizados
         if let Some(broadcast_tx) = &self.broadcast_sender {
-            self.start_broadcasting(broadcast_tx.clone()).await
+            self.start_smart_broadcasting(broadcast_tx.clone()).await
         } else {
             Err("Broadcast sender não inicializado".to_string())
         }
@@ -592,6 +771,9 @@ impl WebSocketServer {
             handle.abort();
         }
         if let Some(handle) = self.broadcast_handle.take() {
+            handle.abort();
+        }
+        if let Some(handle) = self.cache_updater_handle.take() {
             handle.abort();
         }
 
