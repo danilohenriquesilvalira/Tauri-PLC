@@ -36,3 +36,5 @@ dashmap = "5.5"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid"] }
 postgres = "0.19"
 tokio-postgres = "0.7"
+# ✅ MESSAGEPACK - JSON COMPRIMIDO
+rmp-serde = "1.1"

@@ -16,6 +16,32 @@ interface PostgresConfigPanelProps {
   onClose: () => void;
 }
 
+interface DatabaseColumn {
+  name: string;
+  type: string;
+  data_type: string;
+  nullable: boolean;
+  is_nullable: boolean;
+  default_value: string | null;
+  is_primary_key: boolean;
+}
+
+interface DatabaseTable {
+  name: string;
+  columns: DatabaseColumn[];
+  row_count: number;
+}
+
+interface DatabaseInspection {
+  database_name: string;
+  tables: DatabaseTable[];
+  total_tables: number;
+}
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
 export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClose }) => {
   const [config, setConfig] = useState<PostgresConfig>({
     host: "localhost",
@@ -38,7 +64,7 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
   
   // Estados para inspeção de banco
   const [inspectedDatabase, setInspectedDatabase] = useState<string | null>(null);
-  const [databaseInspection, setDatabaseInspection] = useState<any>(null);
+  const [databaseInspection, setDatabaseInspection] = useState<DatabaseInspection | null>(null);
   const [inspectionLoading, setInspectionLoading] = useState(false);
   
   // Estados para verificação rápida
@@ -93,8 +119,8 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
         title: 'PostgreSQL Conectado',
         message: `Conexão bem-sucedida com ${config.host}:${config.port} usando usuário "${config.user}"`
       });
-    } catch (e: any) {
-      setMessage(e.toString());
+    } catch (e: unknown) {
+      setMessage(getErrorMessage(e));
       addNotification({
         type: 'error',
         title: 'Falha na Conexão PostgreSQL',
@@ -124,8 +150,8 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
         title: 'Teste Database Padrão Sucesso',
         message: `Servidor PostgreSQL funcionando! Database padrão 'postgres' acessível em ${config.host}:${config.port}`
       });
-    } catch (e: any) {
-      setMessage(e.toString());
+    } catch (e: unknown) {
+      setMessage(getErrorMessage(e));
       addNotification({
         type: 'error',
         title: 'Erro na Database Padrão',
@@ -158,12 +184,12 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (e: any) {
-      setMessage(e.toString());
+    } catch (e: unknown) {
+      setMessage(getErrorMessage(e));
       addNotification({
         type: 'error',
         title: 'Erro ao Salvar Configuração',
-        message: `Não foi possível salvar a configuração PostgreSQL no banco local - ${e.toString()}`
+        message: `Não foi possível salvar a configuração PostgreSQL no banco local - ${getErrorMessage(e)}`
       });
     }
     setLoading(false);
@@ -194,11 +220,11 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
         title: 'Bancos PostgreSQL Carregados',
         message: `Encontrados ${dbList.length} bancos de dados no servidor ${config.host}:${config.port}`
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       addNotification({
         type: 'error',
         title: 'Erro ao Listar Bancos',
-        message: `Não foi possível carregar a lista de bancos: ${e.toString()}`
+        message: `Não foi possível carregar a lista de bancos: ${getErrorMessage(e)}`
       });
     }
     setDatabaseLoading(false);
@@ -234,11 +260,11 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
       
       setNewDatabaseName("");
       await loadDatabases(); // Recarregar lista
-    } catch (e: any) {
+    } catch (e: unknown) {
       addNotification({
         type: 'error',
         title: 'Erro ao Criar Banco',
-        message: `Não foi possível criar o banco '${newDatabaseName}': ${e.toString()}`
+        message: `Não foi possível criar o banco '${newDatabaseName}': ${getErrorMessage(e)}`
       });
     }
     setDatabaseLoading(false);
@@ -272,11 +298,11 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
       });
       
       await loadDatabases(); // Recarregar lista
-    } catch (e: any) {
+    } catch (e: unknown) {
       addNotification({
         type: 'error',
         title: 'Erro ao Excluir Banco',
-        message: `Não foi possível excluir o banco '${databaseName}': ${e.toString()}`
+        message: `Não foi possível excluir o banco '${databaseName}': ${getErrorMessage(e)}`
       });
     }
     setDatabaseLoading(false);
@@ -308,11 +334,11 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
         title: 'Verificação Concluída',
         message: `Encontrados ${dbList.length} bancos de dados no servidor`
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       addNotification({
         type: 'error',
         title: 'Erro na Verificação',
-        message: `Não foi possível verificar os bancos: ${e.toString()}`
+        message: `Não foi possível verificar os bancos: ${getErrorMessage(e)}`
       });
     }
     setDatabaseLoading(false);
@@ -345,11 +371,11 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
         message: `Estrutura do banco '${databaseName}' carregada: ${inspection.total_tables} tabelas encontradas`
       });
       
-    } catch (e: any) {
+    } catch (e: unknown) {
       addNotification({
         type: 'error',
         title: 'Erro na Inspeção',
-        message: `Não foi possível inspecionar o banco '${databaseName}': ${e.toString()}`
+        message: `Não foi possível inspecionar o banco '${databaseName}': ${getErrorMessage(e)}`
       });
     }
     setInspectionLoading(false);
@@ -380,7 +406,7 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
 
   const expandAllTables = () => {
     if (databaseInspection?.tables) {
-      setExpandedTables(new Set(databaseInspection.tables.map((t: any) => t.name)));
+      setExpandedTables(new Set(databaseInspection.tables.map((t: DatabaseTable) => t.name)));
     }
   };
 
@@ -811,14 +837,14 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
                       </div>
                       <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC]/50">
                         <div className="text-lg font-bold text-[#212E3E]">
-                          {databaseInspection.tables.reduce((sum: number, table: any) => sum + table.columns.length, 0)}
+                          {databaseInspection.tables.reduce((sum: number, table: DatabaseTable) => sum + table.columns.length, 0)}
                         </div>
                         <div className="text-xs text-[#7C9599]">Colunas Total</div>
                       </div>
                       <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC]/50">
                         <div className="text-lg font-bold text-[#212E3E]">
-                          {databaseInspection.tables.reduce((sum: number, table: any) => 
-                            sum + table.columns.filter((col: any) => col.is_primary_key).length, 0)}
+                          {databaseInspection.tables.reduce((sum: number, table: DatabaseTable) => 
+                            sum + table.columns.filter((col: DatabaseColumn) => col.is_primary_key).length, 0)}
                         </div>
                         <div className="text-xs text-[#7C9599]">Chaves Primárias</div>
                       </div>
@@ -868,7 +894,7 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
                       <p className="text-xs opacity-75">Este banco não possui tabelas no schema 'public'</p>
                     </div>
                   ) : (
-                    databaseInspection.tables.map((table: any) => (
+                    databaseInspection.tables.map((table: DatabaseTable) => (
                       <div key={table.name} className="bg-white rounded-lg border border-[#BECACC] p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -911,7 +937,7 @@ export const PostgresConfigPanel: React.FC<PostgresConfigPanelProps> = ({ onClos
                                 Estrutura das Colunas ({table.columns.length}):
                               </div>
                               <div className="bg-[#F1F4F4] rounded-lg border border-[#BECACC]/50 p-3 space-y-2">
-                                {table.columns.map((column: any) => (
+                                {table.columns.map((column: DatabaseColumn) => (
                                   <div key={column.name} className="flex items-center justify-between bg-white rounded px-3 py-2 text-xs">
                                     <div className="flex items-center gap-2">
                                       {column.is_primary_key && (

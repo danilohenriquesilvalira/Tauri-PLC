@@ -125,24 +125,32 @@ export const useNotifications = () => {
         if (enabled === false) {
           addTagDisabledNotification(tag_name, plc_ip);
         } else {
-          // Remover a notificação de desativado e adicionar a de reativado no topo, preservando ordem
-          setState(prevState => {
-            const filtered = prevState.notifications.filter(n =>
-              !(n.title === 'Tag Desativado' && n.message.includes(tag_name) && (n.plcIp || '') === (plc_ip || ''))
-            );
-            const newNotification: Notification = {
-              id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              type: 'success',
-              title: 'Tag Reativado',
-              message: `O tag "${tag_name}" foi reativado no PLC ${plc_ip}.`,
-              plcIp: plc_ip,
-              timestamp: new Date(),
-              read: false
-            };
-            const newNotifications = [newNotification, ...filtered].slice(0, 50);
-            const unreadCount = newNotifications.filter(n => !n.read).length;
-            return { notifications: newNotifications, unreadCount };
-          });
+          // Usar setTimeout para garantir timestamp mais recente
+          setTimeout(() => {
+            setState(prevState => {
+              // Remover qualquer notificação de "Tag Desativado" relacionada
+              const filtered = prevState.notifications.filter(n =>
+                !(n.title === 'Tag Desativado' && n.message.includes(tag_name) && (n.plcIp || '') === (plc_ip || ''))
+              );
+              
+              // Criar notificação de reativação com timestamp atual (garantidamente mais recente)
+              const newNotification: Notification = {
+                id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                type: 'success',
+                title: 'Tag Reativado',
+                message: `O tag "${tag_name}" foi reativado no PLC ${plc_ip}.`,
+                plcIp: plc_ip,
+                timestamp: new Date(),
+                read: false
+              };
+              
+              // Adicionar no início do array
+              const newNotifications = [newNotification, ...filtered].slice(0, 50);
+              const unreadCount = newNotifications.filter(n => !n.read).length;
+              
+              return { notifications: newNotifications, unreadCount };
+            });
+          }, 10); // 10ms delay para garantir timestamp diferente
         }
       }
     });

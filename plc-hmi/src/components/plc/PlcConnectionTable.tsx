@@ -98,7 +98,9 @@ export const PlcConnectionTable: React.FC = () => {
           else updated.delete(plcIp);
           return updated;
         });
-      } catch {}
+      } catch (error) {
+        console.error('Erro ao carregar dados do PLC:', error);
+      }
     };
 
 
@@ -761,7 +763,9 @@ export const PlcConnectionTable: React.FC = () => {
                                 );
                               }
                             }
-                          } catch {}
+                          } catch (error) {
+                            console.error('Erro ao parsear valor da variável:', error);
+                          }
                           
                           return (
                             <tr key={`${variable.data_type}-${variable.name}-${startIndex + index}`} 

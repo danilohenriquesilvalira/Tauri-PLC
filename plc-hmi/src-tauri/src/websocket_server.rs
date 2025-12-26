@@ -15,6 +15,36 @@ use std::collections::HashMap;
 
 use crate::database::Database;
 use crate::tcp_server::TcpServer;
+use tokio::sync::mpsc;
+
+// ✅ Helper para base64 encode simples
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    
+    for chunk in data.chunks(3) {
+        let mut buf = [0u8; 3];
+        for (i, &byte) in chunk.iter().enumerate() {
+            buf[i] = byte;
+        }
+        
+        let b = (buf[0] as u32) << 16 | (buf[1] as u32) << 8 | buf[2] as u32;
+        result.push(CHARS[((b >> 18) & 63) as usize] as char);
+        result.push(CHARS[((b >> 12) & 63) as usize] as char);
+        result.push(if chunk.len() > 1 { CHARS[((b >> 6) & 63) as usize] as char } else { '=' });
+        result.push(if chunk.len() > 2 { CHARS[(b & 63) as usize] as char } else { '=' });
+    }
+    
+    result
+}
+
+// ✅ ESTRUTURA PARA SERIALIZAR ATUALIZAÇÕES DE CACHE
+#[derive(Debug, Clone)]
+struct CacheUpdateData {
+    plc_ip: String,
+    variables: Vec<crate::tcp_server::PlcVariable>,
+    timestamp: u64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInterface {
@@ -224,6 +254,36 @@ impl WebSocketServer {
             cache_updater_handle: None,
         }
     }
+
+    // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
+    fn send_msgpack_message(&self, broadcast_tx: &broadcast::Sender<String>, variables: &HashMap<String, String>) {
+        match rmp_serde::to_vec(variables) {
+            Ok(msgpack_bytes) => {
+                // Converter bytes para base64 para envio via WebSocket texto
+                let base64_data = base64_encode(&msgpack_bytes);
+                let msgpack_message = format!("MSGPACK:{}", base64_data);
+                
+                if broadcast_tx.receiver_count() > 0 {
+                    let _ = broadcast_tx.send(msgpack_message);
+                }
+                
+                println!("📦 MSGPACK: {} tags → {} bytes ({}% menor que JSON)", 
+                    variables.len(), 
+                    msgpack_bytes.len(),
+                    (100.0 * (1.0 - msgpack_bytes.len() as f64 / serde_json::to_string(variables).unwrap_or_default().len() as f64)) as i32
+                );
+            }
+            Err(e) => {
+                println!("❌ Erro MessagePack: {}. Usando JSON fallback.", e);
+                // Fallback para JSON
+                let message = serde_json::to_string(variables).unwrap_or_else(|_| "{}".to_string());
+                if broadcast_tx.receiver_count() > 0 {
+                    let _ = broadcast_tx.send(message);
+                }
+            }
+        }
+    }
+
 
     // Função para detectar interfaces de rede disponíveis
     pub fn get_available_network_interfaces() -> Result<Vec<NetworkInterface>, String> {
@@ -523,12 +583,38 @@ impl WebSocketServer {
 
         println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
 
+        // ✅ CANAL PARA SERIALIZAR ATUALIZAÇÕES DE CACHE
+        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(1000);
+        
         // TASK 1: CACHE UPDATER - Escuta eventos TCP (ZERO acesso direto ao TCP)
         let is_running_cache = is_running.clone();
         let smart_cache_updater = smart_cache.clone();
         let database_updater = database.clone();
         let app_handle_cache = self.app_handle.clone();
         
+        // ✅ TASK 1A: PROCESSADOR ATÔMICO DE CACHE (Serializa todas as atualizações)
+        let atomic_cache_processor = tokio::spawn({
+            let smart_cache_clone = smart_cache_updater.clone();
+            let database_clone = database_updater.clone();
+            let is_running_clone = is_running_cache.clone();
+            async move {
+                while let Some(update_data) = update_rx.recv().await {
+                    if !is_running_clone.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    
+                    // ✅ ATUALIZAÇÃO ATÔMICA: Uma de cada vez, sem race conditions
+                    smart_cache_clone.update_from_tcp(
+                        &update_data.plc_ip,
+                        &update_data.variables,
+                        &database_clone
+                    ).await;
+                }
+                println!("✅ Atomic cache processor finalizado");
+            }
+        });
+        
+        // ✅ TASK 1B: EVENT LISTENER (Apenas converte eventos para o canal)
         let cache_handle = tokio::spawn(async move {
             use tauri::Listener;
             
@@ -555,14 +641,15 @@ impl WebSocketServer {
                             }
                         }
                         
-                        // Atualizar cache via evento - SEM locks!
-                        let smart_cache_clone = smart_cache_updater.clone();
-                        let database_clone = database_updater.clone();
-                        let plc_ip_clone = plc_ip.to_string();
+                        // ✅ ENVIAR PARA CANAL ATÔMICO - Evita race conditions
+                        let update_data = CacheUpdateData {
+                            plc_ip: plc_ip.to_string(),
+                            variables,
+                            timestamp: data["timestamp"].as_u64().unwrap_or(0),
+                        };
                         
-                        tokio::spawn(async move {
-                            smart_cache_clone.update_from_tcp(&plc_ip_clone, &variables, &database_clone).await;
-                        });
+                        // ✅ USAR CHANNEL PARA SERIALIZAR ATUALIZAÇÕES
+                        let _ = update_tx.try_send(update_data);
                     }
                 }
             });
@@ -576,39 +663,177 @@ impl WebSocketServer {
             println!("Cache listener finalizado (ID: {})", _unlisten_id);
         });
         
+        // ✅ ARMAZENAR AMBOS OS HANDLES PARA CONTROLE COMPLETO
         self.cache_updater_handle = Some(cache_handle);
+        // atomic_cache_processor será gerenciado automaticamente quando o canal fechar
 
         // TASK 2: BROADCASTING INTELIGENTE - Usa apenas cache (zero acesso TCP)
         let smart_cache_broadcast = smart_cache.clone();
         let is_running_broadcast = is_running.clone();
         
-        // Criar tasks para cada intervalo (1s a 10s)
+        // ✅ BATCH PROCESSOR INTELIGENTE - Agrupa múltiplos intervalos
         let mut handles = Vec::new();
-        for interval_s in 1..=10u64 {
+        
+        
+        // BATCH 1: Intervalos rápidos (1-3s) - Processamento a cada 0.5s
+        let fast_batch_handle = tokio::spawn({
             let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
             
-            let handle = tokio::spawn(async move {
-                let mut interval_timer = time::interval(Duration::from_secs(interval_s));
+            async move {
+                let mut batch_timer = time::interval(Duration::from_millis(500)); // ✅ 0.5s batch
+                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
+                
                 while is_running_clone.load(Ordering::SeqCst) {
-                    interval_timer.tick().await;
+                    batch_timer.tick().await;
                     
-                    // ✅ SEGURO: Acesso APENAS ao cache, zero TCP!
-                    let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
-                    
-                    if !tag_data.is_empty() {
-                        let message = serde_json::to_string(&tag_data).unwrap_or_else(|_| "{}".to_string());
-                        if broadcast_tx_clone.receiver_count() > 0 {
-                            let _ = broadcast_tx_clone.send(message);
+                    // ✅ COLETAR DADOS DE MÚLTIPLOS INTERVALOS EM BATCH
+                    for interval_s in 1..=3u64 {
+                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                        for (key, value) in tag_data {
+                            batch_accumulator.insert(key, serde_json::Value::String(value));
                         }
-                        println!("📡 Broadcast grupo {}s: {} tags enviados", interval_s, tag_data.len());
+                    }
+                    
+                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
+                    if !batch_accumulator.is_empty() {
+                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
+                        let string_map: HashMap<String, String> = batch_accumulator.iter()
+                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                            .collect();
+                        
+                        match rmp_serde::to_vec(&string_map) {
+                            Ok(msgpack_bytes) => {
+                                let base64_data = base64_encode(&msgpack_bytes);
+                                let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(msgpack_message);
+                                }
+                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
+                            }
+                            Err(_) => {
+                                // Fallback para JSON
+                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(message);
+                                }
+                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
+                            }
+                        }
+                        batch_accumulator.clear();
                     }
                 }
-            });
+            }
+        });
+        
+        // BATCH 2: Intervalos médios (4-7s) - Processamento a cada 2s
+        let medium_batch_handle = tokio::spawn({
+            let broadcast_tx_clone = broadcast_tx.clone();
+            let smart_cache_clone = smart_cache_broadcast.clone();
+            let is_running_clone = is_running_broadcast.clone();
             
-            handles.push(handle);
-        }
+            async move {
+                let mut batch_timer = time::interval(Duration::from_secs(2)); // ✅ 2s batch
+                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
+                
+                while is_running_clone.load(Ordering::SeqCst) {
+                    batch_timer.tick().await;
+                    
+                    // ✅ COLETAR DADOS DE INTERVALOS MÉDIOS EM BATCH
+                    for interval_s in 4..=7u64 {
+                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                        for (key, value) in tag_data {
+                            batch_accumulator.insert(key, serde_json::Value::String(value));
+                        }
+                    }
+                    
+                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
+                    if !batch_accumulator.is_empty() {
+                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
+                        let string_map: HashMap<String, String> = batch_accumulator.iter()
+                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                            .collect();
+                        
+                        match rmp_serde::to_vec(&string_map) {
+                            Ok(msgpack_bytes) => {
+                                let base64_data = base64_encode(&msgpack_bytes);
+                                let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(msgpack_message);
+                                }
+                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
+                            }
+                            Err(_) => {
+                                // Fallback para JSON
+                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(message);
+                                }
+                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
+                            }
+                        }
+                        batch_accumulator.clear();
+                    }
+                }
+            }
+        });
+        
+        // BATCH 3: Intervalos lentos (8-10s) - Processamento a cada 5s
+        let slow_batch_handle = tokio::spawn({
+            let broadcast_tx_clone = broadcast_tx.clone();
+            let smart_cache_clone = smart_cache_broadcast.clone();
+            let is_running_clone = is_running_broadcast.clone();
+            
+            async move {
+                let mut batch_timer = time::interval(Duration::from_secs(5)); // ✅ 5s batch
+                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
+                
+                while is_running_clone.load(Ordering::SeqCst) {
+                    batch_timer.tick().await;
+                    
+                    // ✅ COLETAR DADOS DE INTERVALOS LENTOS EM BATCH
+                    for interval_s in 8..=10u64 {
+                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                        for (key, value) in tag_data {
+                            batch_accumulator.insert(key, serde_json::Value::String(value));
+                        }
+                    }
+                    
+                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
+                    if !batch_accumulator.is_empty() {
+                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
+                        let string_map: HashMap<String, String> = batch_accumulator.iter()
+                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                            .collect();
+                        
+                        match rmp_serde::to_vec(&string_map) {
+                            Ok(msgpack_bytes) => {
+                                let base64_data = base64_encode(&msgpack_bytes);
+                                let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(msgpack_message);
+                                }
+                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
+                            }
+                            Err(_) => {
+                                // Fallback para JSON
+                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
+                                if broadcast_tx_clone.receiver_count() > 0 {
+                                    let _ = broadcast_tx_clone.send(message);
+                                }
+                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
+                            }
+                        }
+                        batch_accumulator.clear();
+                    }
+                }
+            }
+        });
+        
+        handles.push(fast_batch_handle);
+        handles.push(medium_batch_handle);
+        handles.push(slow_batch_handle);
         
         // TASK 3: BROADCASTING PARA TAGS EM MODO "CHANGE"
         let broadcast_tx_change = broadcast_tx.clone();

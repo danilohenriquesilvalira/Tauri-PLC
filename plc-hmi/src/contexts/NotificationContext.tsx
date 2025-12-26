@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, type ReactNode } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
 import type { Notification } from '../hooks/useNotifications';
 

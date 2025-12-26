@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Home, 
   Gauge,
   Settings,
   Menu,
   ChevronLeft,
-  Database,
   Server
 } from 'lucide-react';
 import logoDanilo from '../../assets/Logo_Danilo.svg';

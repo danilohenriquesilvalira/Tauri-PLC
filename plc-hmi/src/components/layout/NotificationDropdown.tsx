@@ -11,7 +11,7 @@ export const NotificationDropdown: React.FC = () => {
     // Ícones específicos para PostgreSQL
     if (title && title.toLowerCase().includes('postgresql')) {
       switch (type) {
-        case 'success': return <Database size={16} className="text-edp-electric" />;
+        case 'success': return <Database size={16} className="text-edp-marine" />;
         case 'error': return <Database size={16} className="text-edp-semantic-red" />;
         case 'info': return <Database size={16} className="text-edp-marine" />;
         case 'warning': return <Database size={16} className="text-edp-semantic-yellow" />;
@@ -20,18 +20,18 @@ export const NotificationDropdown: React.FC = () => {
     
     // Ícones para inspeção de banco
     if (title && title.toLowerCase().includes('inspecionado')) {
-      return <Search size={16} className="text-edp-electric" />;
+      return <Search size={16} className="text-edp-marine" />;
     }
     
     // Ícones para configurações salvas
     if (title && (title.includes('Salva') || title.includes('Salvando'))) {
-      return <Save size={16} className={type === 'success' ? "text-edp-electric" : "text-edp-marine"} />;
+      return <Save size={16} className="text-edp-marine" />;
     }
     
     // Ícones para servidores/conexões
     if (title && (title.includes('Conectado') || title.includes('Servidor') || title.includes('Conexão'))) {
       switch (type) {
-        case 'success': return <Server size={16} className="text-edp-electric" />;
+        case 'success': return <Server size={16} className="text-edp-marine" />;
         case 'error': return <Server size={16} className="text-edp-semantic-red" />;
         case 'info': return <Server size={16} className="text-edp-marine" />;
         case 'warning': return <Server size={16} className="text-edp-semantic-yellow" />;
@@ -42,7 +42,7 @@ export const NotificationDropdown: React.FC = () => {
     switch (type) {
       case 'error': return <AlertCircle size={16} className="text-edp-semantic-red" />;
       case 'warning': return <AlertTriangle size={16} className="text-edp-semantic-yellow" />;
-      case 'success': return <CheckCircle size={16} className="text-edp-electric" />;
+      case 'success': return <CheckCircle size={16} className="text-edp-marine" />;
       case 'info': default: return <Info size={16} className="text-edp-marine" />;
     }
   };
@@ -69,7 +69,11 @@ export const NotificationDropdown: React.FC = () => {
   const hasNotifications = notifications.length > 0;
 
   // Ordena as notificações por timestamp decrescente (mais recente primeiro)
-  const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const sortedNotifications = [...notifications].sort((a, b) => {
+    const timeA = new Date(a.timestamp).getTime();
+    const timeB = new Date(b.timestamp).getTime();
+    return timeB - timeA;
+  });
 
   return (
     <div className="relative">
@@ -89,7 +93,7 @@ export const NotificationDropdown: React.FC = () => {
         
         {/* Indicador de atividade quando há notificações */}
         {hasNotifications && unreadCount === 0 && (
-          <span className="absolute top-1 right-1 w-2 h-2 bg-edp-electric rounded-full"></span>
+          <span className="absolute top-1 right-1 w-2 h-2 bg-edp-marine rounded-full"></span>
         )}
       </button>
 
@@ -103,12 +107,12 @@ export const NotificationDropdown: React.FC = () => {
           />
           
           {/* Dropdown */}
-          <div className="absolute right-0 top-12 w-96 bg-white rounded-lg shadow-xl border border-edp-marine/30 z-50 max-h-[80vh] flex flex-col">
+          <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-edp-marine/20 z-50 flex flex-col">
             {/* Header do dropdown */}
-            <div className="px-4 py-3 border-b border-edp-marine/20 flex items-center justify-between bg-edp-neutral-white-wash rounded-t-lg">
+            <div className="px-4 py-2.5 border-b border-edp-marine/15 flex items-center justify-between bg-edp-neutral-white-wash rounded-t-lg">
               <div className="flex items-center gap-2">
-                <Bell size={18} className="text-edp-marine" />
-                <h3 className="font-semibold text-edp-marine">Notificações</h3>
+                <Bell size={16} className="text-edp-marine" />
+                <h3 className="font-medium text-edp-marine text-sm">Notificações</h3>
                 {unreadCount > 0 && (
                   <span className="bg-edp-semantic-red text-white text-xs px-2 py-0.5 rounded-full font-medium">
                     {unreadCount}
@@ -141,7 +145,7 @@ export const NotificationDropdown: React.FC = () => {
             </div>
 
             {/* Lista de notificações */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="max-h-72 overflow-y-auto scrollbar-thin">
               {!hasNotifications ? (
                 <div className="px-4 py-8 text-center text-edp-slate">
                   <Bell size={32} className="mx-auto mb-2 opacity-50" />
@@ -149,16 +153,16 @@ export const NotificationDropdown: React.FC = () => {
                   <p className="text-xs opacity-75">Você está em dia!</p>
                 </div>
               ) : (
-                <div className="py-2">
+                <div className="py-1">
                   {sortedNotifications.map((notification) => (
                     <div 
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`px-4 py-3 border-b border-edp-marine/10 hover:bg-edp-neutral-white-wash cursor-pointer transition-edp group relative ${
-                        !notification.read ? 'bg-gradient-to-r from-edp-electric/5 to-transparent border-l-2 border-l-edp-electric' : ''
+                      className={`px-4 py-2.5 border-b border-edp-marine/8 hover:bg-edp-neutral-white-wash/70 cursor-pointer transition-edp group relative ${
+                        !notification.read ? 'bg-gradient-to-r from-edp-marine/8 to-transparent border-l-3 border-l-edp-marine' : ''
                       }`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2.5">
                         {/* Ícone do tipo */}
                         <div className="flex-shrink-0 mt-0.5">
                           {getIconForType(notification.type, notification.title)}
@@ -167,11 +171,11 @@ export const NotificationDropdown: React.FC = () => {
                         {/* Conteúdo */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className={`text-sm font-medium text-edp-marine ${!notification.read ? 'font-semibold' : ''}`}>
+                            <h4 className={`text-xs font-medium text-edp-marine ${!notification.read ? 'font-semibold' : ''}`}>
                               {notification.title}
                             </h4>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs text-edp-slate">
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <span className="text-xs text-edp-slate opacity-75">
                                 {formatTime(notification.timestamp)}
                               </span>
                               <button
@@ -186,7 +190,7 @@ export const NotificationDropdown: React.FC = () => {
                             </div>
                           </div>
                           
-                          <p className="text-sm text-edp-slate mt-0.5 leading-relaxed">
+                          <p className="text-xs text-edp-slate mt-1 leading-relaxed">
                             {notification.message}
                           </p>
                           
@@ -201,7 +205,7 @@ export const NotificationDropdown: React.FC = () => {
                         
                         {/* Indicador não lida */}
                         {!notification.read && (
-                          <div className="w-2 h-2 bg-edp-electric rounded-full flex-shrink-0 mt-1"></div>
+                          <div className="w-1.5 h-1.5 bg-edp-marine rounded-full flex-shrink-0 mt-1"></div>
                         )}
                       </div>
                     </div>
@@ -211,10 +215,10 @@ export const NotificationDropdown: React.FC = () => {
             </div>
 
             {/* Footer (se houver muitas notificações) */}
-            {sortedNotifications.length >= 10 && (
-              <div className="px-4 py-2 border-t border-edp-marine/20 bg-edp-neutral-white-wash rounded-b-lg">
-                <p className="text-xs text-edp-slate text-center">
-                  Mostrando {Math.min(sortedNotifications.length, 50)} de {sortedNotifications.length} notificações
+            {sortedNotifications.length >= 4 && (
+              <div className="px-4 py-1.5 border-t border-edp-marine/15 bg-edp-neutral-white-wash rounded-b-lg">
+                <p className="text-xs text-edp-slate text-center opacity-75">
+                  {sortedNotifications.length} notificações
                 </p>
               </div>
             )}

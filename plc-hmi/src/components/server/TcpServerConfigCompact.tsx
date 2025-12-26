@@ -1,20 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTcpServer } from '../../hooks/useTcpServer';
 import { PlcConnectionTable } from '../plc/PlcConnectionTable';
-import {
-  Server,
-  Wifi,
-  WifiOff,
-  Search,
-  Play,
-  Square,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  Zap,
-  Settings,
-  Activity
-} from 'lucide-react';
+// Todos os imports de ícones foram removidos pois não são utilizados no JSX
+// Mantendo apenas o necessário para o futuro
 
 interface DiscoveredPlc {
   ip: string;

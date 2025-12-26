@@ -1,13 +1,78 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Mutex};
 use dashmap::DashMap; // HashMap concorrente sem locks!
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use crate::database::Database;
+
+// ✅ BUFFER POOL PARA ZERO ALLOCATIONS
+#[derive(Debug)]
+struct BufferPool {
+    small_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,   // 1KB buffers
+    medium_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,  // 8KB buffers
+    large_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,   // 64KB buffers
+}
+
+impl BufferPool {
+    fn new() -> Self {
+        Self {
+            small_buffers: Arc::new(Mutex::new(VecDeque::new())),
+            medium_buffers: Arc::new(Mutex::new(VecDeque::new())),
+            large_buffers: Arc::new(Mutex::new(VecDeque::new())),
+        }
+    }
+    
+    async fn get_buffer(&self, size: usize) -> Vec<u8> {
+        if size <= 1024 {
+            if let Some(mut buf) = self.small_buffers.lock().await.pop_front() {
+                buf.clear();
+                buf.reserve(1024);
+                return buf;
+            }
+            Vec::with_capacity(1024)
+        } else if size <= 8192 {
+            if let Some(mut buf) = self.medium_buffers.lock().await.pop_front() {
+                buf.clear();
+                buf.reserve(8192);
+                return buf;
+            }
+            Vec::with_capacity(8192)
+        } else {
+            if let Some(mut buf) = self.large_buffers.lock().await.pop_front() {
+                buf.clear();
+                buf.reserve(65536);
+                return buf;
+            }
+            Vec::with_capacity(65536)
+        }
+    }
+    
+    async fn return_buffer(&self, mut buf: Vec<u8>) {
+        let capacity = buf.capacity();
+        buf.clear();
+        
+        if capacity <= 1024 {
+            let mut pool = self.small_buffers.lock().await;
+            if pool.len() < 10 { // Máximo 10 buffers pequenos
+                pool.push_back(buf);
+            }
+        } else if capacity <= 8192 {
+            let mut pool = self.medium_buffers.lock().await;
+            if pool.len() < 5 { // Máximo 5 buffers médios
+                pool.push_back(buf);
+            }
+        } else {
+            let mut pool = self.large_buffers.lock().await;
+            if pool.len() < 2 { // Máximo 2 buffers grandes
+                pool.push_back(buf);
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlcData {
@@ -55,6 +120,7 @@ pub struct TcpServer {
     bytes_received: Arc<RwLock<HashMap<String, u64>>>, // Contador de bytes por IP
     latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 SEM LOCKS! Acesso concorrente livre
     database: Option<Arc<Database>>, // Banco de dados para configurações
+    buffer_pool: Arc<BufferPool>, // ✅ BUFFER POOL PARA ZERO ALLOCATIONS
 }
 
 impl TcpServer {
@@ -73,6 +139,7 @@ impl TcpServer {
             bytes_received: Arc::new(RwLock::new(HashMap::new())),
             latest_data: Arc::new(DashMap::new()), // 🚀 DashMap = zero locks!
             database,
+            buffer_pool: Arc::new(BufferPool::new()), // ✅ BUFFER POOL INICIALIZADO
         }
     }
 
@@ -99,6 +166,7 @@ impl TcpServer {
         let bytes_received = self.bytes_received.clone();
         let latest_data = self.latest_data.clone();
         let database = self.database.clone();
+        let buffer_pool = self.buffer_pool.clone(); // ✅ BUFFER POOL
         let port = self.port;
 
         let handle = tokio::spawn(async move {
@@ -173,6 +241,7 @@ impl TcpServer {
                         let connected_clients_clone = connected_clients.clone();
                         let connection_handles_clone = connection_handles.clone();
                         let database_clone = database.clone();
+                        let buffer_pool_clone = buffer_pool.clone(); // ✅ BUFFER POOL
                         let ip_clone = ip.clone();
                         let is_running_clone = is_running.clone();
 
@@ -186,7 +255,8 @@ impl TcpServer {
                                 bytes_received_clone.clone(),
                                 latest_data_clone.clone(),
                                 app_handle_clone.clone(),
-                                database_clone.clone()
+                                database_clone.clone(),
+                                buffer_pool_clone.clone() // ✅ BUFFER POOL
                             ).await;
                             
                             println!("📊 PLC {} (ID: {}) transferiu {} bytes no total", ip_clone, conn_id, total_bytes);
@@ -399,6 +469,11 @@ impl TcpServer {
     }
 }
 
+// 🔧 CONSTANTES DE SEGURANÇA
+const MAX_PACKET_SIZE: usize = 1_048_576; // 1MB máximo
+const MAX_ACCUMULATOR_SIZE: usize = 65536; // 64KB máximo  
+const BUFFER_CAPACITY: usize = 8192; // 8KB inicial
+
 async fn handle_client_connection(
     mut socket: TcpStream, 
     conn_id: u64, 
@@ -407,10 +482,11 @@ async fn handle_client_connection(
     _bytes_received: Arc<RwLock<HashMap<String, u64>>>,
     latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 DashMap!
     app_handle: tauri::AppHandle,
-    database: Option<Arc<Database>>
+    database: Option<Arc<Database>>,
+    buffer_pool: Arc<BufferPool> // ✅ BUFFER POOL
 ) -> u64 {
     let mut buffer = [0; 1024];
-    let mut accumulator: Vec<u8> = Vec::new(); // 📦 Buffer para acumular fragmentos
+    let mut accumulator = buffer_pool.get_buffer(BUFFER_CAPACITY).await; // ✅ BUFFER DO POOL
     let mut expected_size: Option<usize> = None; // 🎯 Tamanho esperado da configuração
     let mut total_bytes = 0u64;
     let mut packet_count = 0u64;
@@ -496,6 +572,15 @@ async fn handle_client_connection(
                 last_fragment_time = std::time::Instant::now();
                 _fragment_timeout_logged = false;
                 
+                // ✅ PROTEÇÃO CONTRA MEMORY LEAK
+                if accumulator.len() + n > MAX_ACCUMULATOR_SIZE {
+                    println!("⚠️ BUFFER OVERFLOW PROTECTION: {} tentou enviar {} bytes (max: {})", 
+                             ip, accumulator.len() + n, MAX_ACCUMULATOR_SIZE);
+                    accumulator.clear();
+                    accumulator.shrink_to_fit();
+                    continue;
+                }
+                
                 // 📦 Adicionar fragmento ao acumulador
                 accumulator.extend_from_slice(&buffer[0..n]);
                 // 🎯 Verificar se temos pacote completo
@@ -566,8 +651,12 @@ async fn handle_client_connection(
                         "timestamp": parsed.timestamp
                     }));
                     
-                    // 🧹 Limpar acumulador após parsear
+                    // 🧹 Limpar acumulador após parsear e recuperar memória
                     accumulator.clear();
+                    if accumulator.capacity() > BUFFER_CAPACITY * 2 {
+                        accumulator.shrink_to_fit(); // ✅ Recuperar memória excessiva
+                        accumulator.reserve(BUFFER_CAPACITY); // ✅ Manter capacidade mínima
+                    }
                     
                     // Emitir estatísticas a cada 1 segundo para calcular taxa
                     let elapsed = last_emit_time.elapsed();
@@ -640,6 +729,9 @@ async fn handle_client_connection(
             }
         }
     }
+    
+    // ✅ RETORNAR BUFFER PARA O POOL
+    buffer_pool.return_buffer(accumulator).await;
     
     total_bytes
 }

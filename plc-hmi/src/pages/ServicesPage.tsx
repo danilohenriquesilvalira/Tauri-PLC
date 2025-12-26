@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Server,
@@ -44,16 +44,7 @@ export const ServicesPage: React.FC = () => {
   const [showNetworkConfig, setShowNetworkConfig] = useState(false);
   const [showPostgresConfig, setShowPostgresConfig] = useState(false);
 
-  // Carregar estatísticas iniciais
-  useEffect(() => {
-    loadInitialStats();
-    
-    // Auto-refresh a cada 2 segundos
-    const interval = setInterval(loadInitialStats, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadInitialStats = async () => {
+  const loadInitialStats = useCallback(async () => {
     try {
       // TCP Stats
       try {
@@ -80,7 +71,16 @@ export const ServicesPage: React.FC = () => {
       console.error('Erro ao carregar stats:', error);
       setLoading(false);
     }
-  };
+  }, []);
+
+  // ✅ Carregar estatísticas iniciais
+  useEffect(() => {
+    loadInitialStats();
+    
+    // Auto-refresh a cada 2 segundos
+    const interval = setInterval(loadInitialStats, 2000);
+    return () => clearInterval(interval);
+  }, [loadInitialStats]);
 
   const handleStartTcp = async () => {
     try {
@@ -219,206 +219,193 @@ export const ServicesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* Cards de Resumo - Design Elegante Unificado */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+      {/* Cards de Resumo - Design Unificado */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         
         {/* Card 1 - Serviços Ativos */}
-        <div className="group bg-gradient-to-br from-white via-white to-[#BECACC]/8 rounded-2xl border border-[#A3B5B8]/25 p-6 hover:border-[#90A5A8]/35 hover:shadow-[0_8px_30px_-4px_rgba(163,181,184,0.08)] transition-all duration-500 cursor-default backdrop-blur-sm">
+        <div className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#BECACC]/50 to-[#A3B5B8]/35 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-2 shadow-sm">
-              <CheckCircle className="w-7 h-7 text-[#212E3E] drop-shadow-sm" />
+            <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-white" />
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-br from-[#212E3E] to-[#424D5B] bg-clip-text text-transparent transition-all duration-300">
+              <div className="text-2xl font-bold text-edp-marine">
                 {activeServices}
               </div>
-              <div className="text-sm text-[#90A5A8] font-medium">de {services.length}</div>
+              <div className="text-sm text-edp-slate">de {services.length}</div>
             </div>
           </div>
-          <div className="mt-5 pt-4 border-t border-[#A3B5B8]/15">
-            <h3 className="font-semibold text-[#212E3E] mb-1 text-sm tracking-wide">Serviços Ativos</h3>
-            <p className="text-xs text-[#90A5A8] font-medium">Sistema operacional</p>
+          <div className="mt-4 pt-3 border-t border-edp-marine/10">
+            <h3 className="font-medium text-edp-marine text-sm">Serviços Ativos</h3>
+            <p className="text-xs text-edp-slate mt-1">Sistema operacional</p>
           </div>
         </div>
 
         {/* Card 2 - Conexões */}
-        <div className="group bg-gradient-to-br from-white via-white to-[#BECACC]/8 rounded-2xl border border-[#A3B5B8]/25 p-6 hover:border-[#90A5A8]/35 hover:shadow-[0_8px_30px_-4px_rgba(163,181,184,0.08)] transition-all duration-500 cursor-default backdrop-blur-sm">
+        <div className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#BECACC]/50 to-[#A3B5B8]/35 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-2 shadow-sm">
-              <Network className="w-7 h-7 text-[#212E3E] drop-shadow-sm" />
+            <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center">
+              <Network className="w-6 h-6 text-white" />
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-br from-[#212E3E] to-[#424D5B] bg-clip-text text-transparent transition-all duration-300">
+              <div className="text-2xl font-bold text-edp-marine">
                 {totalConnections}
               </div>
-              <div className="text-sm text-[#90A5A8] font-medium">conexões</div>
+              <div className="text-sm text-edp-slate">conexões</div>
             </div>
           </div>
-          <div className="mt-5 pt-4 border-t border-[#A3B5B8]/15">
-            <h3 className="font-semibold text-[#212E3E] mb-1 text-sm tracking-wide">Conexões Ativas</h3>
-            <p className="text-xs text-[#90A5A8] font-medium">PLCs e clientes</p>
+          <div className="mt-4 pt-3 border-t border-edp-marine/10">
+            <h3 className="font-medium text-edp-marine text-sm">Conexões Ativas</h3>
+            <p className="text-xs text-edp-slate mt-1">PLCs e clientes</p>
           </div>
         </div>
 
         {/* Card 3 - Broadcast */}
-        <div className="group bg-gradient-to-br from-white via-white to-[#BECACC]/8 rounded-2xl border border-[#A3B5B8]/25 p-6 hover:border-[#90A5A8]/35 hover:shadow-[0_8px_30px_-4px_rgba(163,181,184,0.08)] transition-all duration-500 cursor-default backdrop-blur-sm">
+        <div className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#BECACC]/50 to-[#A3B5B8]/35 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-2 shadow-sm">
-              <Zap className="w-7 h-7 text-[#212E3E] drop-shadow-sm" />
+            <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white" />
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-br from-[#212E3E] to-[#424D5B] bg-clip-text text-transparent transition-all duration-300">
+              <div className="text-2xl font-bold text-edp-marine">
                 {wsRunning ? broadcastRate : '—'}
               </div>
-              <div className="text-sm text-[#90A5A8] font-medium">Hz</div>
+              <div className="text-sm text-edp-slate">Hz</div>
             </div>
           </div>
-          <div className="mt-5 pt-4 border-t border-[#A3B5B8]/15">
-            <h3 className="font-semibold text-[#212E3E] mb-1 text-sm tracking-wide">Taxa Broadcast</h3>
-            <p className="text-xs text-[#90A5A8] font-medium">{wsRunning ? 'Tempo real' : 'Inativo'}</p>
+          <div className="mt-4 pt-3 border-t border-edp-marine/10">
+            <h3 className="font-medium text-edp-marine text-sm">Taxa Broadcast</h3>
+            <p className="text-xs text-edp-slate mt-1">{wsRunning ? 'Tempo real' : 'Inativo'}</p>
           </div>
         </div>
 
         {/* Card 4 - Status */}
-        <div className="group bg-gradient-to-br from-white via-white to-[#BECACC]/8 rounded-2xl border border-[#A3B5B8]/25 p-6 hover:border-[#90A5A8]/35 hover:shadow-[0_8px_30px_-4px_rgba(163,181,184,0.08)] transition-all duration-500 cursor-default backdrop-blur-sm">
+        <div className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200">
           <div className="flex items-center justify-between">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#BECACC]/50 to-[#A3B5B8]/35 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-2 shadow-sm">
-              <Activity className="w-7 h-7 text-[#212E3E] drop-shadow-sm" />
+            <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center">
+              <Activity className="w-6 h-6 text-white" />
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-br from-[#212E3E] to-[#424D5B] bg-clip-text text-transparent transition-all duration-300">
+              <div className="text-2xl font-bold text-edp-marine">
                 {tcpRunning && wsRunning ? '100%' : tcpRunning || wsRunning ? '50%' : '0%'}
               </div>
-              <div className="text-sm text-[#90A5A8] font-medium">saúde</div>
+              <div className="text-sm text-edp-slate">saúde</div>
             </div>
           </div>
-          <div className="mt-5 pt-4 border-t border-[#A3B5B8]/15">
-            <h3 className="font-semibold text-[#212E3E] mb-1 text-sm tracking-wide">Sistema</h3>
-            <p className="text-xs text-[#90A5A8] font-medium">Operacional</p>
+          <div className="mt-4 pt-3 border-t border-edp-marine/10">
+            <h3 className="font-medium text-edp-marine text-sm">Sistema</h3>
+            <p className="text-xs text-edp-slate mt-1">Operacional</p>
           </div>
         </div>
       </div>
 
-      {/* Tabela de Serviços com Separações Detalhadas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
+      {/* Gerenciamento de Serviços Modernizado */}
+      <div className="bg-white rounded-xl border border-edp-marine/15 overflow-hidden">
         
-        {/* Header com Separação Visual */}
-        <div className="px-8 py-6 bg-gradient-to-b from-gray-50/80 to-white border-b border-gray-200">
+        {/* Header Limpo e Moderno */}
+        <div className="px-8 py-6 border-b border-edp-marine/10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#212E3E] mb-2 tracking-tight">Gerenciamento de Serviços</h2>
-              <p className="text-sm text-[#7C9599]">
+              <h2 className="text-xl font-semibold text-edp-marine tracking-tight mb-1">Gerenciamento de Serviços</h2>
+              <p className="text-sm text-edp-slate">
                 Controle centralizado e monitoramento em tempo real
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="px-4 py-2 bg-white border border-[#A3B5B8]/40 rounded-lg shadow-sm hover:shadow-md transition-all duration-300">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-[#212E3E] rounded-full animate-pulse"></div>
-                  <span className="text-sm font-semibold text-[#212E3E]">
-                    {activeServices} Serviços Ativos
-                  </span>
-                </div>
+            
+            {/* Status Badge Moderno */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 bg-edp-marine/5 border border-edp-marine/20 rounded-lg">
+                <div className="w-2 h-2 bg-edp-marine rounded-full"></div>
+                <span className="text-sm font-medium text-edp-marine">
+                  {activeServices} de {services.length} ativos
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Lista de Serviços com Separações Claras */}
-        <div>
-          {services.map((service, index) => {
+        {/* Lista de Serviços Modernizada */}
+        <div className="divide-y divide-edp-marine/8">
+          {services.map((service) => {
             const IconComponent = service.icon;
-            const isLast = index === services.length - 1;
             
             return (
-              <div key={service.id} className={`group hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-transparent transition-all duration-300 ${!isLast ? 'border-b border-gray-100' : ''}`}>
+              <div key={service.id} className="group hover:bg-edp-neutral-white-wash transition-all duration-200">
                 <div className="px-8 py-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center">
                     
-                    {/* Seção Principal com Ícone */}
-                    <div className="flex items-center gap-6 flex-1">
-                      
-                      {/* Ícone com Indicador Visual Melhorado */}
-                      <div className="relative group/icon">
-                        <div className={`w-16 h-16 rounded-xl flex items-center justify-center relative overflow-hidden shadow-sm group-hover:shadow-lg transition-all duration-300 ${
+                    {/* Ícone */}
+                    <div className="flex-shrink-0 mr-5">
+                      <div className="relative">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${
                           service.isRunning 
-                            ? 'bg-white border-2 border-[#A3B5B8]/50 group-hover:border-[#90A5A8]/60' 
-                            : 'bg-gray-50 border-2 border-gray-200 group-hover:border-gray-300'
+                            ? 'bg-edp-marine text-white' 
+                            : 'bg-edp-slate/10 text-edp-slate'
                         }`}>
-                          
-                          
-                          <IconComponent className={`w-7 h-7 transition-all duration-300 group-hover:scale-110 ${
-                            service.isRunning 
-                              ? 'text-[#212E3E]' 
-                              : 'text-gray-400'
-                          }`} />
-                          
-                        </div>
-                      </div>
-
-                      {/* Informações do Serviço */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-4 mb-2">
-                          <h3 className="text-lg font-bold text-[#212E3E] group-hover:text-[#424D5B] transition-colors duration-300">
-                            {service.name}
-                          </h3>
-                          
-                          {/* Badge de Status com Melhor Contraste */}
-                          <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-300 ${
-                            service.isRunning 
-                              ? 'bg-[#A3B5B8]/15 text-[#212E3E] border-[#A3B5B8]/40' 
-                              : 'bg-gray-100 text-gray-700 border-gray-200'
-                          }`}>
-                            {service.status}
-                          </div>
+                          <IconComponent className="w-5 h-5" />
                         </div>
                         
-                        <div className="flex items-center gap-4 text-sm text-[#7C9599]">
-                          <span className="font-medium">{service.description}</span>
-                          
-                          {/* Separador visual */}
-                          <div className="w-1 h-1 bg-[#BECACC] rounded-full"></div>
-                          
-                          {/* Badge da porta */}
-                          <span className="px-2 py-1 bg-gray-100 text-[#212E3E] rounded-md font-mono text-xs font-medium border border-gray-200">
-                            {service.port}
-                          </span>
-                        </div>
+                        {/* Indicador de Status */}
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                          service.isRunning ? 'bg-green-500' : 'bg-edp-slate'
+                        }`}></div>
                       </div>
                     </div>
 
-                    {/* Métricas Desktop com Separação Visual */}
-                    {service.isRunning && service.metrics.length > 0 && (
-                      <div className="hidden xl:flex items-center gap-8 mr-6">
-                        {service.metrics.slice(0, 3).map((metric, idx) => (
-                          <div key={idx} className="text-center min-w-[90px] group-hover:scale-105 transition-transform duration-300">
-                            <div className="text-lg font-bold text-[#212E3E] mb-1 transition-all">
-                              {metric.value}
-                            </div>
-                            <div className="text-xs text-[#7C9599] font-medium uppercase tracking-wide">
-                              {metric.label}
-                            </div>
-                          </div>
-                        ))}
+                    {/* Informações do Serviço */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-lg font-semibold text-edp-marine">
+                          {service.name}
+                        </h3>
+                        <span className={`px-2 py-1 rounded text-xs font-medium bg-gray-100 ${
+                          service.isRunning 
+                            ? 'text-edp-marine' 
+                            : 'text-edp-slate'
+                        }`}>
+                          {service.status}
+                        </span>
                       </div>
-                    )}
-                    
-                    {/* Placeholder quando desativado */}
-                    {!service.isRunning && (service.id === 'tcp' || service.id === 'websocket') && (
-                      <div className="hidden xl:flex items-center gap-3 mr-6">
-                        <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                          <span className="text-sm text-[#7C9599] font-medium">Aguardando ativação</span>
-                        </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-edp-slate">
+                        <span>{service.description}</span>
+                        <span className="font-mono text-xs text-edp-marine bg-gray-100 px-2 py-1 rounded">
+                          {service.port}
+                        </span>
                       </div>
-                    )}
+                    </div>
 
-                    {/* Controles com Separação Visual */}
-                    <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
+                    {/* Métricas */}
+                    <div className="flex items-center">
+                      {service.isRunning && service.metrics.length > 0 ? (
+                        <div className="flex items-center gap-8 mr-8">
+                          {service.metrics.slice(0, 3).map((metric, idx) => (
+                            <div key={idx} className="text-center min-w-[80px]">
+                              <div className="text-base font-semibold text-edp-marine">
+                                {metric.value}
+                              </div>
+                              <div className="text-xs text-edp-slate mt-1">
+                                {metric.label}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mr-8">
+                          {!service.isRunning && (service.id === 'tcp' || service.id === 'websocket') && (
+                            <span className="text-sm text-edp-slate">Serviço parado</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Controles */}
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       {service.id === 'tcp' || service.id === 'websocket' ? (
                         service.isRunning ? (
                           <button
                             onClick={service.onStop}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-[#E32C2C] border border-[#E32C2C] rounded-lg hover:bg-[#c92626] hover:border-[#c92626] hover:shadow-md active:scale-95 transition-all duration-200"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-edp-semantic-red border border-edp-semantic-red rounded-lg hover:bg-red-600 transition-colors duration-200"
                           >
                             <Square size={14} />
                             Parar
@@ -426,26 +413,23 @@ export const ServicesPage: React.FC = () => {
                         ) : (
                           <button
                             onClick={service.onStart}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-[#212E3E] bg-[#A3B5B8]/15 border border-[#A3B5B8]/40 rounded-lg hover:bg-[#A3B5B8]/25 hover:border-[#90A5A8]/60 hover:shadow-md active:scale-95 transition-all duration-200"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-edp-marine bg-edp-marine/5 border border-edp-marine/20 rounded-lg hover:bg-edp-marine/10 transition-colors duration-200"
                           >
                             <Play size={14} />
                             Iniciar
                           </button>
                         )
                       ) : (
-                        <div className="px-4 py-2.5 text-sm text-[#7C9599] bg-gray-50 rounded-lg border border-gray-200 font-medium">
+                        <div className="px-4 py-2 text-sm text-edp-slate bg-edp-slate/5 rounded-lg border border-edp-slate/10 font-medium">
                           Sistema
                         </div>
                       )}
                       
-                      {/* Botão de configuração com separação */}
-                      <div className="w-px h-8 bg-gray-200"></div>
-                      
-                      {/* Botão de configuração - Router para WebSocket, Settings para PostgreSQL */}
+                      {/* Botões de Configuração */}
                       {service.id === 'websocket' ? (
                         <button 
                           onClick={() => setShowNetworkConfig(true)}
-                          className="p-2.5 text-gray-400 hover:text-[#212E3E] hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-90"
+                          className="p-2.5 text-edp-slate hover:text-edp-marine hover:bg-edp-marine/5 rounded-lg transition-colors duration-200"
                           title="Configurar Interfaces de Rede"
                         >
                           <Router size={16} />
@@ -453,14 +437,14 @@ export const ServicesPage: React.FC = () => {
                       ) : service.id === 'postgres' ? (
                         <button 
                           onClick={() => setShowPostgresConfig(true)}
-                          className="p-2.5 text-gray-400 hover:text-[#212E3E] hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-90"
+                          className="p-2.5 text-edp-slate hover:text-edp-marine hover:bg-edp-marine/5 rounded-lg transition-colors duration-200"
                           title="Configurar PostgreSQL"
                         >
                           <Settings size={16} />
                         </button>
                       ) : (
                         <button 
-                          className="p-2.5 text-gray-300 cursor-not-allowed rounded-lg"
+                          className="p-2.5 text-edp-slate/40 cursor-not-allowed rounded-lg"
                           disabled
                           title="Configuração não disponível"
                         >
@@ -470,19 +454,6 @@ export const ServicesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Métricas Mobile com Separação */}
-                  {service.isRunning && service.metrics.length > 0 && (
-                    <div className="xl:hidden mt-6 pt-6 border-t border-gray-100">
-                      <div className="grid grid-cols-2 gap-4">
-                        {service.metrics.map((metric, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <span className="text-xs text-gray-600 font-medium uppercase tracking-wide">{metric.label}</span>
-                            <span className="text-sm font-bold text-[#212E3E]">{metric.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -509,3 +480,5 @@ export const ServicesPage: React.FC = () => {
     </div>
   );
 };
+
+export default ServicesPage;

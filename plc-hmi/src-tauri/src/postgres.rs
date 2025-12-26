@@ -8,11 +8,11 @@ pub struct PgDatabase {
 impl PgDatabase {
     pub async fn connect(database_url: &str) -> Result<Self, sqlx::Error> {
         let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .min_connections(1)
-            .acquire_timeout(Duration::from_secs(10))
-            .idle_timeout(Duration::from_secs(30))
-            .max_lifetime(Duration::from_secs(300))
+            .max_connections(20)        // ✅ Para alta carga industrial
+            .min_connections(2)         // ✅ Sempre prontas  
+            .acquire_timeout(Duration::from_secs(30))   // ✅ Timeout maior
+            .idle_timeout(Duration::from_secs(600))     // ✅ 10min
+            .max_lifetime(Duration::from_secs(3600))    // ✅ 1h
             .test_before_acquire(true)
             .connect(database_url)
             .await?;

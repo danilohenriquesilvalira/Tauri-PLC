@@ -1,6 +1,7 @@
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection, Result, Statement};
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,8 +44,11 @@ pub struct WebSocketDbConfig {
     pub updated_at: i64,
 }
 
+// ✅ DATABASE COM CONNECTION POOLING E PREPARED STATEMENTS
 pub struct Database {
-    conn: Mutex<Connection>,
+    read_conn: Arc<Mutex<Connection>>,   // ✅ Conexão para leitura
+    write_conn: Arc<Mutex<Connection>>,  // ✅ Conexão para escrita
+    prepared_stmts: Arc<Mutex<HashMap<String, String>>>, // ✅ Cache de queries
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +64,7 @@ pub struct PostgresConfig {
 impl Database {
     // Salva configuração do PostgreSQL no SQLite
     pub fn save_postgres_config(&self, config: &PostgresConfig) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         conn.execute(
             "CREATE TABLE IF NOT EXISTS postgres_config (
                 id INTEGER PRIMARY KEY,
@@ -83,7 +87,7 @@ impl Database {
 
     // Carrega configuração do PostgreSQL do SQLite
     pub fn load_postgres_config(&self) -> Result<Option<PostgresConfig>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT host, port, user, password, database, updated_at FROM postgres_config LIMIT 1")?;
         let mut rows = stmt.query([])?;
         if let Some(row) = rows.next()? {
@@ -117,20 +121,48 @@ impl Database {
                 return Err(rusqlite::Error::InvalidPath(parent.to_path_buf()));
             }
         }
-        println!("📁 Banco de dados FIXO: {:?}", db_path);
-        let conn = match Connection::open(db_path) {
-            Ok(c) => c,
+        println!("📁 Banco de dados OTIMIZADO: {:?}", db_path);
+        
+        // ✅ CRIAR DUAS CONEXÕES: UMA PARA LEITURA, OUTRA PARA ESCRITA
+        let read_conn = match Connection::open(&db_path) {
+            Ok(mut c) => {
+                // ✅ Otimizações para leitura
+                c.pragma_update(None, "journal_mode", "WAL")?;
+                c.pragma_update(None, "synchronous", "NORMAL")?;
+                c.pragma_update(None, "cache_size", "10000")?;
+                c.pragma_update(None, "temp_store", "memory")?;
+                c
+            },
             Err(e) => {
                 let _ = app_handle.emit("sqlite-error", serde_json::json!({
-                    "operation": "open_db",
-                    "message": format!("Falha ao abrir banco: {}", e),
+                    "operation": "open_read_db",
+                    "message": format!("Falha ao abrir banco (leitura): {}", e),
                     "timestamp": chrono::Utc::now().to_rfc3339()
                 }));
                 return Err(e);
             }
         };
-        // Criar tabelas se não existirem
-        if let Err(e) = conn.execute(
+        
+        let write_conn = match Connection::open(&db_path) {
+            Ok(mut c) => {
+                // ✅ Otimizações para escrita
+                c.pragma_update(None, "journal_mode", "WAL")?;
+                c.pragma_update(None, "synchronous", "NORMAL")?;
+                c.pragma_update(None, "cache_size", "10000")?;
+                c
+            },
+            Err(e) => {
+                let _ = app_handle.emit("sqlite-error", serde_json::json!({
+                    "operation": "open_write_db",
+                    "message": format!("Falha ao abrir banco (escrita): {}", e),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }));
+                return Err(e);
+            }
+        };
+        // ✅ CRIAR TABELAS COM CONEXÃO DE ESCRITA
+        let write_conn_ref = &write_conn;
+        if let Err(e) = write_conn_ref.execute(
             "CREATE TABLE IF NOT EXISTS plc_structures (
                 plc_ip TEXT PRIMARY KEY,
                 config_json TEXT NOT NULL,
@@ -146,7 +178,7 @@ impl Database {
             }));
             return Err(e);
         }
-        if let Err(e) = conn.execute(
+        if let Err(e) = write_conn_ref.execute(
             "CREATE TABLE IF NOT EXISTS tag_mappings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 plc_ip TEXT NOT NULL,
@@ -164,10 +196,10 @@ impl Database {
             [],
         ) {
                     // Migração automática: garantir que as colunas collect_mode e collect_interval_s existam
-                    let mut stmt = conn.prepare("PRAGMA table_info(tag_mappings)")?;
+                    let mut stmt = write_conn_ref.prepare("PRAGMA table_info(tag_mappings)")?;
                     let columns: Vec<String> = stmt.query_map([], |row| row.get(1))?.filter_map(Result::ok).collect();
                     if !columns.iter().any(|c| c == "collect_mode") {
-                        match conn.execute("ALTER TABLE tag_mappings ADD COLUMN collect_mode TEXT", []) {
+                        match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_mode TEXT", []) {
                             Ok(_) => println!("[MIGRATION] Coluna 'collect_mode' adicionada à tabela tag_mappings."),
                             Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_mode': {}", e),
                         }
@@ -175,7 +207,7 @@ impl Database {
                         println!("[MIGRATION] Coluna 'collect_mode' já existe.");
                     }
                     if !columns.iter().any(|c| c == "collect_interval_s") {
-                        match conn.execute("ALTER TABLE tag_mappings ADD COLUMN collect_interval_s INTEGER", []) {
+                        match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_interval_s INTEGER", []) {
                             Ok(_) => println!("[MIGRATION] Coluna 'collect_interval_s' adicionada à tabela tag_mappings."),
                             Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_interval_s': {}", e),
                         }
@@ -189,7 +221,7 @@ impl Database {
             }));
             return Err(e);
         }
-        if let Err(e) = conn.execute(
+        if let Err(e) = write_conn_ref.execute(
             "CREATE TABLE IF NOT EXISTS websocket_config (
                 id INTEGER PRIMARY KEY,
                 host TEXT NOT NULL DEFAULT '0.0.0.0',
@@ -210,19 +242,36 @@ impl Database {
             return Err(e);
         }
         // Migração para adicionar coluna bind_interfaces_json se não existir
-        let _ = conn.execute(
+        let _ = write_conn_ref.execute(
             "ALTER TABLE websocket_config ADD COLUMN bind_interfaces_json TEXT NOT NULL DEFAULT '[\"0.0.0.0\"]'",
             [],
         );
-        println!("✅ Banco de dados SQLite inicializado");
+        // ✅ CRIAR ÍNDICES PARA PERFORMANCE
+        let indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_plc_structures_last_updated ON plc_structures(last_updated DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_tag_mappings_plc_ip ON tag_mappings(plc_ip)",
+            "CREATE INDEX IF NOT EXISTS idx_tag_mappings_enabled ON tag_mappings(enabled)",
+            "CREATE INDEX IF NOT EXISTS idx_tag_mappings_plc_enabled ON tag_mappings(plc_ip, enabled)",
+        ];
+        
+        for index_sql in &indexes {
+            if let Err(e) = write_conn_ref.execute(index_sql, []) {
+                println!("⚠️ Aviso: Falha ao criar índice: {} - {}", index_sql, e);
+            }
+        }
+        
+        println!("✅ Banco de dados SQLite OTIMIZADO inicializado com dual connections");
+        
         Ok(Database {
-            conn: Mutex::new(conn),
+            read_conn: Arc::new(Mutex::new(read_conn)),
+            write_conn: Arc::new(Mutex::new(write_conn)),
+            prepared_stmts: Arc::new(Mutex::new(HashMap::new())),
         })
     }
     
     /// Salva a configuração de estrutura de um PLC
     pub fn save_plc_structure(&self, config: &PlcStructureConfig) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         let config_json = match serde_json::to_string(&config.blocks) {
             Ok(json) => json,
             Err(e) => {
@@ -264,7 +313,7 @@ impl Database {
     
     /// Carrega a configuração de estrutura de um PLC
     pub fn load_plc_structure(&self, plc_ip: &str) -> Result<Option<PlcStructureConfig>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
             "SELECT config_json, total_size, last_updated FROM plc_structures WHERE plc_ip = ?1"
@@ -298,7 +347,7 @@ impl Database {
     
     /// Lista todos os PLCs configurados
     pub fn list_configured_plcs(&self) -> Result<Vec<String>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare("SELECT plc_ip FROM plc_structures ORDER BY last_updated DESC")?;
         
@@ -310,7 +359,7 @@ impl Database {
     
     /// Remove a configuração de um PLC
     pub fn delete_plc_structure(&self, plc_ip: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         
         conn.execute(
             "DELETE FROM plc_structures WHERE plc_ip = ?1",
@@ -324,7 +373,7 @@ impl Database {
     
     /// 🔍 DEBUG: Mostra EXATAMENTE o que está salvo no banco
     pub fn debug_show_saved_structure(&self, plc_ip: &str) -> Result<String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let result = conn.query_row(
             "SELECT config_json, total_size, last_updated FROM plc_structures WHERE plc_ip = ?1",
@@ -381,7 +430,7 @@ impl Database {
     
     /// Salva um mapeamento de tag
     pub fn save_tag_mapping(&self, tag: &TagMapping) -> Result<i64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         
         let _result = conn.execute(
             "INSERT OR REPLACE INTO tag_mappings 
@@ -408,7 +457,7 @@ impl Database {
     
     /// Carrega todos os tags de um PLC
     pub fn load_tag_mappings(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
             "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
@@ -443,7 +492,7 @@ impl Database {
     
     /// Remove um tag mapping
     pub fn delete_tag_mapping(&self, plc_ip: &str, variable_path: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         
         conn.execute(
             "DELETE FROM tag_mappings WHERE plc_ip = ?1 AND variable_path = ?2",
@@ -456,7 +505,7 @@ impl Database {
     
     /// Lista todos os tags ativos (enabled=true) de um PLC para o WebSocket
     pub fn get_active_tags(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
             "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
@@ -488,7 +537,7 @@ impl Database {
     
     /// Salva configuração WebSocket
     pub fn save_websocket_config(&self, config: &WebSocketDbConfig) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.write_conn.lock().unwrap();
         
         // Serializar lista de interfaces para JSON
         let bind_interfaces_json = serde_json::to_string(&config.bind_interfaces)
@@ -516,7 +565,7 @@ impl Database {
     
     /// Carrega configuração WebSocket
     pub fn load_websocket_config(&self) -> Result<WebSocketDbConfig> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         
         let result = conn.query_row(
             "SELECT host, port, max_clients, broadcast_interval_ms, enabled, bind_interfaces_json, updated_at 
