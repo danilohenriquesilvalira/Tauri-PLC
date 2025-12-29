@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result, Statement};
+use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -125,7 +125,7 @@ impl Database {
         
         // ✅ CRIAR DUAS CONEXÕES: UMA PARA LEITURA, OUTRA PARA ESCRITA
         let read_conn = match Connection::open(&db_path) {
-            Ok(mut c) => {
+            Ok(c) => {
                 // ✅ Otimizações para leitura
                 c.pragma_update(None, "journal_mode", "WAL")?;
                 c.pragma_update(None, "synchronous", "NORMAL")?;
@@ -144,7 +144,7 @@ impl Database {
         };
         
         let write_conn = match Connection::open(&db_path) {
-            Ok(mut c) => {
+            Ok(c) => {
                 // ✅ Otimizações para escrita
                 c.pragma_update(None, "journal_mode", "WAL")?;
                 c.pragma_update(None, "synchronous", "NORMAL")?;
@@ -483,9 +483,9 @@ impl Database {
         let tags = tags?;
         
         // Debug: mostrar estado dos tags carregados
-        for tag in &tags {
-            println!("📖 Tag carregado: {} = {} (enabled: {})", tag.variable_path, tag.tag_name, tag.enabled);
-        }
+        // for tag in &tags {
+        //     println!("📖 Tag carregado: {} = {} (enabled: {})", tag.variable_path, tag.tag_name, tag.enabled);
+        // }
         println!("📖 Total: {} tags carregados para PLC {}", tags.len(), plc_ip);
         Ok(tags)
     }

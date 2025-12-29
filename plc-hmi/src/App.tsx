@@ -4,7 +4,7 @@ import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import { HomePage } from './pages/HomePage';
 import { ServicesPage } from './pages/ServicesPage';
-import { PlcMonitoring } from './components/plc/PlcMonitoring';
+import { SclAnalysisPage } from './pages/SclAnalysisPage';
 import { TcpServerConfigCompact } from './components/server/TcpServerConfigCompact';
 import { FirstRunSetup } from './components/setup/FirstRunSetup';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -15,11 +15,10 @@ function App() {
   const [isFirstRun, setIsFirstRun] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Mapeamento dos títulos das páginas (sempre executar, não condicional)
   const pageTitle = useMemo(() => {
     const titles: Record<string, string> = {
       home: 'Início',
-      monitor: 'Monitoramento',
+      'scl-analysis': 'Análise de Lógica SCL',
       services: 'Serviços',
       settings: 'Configurações'
     };
@@ -68,7 +67,7 @@ function App() {
     <NotificationProvider>
       <div className="flex h-screen overflow-hidden bg-edp-neutral-white-wash">
         {/* Sidebar */}
-        <Sidebar 
+        <Sidebar
           activeItem={activeMenuItem}
           onItemClick={setActiveMenuItem}
           collapsed={sidebarCollapsed}
@@ -84,7 +83,7 @@ function App() {
           <main className="flex-1 overflow-y-auto p-8">
             {/* Renderizar conteúdo baseado no menu ativo */}
             {activeMenuItem === 'home' && <HomePage />}
-            {activeMenuItem === 'monitor' && <PlcMonitoring />}
+            {activeMenuItem === 'scl-analysis' && <SclAnalysisPage />}
             {activeMenuItem === 'services' && <ServicesPage />}
             {activeMenuItem === 'settings' && <TcpServerConfigCompact />}
           </main>
@@ -95,4 +94,3 @@ function App() {
 }
 
 export default App;
-

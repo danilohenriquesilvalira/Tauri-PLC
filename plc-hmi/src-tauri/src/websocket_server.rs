@@ -151,7 +151,10 @@ impl SmartCache {
     
     // Atualizar cache com dados do TCP (chamado apenas quando há novos dados TCP)
     pub async fn update_from_tcp(&self, plc_ip: &str, variables: &[crate::tcp_server::PlcVariable], database: &Database) {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
         
         // Obter tags ativos deste PLC
         if let Ok(tags) = database.get_active_tags(plc_ip) {
@@ -190,7 +193,10 @@ impl SmartCache {
     
     // Obter tags que precisam ser enviados baseado no intervalo
     pub async fn get_tags_for_broadcast(&self, interval_s: u64) -> HashMap<String, String> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
         let mut result = HashMap::new();
         let mut keys_to_update = Vec::new();
         

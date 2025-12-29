@@ -101,6 +101,7 @@ dependencies = [
  "dashmap",
  "futures",
  "futures-util",
+ "libc",
  "log",
  "postgres",
  "rmp-serde",
@@ -117,6 +118,7 @@ dependencies = [
  "tokio-tungstenite",
  "tungstenite",
  "uuid",
+ "winapi",
 ]
 
 [[package]]

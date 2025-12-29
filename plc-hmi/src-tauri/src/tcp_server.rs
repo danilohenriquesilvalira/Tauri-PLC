@@ -1,13 +1,15 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{RwLock, Mutex};
+use tokio::time::timeout;
 use dashmap::DashMap; // HashMap concorrente sem locks!
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
-use crate::database::Database;
+use crate::database::{Database, PlcStructureConfig};
 
 // ✅ BUFFER POOL PARA ZERO ALLOCATIONS
 #[derive(Debug)]
@@ -121,6 +123,8 @@ pub struct TcpServer {
     latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 SEM LOCKS! Acesso concorrente livre
     database: Option<Arc<Database>>, // Banco de dados para configurações
     buffer_pool: Arc<BufferPool>, // ✅ BUFFER POOL PARA ZERO ALLOCATIONS
+    // 🚀 CACHE DE CONFIGURAÇÕES - ZERO DATABASE CALLS NO HOT PATH!
+    plc_configs_cache: Arc<DashMap<String, PlcStructureConfig>>, // IP → Config
 }
 
 impl TcpServer {
@@ -140,6 +144,7 @@ impl TcpServer {
             latest_data: Arc::new(DashMap::new()), // 🚀 DashMap = zero locks!
             database,
             buffer_pool: Arc::new(BufferPool::new()), // ✅ BUFFER POOL INICIALIZADO
+            plc_configs_cache: Arc::new(DashMap::new()), // 🚀 CACHE CONFIG ZERO LOCKS
         }
     }
 
@@ -167,6 +172,7 @@ impl TcpServer {
         let latest_data = self.latest_data.clone();
         let database = self.database.clone();
         let buffer_pool = self.buffer_pool.clone(); // ✅ BUFFER POOL
+        let plc_configs_cache = self.plc_configs_cache.clone(); // 🚀 CACHE
         let port = self.port;
 
         let handle = tokio::spawn(async move {
@@ -242,10 +248,16 @@ impl TcpServer {
                         let connection_handles_clone = connection_handles.clone();
                         let database_clone = database.clone();
                         let buffer_pool_clone = buffer_pool.clone(); // ✅ BUFFER POOL
+                        let plc_configs_cache_clone = plc_configs_cache.clone(); // 🚀 CACHE
                         let ip_clone = ip.clone();
                         let is_running_clone = is_running.clone();
 
                         let connection_handle = tokio::spawn(async move {
+                            // ✅ CONFIGURAR SOCKET PARA KEEPALIVE ANTES DE USAR
+                            if let Err(e) = configure_socket_keepalive(&socket) {
+                                println!("⚠️ Falha ao configurar keepalive para {}: {}", ip_clone, e);
+                            }
+                            
                             // Manter conexão ativa e contar bytes
                             let total_bytes = handle_client_connection(
                                 socket, 
@@ -256,7 +268,8 @@ impl TcpServer {
                                 latest_data_clone.clone(),
                                 app_handle_clone.clone(),
                                 database_clone.clone(),
-                                buffer_pool_clone.clone() // ✅ BUFFER POOL
+                                buffer_pool_clone.clone(), // ✅ BUFFER POOL
+                                plc_configs_cache_clone.clone() // 🚀 CACHE
                             ).await;
                             
                             println!("📊 PLC {} (ID: {}) transferiu {} bytes no total", ip_clone, conn_id, total_bytes);
@@ -406,7 +419,10 @@ impl TcpServer {
             active_connections: active,
             total_connections: total_unique,
             last_data_time: if active > 0 { 
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_else(|_| Duration::from_secs(0))
+                    .as_secs()
             } else { 0 },
             server_status: if self.is_running.load(Ordering::SeqCst) { 
                 "Rodando".to_string() 
@@ -467,12 +483,91 @@ impl TcpServer {
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect()
     }
+    
+    // 🚀 GERENCIAMENTO DO CACHE DE CONFIGURAÇÕES
+    pub async fn invalidate_plc_config_cache(&self, plc_ip: &str) {
+        self.plc_configs_cache.remove(plc_ip);
+        println!("🗑️ Cache de configuração invalidado para PLC: {}", plc_ip);
+    }
+    
+    pub async fn clear_all_config_cache(&self) {
+        self.plc_configs_cache.clear();
+        println!("🧹 Todo cache de configurações limpo");
+    }
+    
+    pub async fn get_cache_stats(&self) -> (usize, Vec<String>) {
+        let cached_ips: Vec<String> = self.plc_configs_cache.iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+        (cached_ips.len(), cached_ips)
+    }
 }
 
-// 🔧 CONSTANTES DE SEGURANÇA
+// 🔧 CONSTANTES DE SEGURANÇA E TIMEOUTS
 const MAX_PACKET_SIZE: usize = 1_048_576; // 1MB máximo
 const MAX_ACCUMULATOR_SIZE: usize = 65536; // 64KB máximo  
 const BUFFER_CAPACITY: usize = 8192; // 8KB inicial
+
+// ✅ TIMEOUTS CONSISTENTES PARA SIEMENS S7
+const TCP_READ_TIMEOUT_SECS: u64 = 30; // 30s timeout para leitura
+const TCP_ACK_TIMEOUT_MILLIS: u64 = 100; // 100ms para enviar ACK
+const KEEPALIVE_INTERVAL_SECS: u64 = 10; // Heartbeat a cada 10s
+const CONNECTION_HEALTH_CHECK_SECS: u64 = 60; // Check saúde a cada 60s
+
+// ✅ FUNÇÃO PARA CONFIGURAR SOCKET KEEPALIVE (WINDOWS COMPATIBLE)
+fn configure_socket_keepalive(socket: &TcpStream) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawSocket;
+        use winapi::um::winsock2::{SOCKET_ERROR, SO_KEEPALIVE, SOL_SOCKET, setsockopt};
+        use winapi::shared::ws2def::SOCKADDR;
+        
+        let raw_socket = socket.as_raw_socket();
+        let keepalive: u32 = 1;
+        
+        let result = unsafe {
+            setsockopt(
+                raw_socket as _,
+                SOL_SOCKET as i32,
+                SO_KEEPALIVE as i32,
+                &keepalive as *const _ as *const i8,
+                std::mem::size_of::<u32>() as i32,
+            )
+        };
+        
+        if result == SOCKET_ERROR {
+            return Err(std::io::Error::last_os_error());
+        }
+        
+        println!("✅ Socket keepalive configurado para {:?}", socket.peer_addr().ok());
+        Ok(())
+    }
+    
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        
+        let raw_socket = socket.as_raw_fd();
+        let keepalive: libc::c_int = 1;
+        
+        let result = unsafe {
+            libc::setsockopt(
+                raw_socket,
+                libc::SOL_SOCKET,
+                libc::SO_KEEPALIVE,
+                &keepalive as *const _ as *const libc::c_void,
+                std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+            )
+        };
+        
+        if result != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        
+        println!("✅ Socket keepalive configurado para {:?}", socket.peer_addr().ok());
+        Ok(())
+    }
+}
 
 async fn handle_client_connection(
     mut socket: TcpStream, 
@@ -483,26 +578,37 @@ async fn handle_client_connection(
     latest_data: Arc<DashMap<String, PlcDataPacket>>, // 🚀 DashMap!
     app_handle: tauri::AppHandle,
     database: Option<Arc<Database>>,
-    buffer_pool: Arc<BufferPool> // ✅ BUFFER POOL
+    buffer_pool: Arc<BufferPool>, // ✅ BUFFER POOL
+    plc_configs_cache: Arc<DashMap<String, PlcStructureConfig>> // 🚀 CONFIG CACHE
 ) -> u64 {
     let mut buffer = [0; 1024];
     let mut accumulator = buffer_pool.get_buffer(BUFFER_CAPACITY).await; // ✅ BUFFER DO POOL
     let mut expected_size: Option<usize> = None; // 🎯 Tamanho esperado da configuração
     let mut total_bytes = 0u64;
     let mut packet_count = 0u64;
-    let mut last_emit_time = std::time::Instant::now();
+    let mut last_emit_time = Instant::now();
     let mut bytes_since_last_emit = 0u64;
     // Timeout de inatividade: fecha conexão se não receber pacote válido por 300s
-    let mut last_valid_packet = std::time::Instant::now();
-    let mut last_fragment_time = std::time::Instant::now();
+    let mut last_valid_packet = Instant::now();
+    let mut last_fragment_time = Instant::now();
     let mut _fragment_timeout_logged = false;
     
-    // 🔍 Carregar configuração salva para saber quantos bytes esperar
-    if let Some(db) = database.as_ref() {
+    // ✅ HEARTBEAT PROATIVO - detectar conexão morta
+    let mut last_keepalive_sent = Instant::now();
+    let mut consecutive_ack_failures = 0u32;
+    
+    // 🚀 CARREGAR CONFIG DO CACHE (ZERO DATABASE CALLS!)
+    if let Some(cached_config) = plc_configs_cache.get(&ip) {
+        expected_size = Some(cached_config.total_size);
+        println!("⚡ PLC {}: Config do CACHE - {} bytes esperados (ZERO DB CALLS!)", ip, cached_config.total_size);
+    } else if let Some(db) = database.as_ref() {
+        // Só consulta banco se NÃO estiver no cache
         match db.load_plc_structure(&ip) {
             Ok(Some(structure)) => {
                 expected_size = Some(structure.total_size);
-                println!("🎯 PLC {}: Esperando {} bytes por pacote (configuração salva)", ip, structure.total_size);
+                // 🚀 SALVAR NO CACHE PARA PRÓXIMAS CALLS
+                plc_configs_cache.insert(ip.clone(), structure.clone());
+                println!("💾 PLC {}: Config carregada do banco e CACHEADA - {} bytes", ip, structure.total_size);
             }
             Ok(None) => {
                 println!("⚠️ PLC {}: Sem configuração salva, aceitando qualquer tamanho", ip);
@@ -518,6 +624,50 @@ async fn handle_client_connection(
         if !is_running.load(Ordering::SeqCst) {
             println!("🛑 Fechando conexão {} pois servidor parou", ip);
             break;
+        }
+        
+        // ✅ HEARTBEAT PROATIVO - enviar keepalive se necessário
+        if last_keepalive_sent.elapsed().as_secs() >= KEEPALIVE_INTERVAL_SECS {
+            // Enviar ping/keepalive para detectar conexão morta
+            match timeout(
+                Duration::from_millis(TCP_ACK_TIMEOUT_MILLIS),
+                socket.write_all(b"PING\n")
+            ).await {
+                Ok(Ok(_)) => {
+                    match timeout(
+                        Duration::from_millis(TCP_ACK_TIMEOUT_MILLIS),
+                        socket.flush()
+                    ).await {
+                        Ok(Ok(_)) => {
+                            last_keepalive_sent = Instant::now();
+                            consecutive_ack_failures = 0;
+                            println!("💓 Keepalive enviado para {}", ip);
+                        }
+                        _ => {
+                            consecutive_ack_failures += 1;
+                            println!("❌ KEEPALIVE FLUSH FALHOU para {} (tentativa {})", ip, consecutive_ack_failures);
+                        }
+                    }
+                }
+                _ => {
+                    consecutive_ack_failures += 1;
+                    println!("❌ KEEPALIVE SEND FALHOU para {} (tentativa {})", ip, consecutive_ack_failures);
+                }
+            }
+            
+            // Se múltiplos keepalives falharam, conexão está morta
+            if consecutive_ack_failures >= 3 {
+                println!("☠️ CONEXÃO MORTA DETECTADA: {} falhou {} keepalives consecutivos - Siemens erro 7005", 
+                         ip, consecutive_ack_failures);
+                let _ = app_handle.emit("tcp-dead-connection", serde_json::json!({
+                    "ip": ip,
+                    "id": conn_id,
+                    "consecutive_failures": consecutive_ack_failures,
+                    "reason": "Keepalive falhou múltiplas vezes - conexão TCP morta",
+                    "siemens_error": "7005 - Connection Lost"
+                }));
+                break;
+            }
         }
         
         // Verificar fragmentos pendentes no acumulador (timeout de 30s para fragmento incompleto)
@@ -541,7 +691,7 @@ async fn handle_client_connection(
                 accumulator.clear();
                 _fragment_timeout_logged = false;
                 // Reset fragment time para evitar warning
-                last_fragment_time = std::time::Instant::now();
+                last_fragment_time = Instant::now();
             }
         }
         // Timeout de inatividade: se passou de 300s sem pacote válido, fecha conexão
@@ -554,8 +704,9 @@ async fn handle_client_connection(
             }));
             break;
         }
-        match tokio::time::timeout(
-            tokio::time::Duration::from_secs(120), // 120s timeout - PLC pode demorar mais
+        // ✅ TIMEOUT CONSISTENTE - 30s em todo lugar
+        match timeout(
+            Duration::from_secs(TCP_READ_TIMEOUT_SECS),
             socket.read(&mut buffer)
         ).await {
             Ok(Ok(0)) => {
@@ -569,7 +720,7 @@ async fn handle_client_connection(
                 println!("📥 [{}] Fragmento de {} (ID: {}): {} bytes", now, ip, conn_id, n);
                 
                 // Atualizar tempo do último fragmento
-                last_fragment_time = std::time::Instant::now();
+                last_fragment_time = Instant::now();
                 _fragment_timeout_logged = false;
                 
                 // ✅ PROTEÇÃO CONTRA MEMORY LEAK
@@ -602,7 +753,8 @@ async fn handle_client_connection(
                     true
                 };
                 if should_parse {
-                    last_valid_packet = std::time::Instant::now(); // Atualiza tempo do último pacote válido
+                    last_valid_packet = Instant::now(); // Atualiza tempo do último pacote válido
+                    consecutive_ack_failures = 0; // Reset contador de falhas ACK
                     packet_count += 1;
                     
                     // Timestamp de recepção TCP (nanosegundos)
@@ -618,7 +770,9 @@ async fn handle_client_connection(
                         &accumulator[..] 
                     };
                     
-                    let parsed = crate::plc_parser::parse_plc_data(data_to_parse, &ip, database.as_ref());
+                    // 🚀 PASSAR CACHE EM VEZ DE DATABASE - ZERO LOCKS!
+                    let cached_config = plc_configs_cache.get(&ip).map(|entry| entry.value().clone());
+                    let parsed = crate::plc_parser::parse_plc_data_cached(data_to_parse, &ip, cached_config);
                     
                     // Adicionar métricas de transferência
                     let backend_processed_ns = std::time::SystemTime::now()
@@ -691,22 +845,41 @@ async fn handle_client_connection(
                         
                         // Reset contadores
                         bytes_since_last_emit = 0;
-                        last_emit_time = std::time::Instant::now();
+                        last_emit_time = Instant::now();
                     }
                 }
                 
-                // Responder com ACK simples e imediato
+                // ✅ PROBLEMA 2: ACK demorado causa timeout no PLC
+                // Siemens precisa de ACK rápido senão detecta como erro 7005
                 if let Err(e) = socket.write_all(b"OK\n").await {
-                    println!("❌ Erro ao enviar ACK para {}: {}", ip, e);
+                    println!("❌ ERRO CRÍTICO: Falha no ACK para {} - PLC detectará erro 7005: {}", ip, e);
                     let _ = app_handle.emit("tcp-ack-error", serde_json::json!({
                         "ip": ip,
                         "id": conn_id,
-                        "error": e.to_string()
+                        "error": e.to_string(),
+                        "critical": true,
+                        "siemens_error": "7005 - Connection Lost"
                     }));
                     break;
                 }
-                // Garantir envio imediato do ACK
-                let _ = socket.flush().await;
+                
+                // ✅ FLUSH OBRIGATÓRIO COM TIMEOUT CONSISTENTE
+                match timeout(
+                    Duration::from_millis(TCP_ACK_TIMEOUT_MILLIS),
+                    socket.flush()
+                ).await {
+                    Ok(Ok(_)) => {
+                        // ACK enviado com sucesso
+                    }
+                    Ok(Err(e)) => {
+                        println!("❌ ERRO CRÍTICO: Falha no flush ACK para {} - PLC detectará erro 7005: {}", ip, e);
+                        break;
+                    }
+                    Err(_) => {
+                        println!("❌ TIMEOUT no ACK para {} - PLC detectará erro 7005", ip);
+                        break;
+                    }
+                }
             }
             Ok(Err(e)) => {
                 println!("❌ Erro de leitura de {} (ID: {}): {}", ip, conn_id, e);
@@ -718,11 +891,11 @@ async fn handle_client_connection(
                 break;
             }
             Err(_) => {
-                println!("⏰ Timeout de leitura (120s) na conexão {} (ID: {}) - PLC pode estar ocupado", ip, conn_id);
+                println!("⏰ Timeout de leitura ({}s) na conexão {} (ID: {}) - PLC pode estar ocupado", TCP_READ_TIMEOUT_SECS, ip, conn_id);
                 let _ = app_handle.emit("tcp-read-timeout", serde_json::json!({
                     "ip": ip,
                     "id": conn_id,
-                    "timeout_seconds": 120,
+                    "timeout_seconds": TCP_READ_TIMEOUT_SECS,
                     "reason": "PLC não enviou dados dentro do timeout de leitura"
                 }));
                 break;

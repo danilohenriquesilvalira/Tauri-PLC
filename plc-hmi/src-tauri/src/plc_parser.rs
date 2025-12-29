@@ -1,6 +1,7 @@
 use crate::tcp_server::{PlcVariable, PlcDataPacket};
-use crate::database::{Database, DataBlockConfig};
+use crate::database::{Database, DataBlockConfig, PlcStructureConfig};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Converte bytes para WORD (16-bit unsigned)
 fn bytes_to_word(high_byte: u8, low_byte: u8) -> u16 {
@@ -149,13 +150,50 @@ fn detect_data_format(raw_data: &[u8]) -> &'static str {
     "byte"
 }
 
-/// Função INTELIGENTE para parsear dados do PLC
+/// 🚀 NOVA FUNÇÃO: Parse com cache - ZERO DATABASE CALLS!
+pub fn parse_plc_data_cached(raw_data: &[u8], ip: &str, cached_config: Option<PlcStructureConfig>) -> PlcDataPacket {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::from_secs(0))
+        .as_secs();
+    
+    let data_len = raw_data.len();
+    
+    // 🚀 USAR CONFIG DO CACHE - ZERO LOCKS!
+    let variables = if let Some(config) = cached_config {
+        println!("⚡ PLC {}: Usando config CACHEADA ({} blocos, {} bytes) - PERFORMANCE MÁXIMA!", 
+                 ip, config.blocks.len(), config.total_size);
+        
+        if config.total_size == data_len {
+            parse_with_config(raw_data, &config.blocks)
+        } else {
+            println!("⚠️ PLC {}: Tamanho diferente! Esperado {} bytes, recebido {} bytes. Usando detecção automática.",
+                     ip, config.total_size, data_len);
+            parse_auto_detect(raw_data)
+        }
+    } else {
+        println!("📊 PLC {}: Sem config cacheada. Usando detecção automática em {} bytes", ip, data_len);
+        parse_auto_detect(raw_data)
+    };
+    
+    println!("📊 PLC {}: Parseados {} variáveis", ip, variables.len());
+    
+    PlcDataPacket {
+        ip: ip.to_string(),
+        timestamp,
+        raw_data: raw_data.to_vec(),
+        size: data_len,
+        variables,
+    }
+}
+
+/// ⚠️ FUNÇÃO LEGADA: Parse com database calls (EVITAR USAR!)
 /// 1. Tenta usar configuração salva no banco de dados
 /// 2. Se não tiver, usa detecção automática (fallback)
 pub fn parse_plc_data(raw_data: &[u8], ip: &str, db: Option<&Arc<Database>>) -> PlcDataPacket {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_else(|_| Duration::from_secs(0))
         .as_secs();
     
     let data_len = raw_data.len();

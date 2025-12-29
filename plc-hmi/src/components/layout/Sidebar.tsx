@@ -1,11 +1,12 @@
 import React from 'react';
-import { 
-  Home, 
+import {
+  Home,
   Gauge,
   Settings,
   Menu,
   ChevronLeft,
-  Server
+  Server,
+  Code
 } from 'lucide-react';
 import logoDanilo from '../../assets/Logo_Danilo.svg';
 
@@ -24,7 +25,7 @@ export type SidebarProps = {
 
 const menuItems: MenuItem[] = [
   { id: 'home', label: 'Início', icon: <Home size={20} /> },
-  { id: 'monitor', label: 'Monitoramento', icon: <Gauge size={20} /> },
+  { id: 'scl-analysis', label: 'Analisar SCL', icon: <Code size={20} /> },
   { id: 'services', label: 'Serviços', icon: <Server size={20} /> },
   { id: 'settings', label: 'Configurações', icon: <Settings size={20} /> },
 ];
@@ -47,9 +48,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={`h-[76px] flex items-center ${collapsed ? 'justify-center' : 'justify-between'} border-b border-white/20 px-4`}>
         <div className={`transition-all duration-300 ${collapsed ? 'opacity-0 w-0 overflow-hidden absolute' : 'opacity-100 flex-1'}`}>
           <div className="p-2 flex items-center gap-3">
-            <img 
-              src={logoDanilo} 
-              alt="Logo Danilo" 
+            <img
+              src={logoDanilo}
+              alt="Logo Danilo"
               className="h-12 w-auto object-contain"
             />
             <div className="flex flex-col items-center">
@@ -58,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={onToggleCollapse}
           className="text-white hover:bg-white/10 transition-edp p-2 rounded-lg transform hover:scale-110 active:scale-95"
           title={collapsed ? 'Expandir' : 'Recolher'}
@@ -72,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <ul className={`space-y-2 ${collapsed ? 'px-2' : 'px-3'}`}>
           {menuItems.map((item) => {
             const isActive = activeItem === item.id;
-            
+
             return (
               <li key={item.id}>
                 <button
@@ -81,8 +82,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     w-full flex items-center
                     ${collapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'}
                     rounded-lg transition-edp transform active:scale-95
-                    ${isActive 
-                      ? 'bg-white/20 text-white font-semibold shadow-sm' 
+                    ${isActive
+                      ? 'bg-white/20 text-white font-semibold shadow-sm'
                       : 'text-white hover:bg-white/10 hover:scale-105'
                     }
                   `}

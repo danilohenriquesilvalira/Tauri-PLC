@@ -38,3 +38,6 @@ postgres = "0.19"
 tokio-postgres = "0.7"
 # ✅ MESSAGEPACK - JSON COMPRIMIDO
 rmp-serde = "1.1"
+# ✅ SOCKET KEEPALIVE - TCP connection stability
+libc = "0.2"
+winapi = { version = "0.3", features = ["winsock2", "ws2def"] }
