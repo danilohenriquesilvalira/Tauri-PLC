@@ -1395,10 +1395,12 @@ pub struct SclTagInfo {
 
 /// Comando para obter tags com tipo de dado para análise SCL
 /// Retorna informações completas incluindo o data_type inferido
+/// ✅ OTIMIZADO: Usa cache do WebSocket quando disponível, evitando consultas ao banco
 #[tauri::command]
 pub async fn get_scl_tags(
     plc_ip: String,
     tcp_state: State<'_, TcpServerState>,
+    websocket_state: State<'_, WebSocketServerState>,
     db: State<'_, Arc<Database>>,
 ) -> Result<Vec<SclTagInfo>, String> {
     let mut result = Vec::new();
@@ -1412,67 +1414,82 @@ pub async fn get_scl_tags(
         if let Some(plc_data) = latest_data.await {
             println!("🔍 SCL: Dados TCP para {}: {} variáveis", plc_ip, plc_data.variables.len());
             
-            // 2. Buscar mapeamentos do banco
-            match db.load_tag_mappings(&plc_ip) {
-                Ok(mappings) => {
-                    println!("📂 SCL: {} mapeamentos carregados", mappings.len());
-                    
-                    // 3. Processar tags ativos
-                    for mapping in mappings.iter().filter(|m| m.enabled) {
-                        // Determinar se é extração de bit (Word[0].3)
-                        let is_bit_extraction = mapping.variable_path.contains('.') 
-                            && !mapping.variable_path.starts_with("DB");
-                        
-                        // Nome base para buscar no TCP
-                        let search_name = if is_bit_extraction {
-                            mapping.variable_path.split('.').next().unwrap_or("")
-                        } else {
-                            &mapping.variable_path
-                        };
-                        
-                        // Buscar variável TCP correspondente
-                        if let Some(tcp_var) = plc_data.variables.iter().find(|v| v.name == search_name) {
-                            // Determinar valor e tipo
-                            let (final_value, data_type) = if is_bit_extraction {
-                                // Extrair bit da Word
-                                let parts: Vec<&str> = mapping.variable_path.split('.').collect();
-                                if parts.len() == 2 {
-                                    if let Ok(bit_index) = parts[1].parse::<u8>() {
-                                        if let Ok(int_val) = tcp_var.value.parse::<u64>() {
-                                            let bit_val = (int_val >> bit_index) & 1;
-                                            let value = if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() };
-                                            (value, "BOOL".to_string())
-                                        } else {
-                                            (tcp_var.value.clone(), tcp_var.data_type.clone())
-                                        }
-                                    } else {
-                                        (tcp_var.value.clone(), tcp_var.data_type.clone())
-                                    }
+            // 2. Tentar buscar mapeamentos do CACHE do WebSocket primeiro
+            let mappings = {
+                let ws_guard = websocket_state.read().await;
+                if let Some(ws_server) = ws_guard.as_ref() {
+                    // Tentar obter do cache interno do WebSocket
+                    ws_server.get_cached_tag_mappings(&plc_ip).await
+                } else {
+                    None
+                }
+            };
+            
+            // Se cache não disponível, buscar do banco (fallback)
+            let mappings = match mappings {
+                Some(cached) => {
+                    println!("⚡ SCL: {} mapeamentos do CACHE (zero I/O!)", cached.len());
+                    cached
+                }
+                None => {
+                    println!("⚠️ SCL: Cache não disponível, buscando do banco...");
+                    match db.load_tag_mappings(&plc_ip) {
+                        Ok(m) => {
+                            println!("📂 SCL: {} mapeamentos carregados do banco", m.len());
+                            m
+                        }
+                        Err(e) => {
+                            return Err(format!("Erro ao carregar mapeamentos: {}", e));
+                        }
+                    }
+                }
+            };
+            
+            // 3. Processar tags ativos
+            for mapping in mappings.iter().filter(|m| m.enabled) {
+                // Determinar se é extração de bit (Word[0].3)
+                let is_bit_extraction = mapping.variable_path.contains('.') 
+                    && !mapping.variable_path.starts_with("DB");
+                
+                // Nome base para buscar no TCP
+                let search_name = if is_bit_extraction {
+                    mapping.variable_path.split('.').next().unwrap_or("")
+                } else {
+                    &mapping.variable_path
+                };
+                
+                // Buscar variável TCP correspondente
+                if let Some(tcp_var) = plc_data.variables.iter().find(|v| v.name == search_name) {
+                    // Determinar valor e tipo
+                    let (final_value, data_type) = if is_bit_extraction {
+                        // Extrair bit da Word
+                        let parts: Vec<&str> = mapping.variable_path.split('.').collect();
+                        if parts.len() == 2 {
+                            if let Ok(bit_index) = parts[1].parse::<u8>() {
+                                if let Ok(int_val) = tcp_var.value.parse::<u64>() {
+                                    let bit_val = (int_val >> bit_index) & 1;
+                                    let value = if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() };
+                                    (value, "BOOL".to_string())
                                 } else {
                                     (tcp_var.value.clone(), tcp_var.data_type.clone())
                                 }
                             } else {
-                                // Valor inteiro (WORD, INT, REAL, etc.)
                                 (tcp_var.value.clone(), tcp_var.data_type.clone())
-                            };
-                            
-                            result.push(SclTagInfo {
-                                tag_name: mapping.tag_name.clone(),
-                                value: final_value,
-                                data_type,
-                                variable_path: mapping.variable_path.clone(),
-                            });
-                            
-                            println!("✅ SCL Tag: {} = {} ({})", 
-                                mapping.tag_name, 
-                                result.last().unwrap().value, 
-                                result.last().unwrap().data_type
-                            );
+                            }
+                        } else {
+                            (tcp_var.value.clone(), tcp_var.data_type.clone())
                         }
-                    }
-                }
-                Err(e) => {
-                    return Err(format!("Erro ao carregar mapeamentos: {}", e));
+                    } else {
+                        // Valor inteiro (WORD, INT, REAL, etc.)
+                        (tcp_var.value.clone(), tcp_var.data_type.clone())
+                    };
+                    
+                    result.push(SclTagInfo {
+                        tag_name: mapping.tag_name.clone(),
+                        value: final_value,
+                        data_type,
+                        variable_path: mapping.variable_path.clone(),
+                    });
                 }
             }
         } else {

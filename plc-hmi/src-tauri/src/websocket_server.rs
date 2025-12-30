@@ -1,6 +1,6 @@
 use dashmap::DashMap;
-use std::sync::Mutex;
 use futures_util::{SinkExt, StreamExt};
+use tokio::sync::Mutex as TokioMutex;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -140,7 +140,7 @@ pub struct WebSocketServer {
     broadcast_sender: Option<broadcast::Sender<String>>,
     server_handle: Option<tokio::task::JoinHandle<()>>,
     broadcast_handle: Option<tokio::task::JoinHandle<()>>,
-    interval_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+    interval_handles: Arc<TokioMutex<Vec<tokio::task::JoinHandle<()>>>>,
     smart_cache: Arc<SmartCache>,
     cache_updater_handle: Option<tokio::task::JoinHandle<()>>,
 }
@@ -344,7 +344,7 @@ impl WebSocketServer {
             broadcast_sender: None,
             server_handle: None,
             broadcast_handle: None,
-            interval_handles: Arc::new(std::sync::Mutex::new(Vec::new())),
+            interval_handles: Arc::new(TokioMutex::new(Vec::new())),
             smart_cache: Arc::new(SmartCache::new()),
             cache_updater_handle: None,
         }
@@ -897,7 +897,7 @@ impl WebSocketServer {
         
         handles.push(change_handle);
         
-        let mut guard = self.interval_handles.lock().unwrap();
+        let mut guard = self.interval_handles.lock().await;
         *guard = handles;
         
         println!("✅ Sistema inteligente iniciado com cache de tags");
@@ -914,7 +914,7 @@ impl WebSocketServer {
 
         // Parar tasks antigas
         {
-            let mut guard = self.interval_handles.lock().unwrap();
+            let mut guard = self.interval_handles.lock().await;
             for handle in guard.iter() {
                 handle.abort();
             }
@@ -1095,5 +1095,11 @@ impl WebSocketServer {
 
     pub fn get_config(&self) -> &WebSocketConfig {
         &self.config
+    }
+
+    /// Expõe o cache de tag mappings para uso externo (ex: SCL Analysis)
+    /// Retorna None se o cache estiver vazio para o PLC
+    pub async fn get_cached_tag_mappings(&self, plc_ip: &str) -> Option<Vec<crate::database::TagMapping>> {
+        self.smart_cache.get_cached_tags(plc_ip)
     }
 }

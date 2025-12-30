@@ -1,7 +1,6 @@
 use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,11 +43,10 @@ pub struct WebSocketDbConfig {
     pub updated_at: i64,
 }
 
-// ✅ DATABASE COM CONNECTION POOLING E PREPARED STATEMENTS
+// ✅ DATABASE COM CONNECTION POOLING OTIMIZADO
 pub struct Database {
     read_conn: Arc<Mutex<Connection>>,   // ✅ Conexão para leitura
     write_conn: Arc<Mutex<Connection>>,  // ✅ Conexão para escrita
-    prepared_stmts: Arc<Mutex<HashMap<String, String>>>, // ✅ Cache de queries
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -265,7 +263,6 @@ impl Database {
         Ok(Database {
             read_conn: Arc::new(Mutex::new(read_conn)),
             write_conn: Arc::new(Mutex::new(write_conn)),
-            prepared_stmts: Arc::new(Mutex::new(HashMap::new())),
         })
     }
     
@@ -325,7 +322,7 @@ impl Database {
             let last_updated: i64 = row.get(2)?;
             
             let blocks: Vec<DataBlockConfig> = serde_json::from_str(&config_json)
-                .expect("Falha ao deserializar configuração");
+                .map_err(|e| rusqlite::Error::InvalidQuery)?;
             
             Ok(PlcStructureConfig {
                 plc_ip: plc_ip.to_string(),

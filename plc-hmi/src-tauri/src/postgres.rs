@@ -1,10 +1,12 @@
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use std::time::Duration;
 
+#[allow(dead_code)]
 pub struct PgDatabase {
     pub pool: Pool<Postgres>,
 }
 
+#[allow(dead_code)]
 impl PgDatabase {
     pub async fn connect(database_url: &str) -> Result<Self, sqlx::Error> {
         let pool = PgPoolOptions::new()
@@ -31,6 +33,7 @@ impl PgDatabase {
 }
 
 // Exemplo de função para inserir um valor de tag
+#[allow(dead_code)]
 pub async fn insert_tag_value(
     pool: &Pool<Postgres>,
     tag: &str,
