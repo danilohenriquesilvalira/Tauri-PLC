@@ -502,6 +502,23 @@ impl Database {
         println!("🗑️ Tag removido: {} -> {}", plc_ip, variable_path);
         Ok(())
     }
+
+    /// Remove múltiplos tags de uma vez (Bulk Delete)
+    pub fn delete_tag_mappings_bulk(&self, ids: Vec<i64>) -> Result<()> {
+        let mut conn = self.write_conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        
+        {
+            let mut stmt = tx.prepare("DELETE FROM tag_mappings WHERE id = ?")?;
+            for id in &ids {
+                stmt.execute([id])?;
+            }
+        }
+        
+        tx.commit()?;
+        println!("🗑️ Bulk Delete: {} tags removidos com sucesso.", ids.len());
+        Ok(())
+    }
     
     /// Lista todos os tags ativos (enabled=true) de um PLC para o WebSocket
     pub fn get_active_tags(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {

@@ -16,20 +16,11 @@ interface DiscoveredPlc {
 export const TcpServerConfigCompact: React.FC = () => {
   const {
     isServerRunning,
-    isPlcConnected,
-    connectionStats,
     connections,
-    startTcpServer,
-    stopTcpServer,
-    connectToPlc,
-    disconnectFromPlc,
-    scanNetworkForPlcs,
   } = useTcpServer();
 
-  const [isScanning, setIsScanning] = useState(false);
   const [discoveredPlcs, setDiscoveredPlcs] = useState<DiscoveredPlc[]>([]);
   const [selectedPlc, setSelectedPlc] = useState<DiscoveredPlc | null>(null);
-  const [serverPort, setServerPort] = useState(8502);
 
   // Detectar PLCs automaticamente quando conectarem no servidor
   useEffect(() => {
@@ -77,50 +68,6 @@ export const TcpServerConfigCompact: React.FC = () => {
     }
   }, [connections, isServerRunning]);
 
-  const autoScanNetwork = async () => {
-    // Não fazer scan - instruir usuário
-    console.log('ℹ️ Configure seu PLC para conectar no servidor TCP');
-  };
-
-  const handleStartServer = async () => {
-    if (!isServerRunning) {
-      await startTcpServer(serverPort);
-    }
-  };
-
-  const handleStopServer = async () => {
-    if (isServerRunning) {
-      console.log('🛑 Frontend: Chamando stopTcpServer...');
-      const result = await stopTcpServer();
-      console.log('🛑 Frontend: Resultado stopTcpServer:', result);
-    }
-  };
-
-  const handleConnectToPlc = async () => {
-    if (selectedPlc && !isPlcConnected) {
-      console.log('🔌 Frontend: Chamando connectToPlc...', selectedPlc);
-      const result = await connectToPlc(selectedPlc.ip, selectedPlc.port);
-      console.log('🔌 Frontend: Resultado connectToPlc:', result);
-    }
-  };
-
-  const handleDisconnectFromPlc = async () => {
-    if (isPlcConnected) {
-      console.log('❌ Frontend: Chamando disconnectFromPlc...');
-      const result = await disconnectFromPlc();
-      console.log('❌ Frontend: Resultado disconnectFromPlc:', result);
-    }
-  };
-
-  const handleQuickConnect = async (plc: DiscoveredPlc) => {
-    setSelectedPlc(plc);
-    if (!isServerRunning) {
-      await startTcpServer(serverPort);
-      setTimeout(() => connectToPlc(plc.ip, plc.port), 1000);
-    } else {
-      await connectToPlc(plc.ip, plc.port);
-    }
-  };
 
   return (
     <div className="space-y-5">

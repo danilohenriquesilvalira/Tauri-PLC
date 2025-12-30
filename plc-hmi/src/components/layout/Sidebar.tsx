@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Home,
-  Gauge,
   Settings,
   Menu,
   ChevronLeft,

@@ -446,6 +446,20 @@ pub async fn delete_tag_mapping(
 }
 
 #[tauri::command]
+pub async fn delete_tag_mappings_bulk(
+    ids: Vec<i64>,
+    db: State<'_, Arc<Database>>,
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<String, String> {
+    let count = ids.len();
+    db.delete_tag_mappings_bulk(ids)
+        .map_err(|e| format!("Erro ao deletar tags: {}", e))?;
+    // Sempre recarregar grupos de tags do WebSocket
+    let _ = reload_websocket_tag_groups(websocket_state).await;
+    Ok(format!("{} tags removidos com sucesso", count))
+}
+
+#[tauri::command]
 pub async fn get_active_tags(
     plc_ip: String,
     db: State<'_, Arc<Database>>,
@@ -1283,5 +1297,192 @@ pub async fn inspect_postgres_database(
             Err(format!("Não foi possível conectar ao banco '{}': {}", database_name, e))
         }
     }
+}
+
+// ============================================================================
+// COMANDOS PARA PARSER DE LÓGICA - ACESSO DIRETO AO CACHE
+// ============================================================================
+
+#[tauri::command]
+pub async fn get_real_time_tag_values(
+    plc_ip: String,
+    tcp_state: State<'_, TcpServerState>,
+    db: State<'_, Arc<Database>>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let mut result = std::collections::HashMap::new();
+    
+    // 1. Buscar dados brutos do cache TCP
+    let server_guard = tcp_state.read().await;
+    
+    if let Some(server) = server_guard.as_ref() {
+        // Acessar cache interno do TCP server
+        let latest_data = server.get_plc_data(&plc_ip);
+        
+        if let Some(plc_data) = latest_data.await {
+            println!("📊 Dados TCP para {}: {} variáveis", plc_ip, plc_data.variables.len());
+            
+            // 2. Buscar mapeamentos do banco
+            match db.load_tag_mappings(&plc_ip) {
+                Ok(mappings) => {
+                    println!("🗂️ Mapeamentos carregados: {}", mappings.len());
+                    
+                    // 3. Processar tags ativos
+                    for mapping in mappings.iter().filter(|m| m.enabled) {
+                        // Buscar variável TCP correspondente
+                        if let Some(tcp_var) = plc_data.variables.iter().find(|v| {
+                            // Para bits: Word[0].1 -> procurar Word[0]
+                            if mapping.variable_path.contains('.') {
+                                let base_name = mapping.variable_path.split('.').next().unwrap_or("");
+                                v.name == base_name
+                            } else {
+                                v.name == mapping.variable_path
+                            }
+                        }) {
+                            let final_value = if mapping.variable_path.contains('.') {
+                                // Extrair bit
+                                let parts: Vec<&str> = mapping.variable_path.split('.').collect();
+                                if parts.len() == 2 {
+                                    if let Ok(bit_index) = parts[1].parse::<u8>() {
+                                        if let Ok(int_val) = tcp_var.value.parse::<u64>() {
+                                            let bit_val = (int_val >> bit_index) & 1;
+                                            if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() }
+                                        } else {
+                                            tcp_var.value.clone()
+                                        }
+                                    } else {
+                                        tcp_var.value.clone()
+                                    }
+                                } else {
+                                    tcp_var.value.clone()
+                                }
+                            } else {
+                                tcp_var.value.clone()
+                            };
+                            
+                            result.insert(mapping.tag_name.clone(), final_value);
+                            println!("✅ Tag processado: {} = {}", mapping.tag_name, result.get(&mapping.tag_name).unwrap());
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("❌ Erro ao carregar mapeamentos: {}", e);
+                    return Err(format!("Erro ao carregar mapeamentos: {}", e));
+                }
+            }
+        } else {
+            return Err(format!("Nenhum dado disponível para PLC {}", plc_ip));
+        }
+    } else {
+        return Err("Servidor TCP não está rodando".to_string());
+    }
+    
+    println!("🎯 Total de tags processados: {}", result.len());
+    Ok(result)
+}
+
+// ============================================================================
+// COMANDOS PARA SCL ANALYSIS
+// ============================================================================
+
+// Estrutura para retornar tag com tipo de dado
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SclTagInfo {
+    pub tag_name: String,
+    pub value: String,
+    pub data_type: String,  // "BOOL", "INT", "WORD", "REAL", "DINT", "DWORD"
+    pub variable_path: String,
+}
+
+/// Comando para obter tags com tipo de dado para análise SCL
+/// Retorna informações completas incluindo o data_type inferido
+#[tauri::command]
+pub async fn get_scl_tags(
+    plc_ip: String,
+    tcp_state: State<'_, TcpServerState>,
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<SclTagInfo>, String> {
+    let mut result = Vec::new();
+    
+    // 1. Buscar dados brutos do cache TCP
+    let server_guard = tcp_state.read().await;
+    
+    if let Some(server) = server_guard.as_ref() {
+        let latest_data = server.get_plc_data(&plc_ip);
+        
+        if let Some(plc_data) = latest_data.await {
+            println!("🔍 SCL: Dados TCP para {}: {} variáveis", plc_ip, plc_data.variables.len());
+            
+            // 2. Buscar mapeamentos do banco
+            match db.load_tag_mappings(&plc_ip) {
+                Ok(mappings) => {
+                    println!("📂 SCL: {} mapeamentos carregados", mappings.len());
+                    
+                    // 3. Processar tags ativos
+                    for mapping in mappings.iter().filter(|m| m.enabled) {
+                        // Determinar se é extração de bit (Word[0].3)
+                        let is_bit_extraction = mapping.variable_path.contains('.') 
+                            && !mapping.variable_path.starts_with("DB");
+                        
+                        // Nome base para buscar no TCP
+                        let search_name = if is_bit_extraction {
+                            mapping.variable_path.split('.').next().unwrap_or("")
+                        } else {
+                            &mapping.variable_path
+                        };
+                        
+                        // Buscar variável TCP correspondente
+                        if let Some(tcp_var) = plc_data.variables.iter().find(|v| v.name == search_name) {
+                            // Determinar valor e tipo
+                            let (final_value, data_type) = if is_bit_extraction {
+                                // Extrair bit da Word
+                                let parts: Vec<&str> = mapping.variable_path.split('.').collect();
+                                if parts.len() == 2 {
+                                    if let Ok(bit_index) = parts[1].parse::<u8>() {
+                                        if let Ok(int_val) = tcp_var.value.parse::<u64>() {
+                                            let bit_val = (int_val >> bit_index) & 1;
+                                            let value = if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() };
+                                            (value, "BOOL".to_string())
+                                        } else {
+                                            (tcp_var.value.clone(), tcp_var.data_type.clone())
+                                        }
+                                    } else {
+                                        (tcp_var.value.clone(), tcp_var.data_type.clone())
+                                    }
+                                } else {
+                                    (tcp_var.value.clone(), tcp_var.data_type.clone())
+                                }
+                            } else {
+                                // Valor inteiro (WORD, INT, REAL, etc.)
+                                (tcp_var.value.clone(), tcp_var.data_type.clone())
+                            };
+                            
+                            result.push(SclTagInfo {
+                                tag_name: mapping.tag_name.clone(),
+                                value: final_value,
+                                data_type,
+                                variable_path: mapping.variable_path.clone(),
+                            });
+                            
+                            println!("✅ SCL Tag: {} = {} ({})", 
+                                mapping.tag_name, 
+                                result.last().unwrap().value, 
+                                result.last().unwrap().data_type
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Err(format!("Erro ao carregar mapeamentos: {}", e));
+                }
+            }
+        } else {
+            return Err(format!("Nenhum dado disponível para PLC {}", plc_ip));
+        }
+    } else {
+        return Err("Servidor TCP não está rodando".to_string());
+    }
+    
+    println!("🎯 SCL: Total de {} tags processados", result.len());
+    Ok(result)
 }
 

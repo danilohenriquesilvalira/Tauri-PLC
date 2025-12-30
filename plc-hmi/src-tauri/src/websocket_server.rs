@@ -14,6 +14,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 use std::collections::HashMap;
 
 use crate::database::Database;
+use crate::database::TagMapping;
 use crate::tcp_server::TcpServer;
 use tokio::sync::mpsc;
 
@@ -61,7 +62,7 @@ pub struct WebSocketConfig {
     pub max_clients: u32,
     pub broadcast_interval_ms: u64,
     pub enabled: bool,
-    pub bind_interfaces: Vec<String>, // Lista de IPs para fazer bind
+    pub bind_interfaces: Vec<String>,
 }
 
 impl Default for WebSocketConfig {
@@ -70,9 +71,9 @@ impl Default for WebSocketConfig {
             host: "0.0.0.0".to_string(),
             port: 8765,
             max_clients: 100,
-            broadcast_interval_ms: 1000, // 1000ms = 1 Hz (muito estável, sem travamento)
+            broadcast_interval_ms: 1000,
             enabled: false,
-            bind_interfaces: vec!["0.0.0.0".to_string()], // Bind padrão em todas as interfaces
+            bind_interfaces: vec!["0.0.0.0".to_string()],
         }
     }
 }
@@ -98,8 +99,8 @@ pub struct CachedTagValue {
     pub timestamp_ns: u128,
     pub collect_mode: String,
     pub interval_s: u64,
-    pub last_sent: u128, // Último envio para WebSocket
-    pub changed: bool,   // Se o valor mudou desde última leitura
+    pub last_sent: u128,
+    pub changed: bool,
 }
 
 #[derive(Debug)]
@@ -109,7 +110,11 @@ pub struct SmartCache {
     // Grupos de intervalos: interval_s -> lista de tag_names
     interval_groups: Arc<RwLock<HashMap<u64, Vec<String>>>>,
     // Controle de mudanças para tags em modo "change"
-    change_tracking: Arc<DashMap<String, String>>, // tag_name -> last_value
+    change_tracking: Arc<DashMap<String, String>>,
+    
+    // 🆕 CACHE DE TAG MAPPINGS - EVITA CONSULTAS AO BANCO!
+    tag_mappings_cache: Arc<DashMap<String, Vec<TagMapping>>>, // plc_ip -> tags
+    tag_mappings_last_update: Arc<RwLock<std::time::Instant>>,
 }
 
 #[derive(Debug, Clone)]
@@ -136,8 +141,8 @@ pub struct WebSocketServer {
     server_handle: Option<tokio::task::JoinHandle<()>>,
     broadcast_handle: Option<tokio::task::JoinHandle<()>>,
     interval_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
-    smart_cache: Arc<SmartCache>, // 🚀 CACHE INTELIGENTE
-    cache_updater_handle: Option<tokio::task::JoinHandle<()>>, // Task para atualizar cache
+    smart_cache: Arc<SmartCache>,
+    cache_updater_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl SmartCache {
@@ -146,47 +151,121 @@ impl SmartCache {
             tag_cache: Arc::new(DashMap::new()),
             interval_groups: Arc::new(RwLock::new(HashMap::new())),
             change_tracking: Arc::new(DashMap::new()),
+            // 🆕 INICIALIZAR CACHE DE MAPPINGS
+            tag_mappings_cache: Arc::new(DashMap::new()),
+            tag_mappings_last_update: Arc::new(RwLock::new(std::time::Instant::now())),
+        }
+    }
+
+    pub async fn clear(&self) {
+        self.tag_cache.clear();
+        self.change_tracking.clear();
+        let mut lock = self.interval_groups.write().await;
+        lock.clear();
+        // 🆕 LIMPAR CACHE DE MAPPINGS TAMBÉM
+        self.tag_mappings_cache.clear();
+    }
+    
+    // 🆕 CARREGAR TAGS DO BANCO PARA CACHE (chamado apenas quando necessário)
+    pub async fn load_tag_mappings_to_cache(&self, plc_ip: &str, database: &Database) {
+        match database.get_active_tags(plc_ip) {
+            Ok(tags) => {
+                println!("📦 Cache: Carregados {} tags ativos para PLC {}", tags.len(), plc_ip);
+                self.tag_mappings_cache.insert(plc_ip.to_string(), tags);
+                *self.tag_mappings_last_update.write().await = std::time::Instant::now();
+            }
+            Err(e) => {
+                println!("⚠️ Cache: Erro ao carregar tags para {}: {}", plc_ip, e);
+            }
         }
     }
     
-    // Atualizar cache com dados do TCP (chamado apenas quando há novos dados TCP)
+    // 🆕 OBTER TAGS DO CACHE (ZERO CONSULTAS AO BANCO!)
+    fn get_cached_tags(&self, plc_ip: &str) -> Option<Vec<TagMapping>> {
+        self.tag_mappings_cache.get(plc_ip).map(|r| r.value().clone())
+    }
+    
+    // 🆕 VERIFICAR SE CACHE PRECISA SER ATUALIZADO (só se muito antigo)
+    pub async fn should_refresh_cache(&self) -> bool {
+        let last_update = self.tag_mappings_last_update.read().await;
+        // Só atualiza cache se tiver mais de 60 segundos (raramente!)
+        last_update.elapsed().as_secs() > 60
+    }
+    
+    // ✅ ATUALIZAR CACHE COM DADOS TCP - AGORA USA CACHE DE TAGS!
     pub async fn update_from_tcp(&self, plc_ip: &str, variables: &[crate::tcp_server::PlcVariable], database: &Database) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_| Duration::from_secs(0))
             .as_nanos();
         
-        // Obter tags ativos deste PLC
-        if let Ok(tags) = database.get_active_tags(plc_ip) {
-            for tag in tags {
-                // Encontrar variável correspondente
-                if let Some(variable) = variables.iter().find(|v| v.name == tag.variable_path) {
-                    let tag_key = format!("{}:{}", plc_ip, tag.tag_name);
-                    
-                    // Verificar mudança para tags em modo "change"
-                    let mut value_changed = true;
-                    if tag.collect_mode.as_deref() == Some("change") {
-                        if let Some(last_value) = self.change_tracking.get(&tag_key) {
-                            value_changed = last_value.value() != &variable.value;
-                        }
-                        self.change_tracking.insert(tag_key.clone(), variable.value.clone());
+        // 🆕 USAR CACHE EM VEZ DE CONSULTAR BANCO!
+        let tags = if let Some(cached_tags) = self.get_cached_tags(plc_ip) {
+            // ✅ CACHE HIT - ZERO I/O!
+            cached_tags
+        } else {
+            // ⚠️ CACHE MISS - Carregar do banco (acontece raramente)
+            println!("⚠️ Cache miss para PLC {} - carregando do banco", plc_ip);
+            self.load_tag_mappings_to_cache(plc_ip, database).await;
+            self.get_cached_tags(plc_ip).unwrap_or_default()
+        };
+        
+        for tag in tags {
+            // 🚀 LÓGICA DE EXTRAÇÃO DE BITS (Bit-Parser)
+            let (search_name, bit_index) = if tag.variable_path.contains('.') && !tag.variable_path.starts_with("DB") {
+                let parts: Vec<&str> = tag.variable_path.split('.').collect();
+                if parts.len() == 2 {
+                    if let Ok(bit) = parts[1].parse::<u8>() {
+                         (parts[0], Some(bit))
+                    } else {
+                         (tag.variable_path.as_str(), None)
                     }
-                    
-                    // Atualizar cache
-                    let cached = CachedTagValue {
-                        tag_name: tag.tag_name.clone(),
-                        plc_ip: plc_ip.to_string(),
-                        value: variable.value.clone(),
-                        data_type: variable.data_type.clone(),
-                        timestamp_ns: now,
-                        collect_mode: tag.collect_mode.unwrap_or_default(),
-                        interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
-                        last_sent: 0, // Será atualizado quando enviado
-                        changed: value_changed,
-                    };
-                    
-                    self.tag_cache.insert(tag_key, cached);
+                } else {
+                    (tag.variable_path.as_str(), None)
                 }
+            } else {
+                (tag.variable_path.as_str(), None)
+            };
+
+            // Encontrar variável correspondente
+            if let Some(variable) = variables.iter().find(|v| v.name == search_name) {
+                let tag_key = format!("{}:{}", plc_ip, tag.tag_name);
+                
+                // Determinar valor final
+                let final_value = if let Some(bit) = bit_index {
+                    if let Ok(int_val) = variable.value.parse::<u64>() {
+                         let bit_val = (int_val >> bit) & 1;
+                         if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() }
+                    } else {
+                         variable.value.clone()
+                    }
+                } else {
+                    variable.value.clone()
+                };
+
+                // Verificar mudança para tags em modo "change"
+                let mut value_changed = true;
+                if tag.collect_mode.as_deref() == Some("change") {
+                    if let Some(last_value) = self.change_tracking.get(&tag_key) {
+                        value_changed = last_value.value() != &final_value;
+                    }
+                    self.change_tracking.insert(tag_key.clone(), final_value.clone());
+                }
+                
+                // Atualizar cache
+                let cached = CachedTagValue {
+                    tag_name: tag.tag_name.clone(),
+                    plc_ip: plc_ip.to_string(),
+                    value: final_value,
+                    data_type: if bit_index.is_some() { "BOOL".to_string() } else { variable.data_type.clone() },
+                    timestamp_ns: now,
+                    collect_mode: tag.collect_mode.unwrap_or_default(),
+                    interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
+                    last_sent: 0,
+                    changed: value_changed,
+                };
+                
+                self.tag_cache.insert(tag_key, cached);
             }
         }
     }
@@ -200,13 +279,12 @@ impl SmartCache {
         let mut result = HashMap::new();
         let mut keys_to_update = Vec::new();
         
-        // Primeira passagem: identificar tags que precisam ser enviados
         for entry in self.tag_cache.iter() {
             let cached = entry.value();
             let time_since_last = if now >= cached.last_sent {
-                (now - cached.last_sent) / 1_000_000_000 // Convert to seconds
+                (now - cached.last_sent) / 1_000_000_000
             } else {
-                0 // Se timestamp for menor, considerar como 0
+                0
             };
             
             let should_send = match cached.collect_mode.as_str() {
@@ -221,7 +299,6 @@ impl SmartCache {
             }
         }
         
-        // Segunda passagem: atualizar timestamps dos tags enviados
         for key in keys_to_update {
             if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
                 cached_mut.last_sent = now;
@@ -230,6 +307,18 @@ impl SmartCache {
         }
         
         result
+    }
+    
+    // 🆕 INVALIDAR CACHE DE UM PLC ESPECÍFICO (chamado quando tags mudam)
+    pub fn invalidate_cache(&self, plc_ip: &str) {
+        self.tag_mappings_cache.remove(plc_ip);
+        println!("🔄 Cache invalidado para PLC {}", plc_ip);
+    }
+    
+    // 🆕 INVALIDAR TODO O CACHE
+    pub fn invalidate_all_cache(&self) {
+        self.tag_mappings_cache.clear();
+        println!("🔄 Todo cache de tags invalidado");
     }
 }
 
@@ -261,43 +350,12 @@ impl WebSocketServer {
         }
     }
 
-    // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
-    fn send_msgpack_message(&self, broadcast_tx: &broadcast::Sender<String>, variables: &HashMap<String, String>) {
-        match rmp_serde::to_vec(variables) {
-            Ok(msgpack_bytes) => {
-                // Converter bytes para base64 para envio via WebSocket texto
-                let base64_data = base64_encode(&msgpack_bytes);
-                let msgpack_message = format!("MSGPACK:{}", base64_data);
-                
-                if broadcast_tx.receiver_count() > 0 {
-                    let _ = broadcast_tx.send(msgpack_message);
-                }
-                
-                println!("📦 MSGPACK: {} tags → {} bytes ({}% menor que JSON)", 
-                    variables.len(), 
-                    msgpack_bytes.len(),
-                    (100.0 * (1.0 - msgpack_bytes.len() as f64 / serde_json::to_string(variables).unwrap_or_default().len() as f64)) as i32
-                );
-            }
-            Err(e) => {
-                println!("❌ Erro MessagePack: {}. Usando JSON fallback.", e);
-                // Fallback para JSON
-                let message = serde_json::to_string(variables).unwrap_or_else(|_| "{}".to_string());
-                if broadcast_tx.receiver_count() > 0 {
-                    let _ = broadcast_tx.send(message);
-                }
-            }
-        }
-    }
-
-
     // Função para detectar interfaces de rede disponíveis
     pub fn get_available_network_interfaces() -> Result<Vec<NetworkInterface>, String> {
         use std::process::Command;
         
         let mut interfaces = Vec::new();
         
-        // Adicionar localhost sempre
         interfaces.push(NetworkInterface {
             name: "Localhost".to_string(),
             ip: "127.0.0.1".to_string(),
@@ -305,7 +363,6 @@ impl WebSocketServer {
             interface_type: "Loopback".to_string(),
         });
         
-        // Adicionar todas as interfaces (0.0.0.0)
         interfaces.push(NetworkInterface {
             name: "Todas as Interfaces".to_string(),
             ip: "0.0.0.0".to_string(),
@@ -313,7 +370,6 @@ impl WebSocketServer {
             interface_type: "All".to_string(),
         });
 
-        // Detectar interfaces específicas usando ipconfig/ifconfig
         #[cfg(windows)]
         {
             if let Ok(output) = Command::new("ipconfig").output() {
@@ -430,12 +486,10 @@ impl WebSocketServer {
 
         println!("🟢 Preparando endereços de bind...");
         
-        // Se bind_interfaces estiver vazio ou contiver apenas um item que é o host padrão, usar o comportamento original
         let bind_addresses = if self.config.bind_interfaces.is_empty() || 
             (self.config.bind_interfaces.len() == 1 && self.config.bind_interfaces[0] == self.config.host) {
             vec![format!("{}:{}", self.config.host, self.config.port)]
         } else {
-            // Criar endereços para cada interface configurada
             self.config.bind_interfaces.iter()
                 .map(|ip| format!("{}:{}", ip, self.config.port))
                 .collect()
@@ -446,7 +500,6 @@ impl WebSocketServer {
 
         println!("🟢 Tentando bind em {} endereços: {:?}", bind_addresses.len(), bind_addresses);
 
-        // Tentar fazer bind em cada endereço
         for bind_addr in bind_addresses.iter() {
             println!("🟢 Tentando bind em: {}", bind_addr);
             match TcpListener::bind(&bind_addr).await {
@@ -457,7 +510,6 @@ impl WebSocketServer {
                 },
                 Err(e) => {
                     println!("⚠️ Erro ao fazer bind em {}: {}", bind_addr, e);
-                    // Continuar tentando outros endereços
                 }
             }
         }
@@ -468,21 +520,17 @@ impl WebSocketServer {
             return Err("Não foi possível fazer bind em nenhum endereço configurado".to_string());
         }
 
-        // Canal para broadcasting
         let (broadcast_tx, _) = broadcast::channel::<String>(1000);
         self.broadcast_sender = Some(broadcast_tx.clone());
 
-        // Marcar como rodando
         self.is_running.store(true, Ordering::SeqCst);
 
-        // Emitir evento de servidor iniciado
         let _ = self.app_handle.emit("websocket-server-started", serde_json::json!({
             "status": "started",
             "addresses": bound_addresses,
             "timestamp": chrono::Utc::now().to_rfc3339()
         }));
 
-        // Clonar dados necessários para as tasks
         let is_running = self.is_running.clone();
         let connected_clients = self.connected_clients.clone();
         let active_connections = self.active_connections.clone();
@@ -492,7 +540,6 @@ impl WebSocketServer {
         let app_handle = self.app_handle.clone();
         let max_clients = self.config.max_clients;
 
-        // Task do servidor WebSocket para cada listener
         let mut server_handles = Vec::new();
         
         for listener in listeners {
@@ -509,7 +556,6 @@ impl WebSocketServer {
             let server_task = tokio::spawn(async move {
                 while is_running_clone.load(Ordering::SeqCst) {
                     if let Ok((stream, addr)) = listener.accept().await {
-                        // Verificar limite de conexões
                         if active_connections_clone.load(Ordering::SeqCst) >= max_clients_clone as u64 {
                             println!("⚠️ Limite de conexões atingido, rejeitando {}", addr);
                             drop(stream);
@@ -529,14 +575,12 @@ impl WebSocketServer {
 
                         println!("✅ Cliente WebSocket conectado: {} (ID: {})", addr, client_id);
 
-                        // Emitir evento para o frontend
                         let _ = app_handle_clone.emit("websocket-client-connected", serde_json::json!({
                             "client_id": client_id,
                             "address": addr.to_string(),
                             "total_clients": active_connections_clone.load(Ordering::SeqCst)
                         }));
 
-                        // Spawnar task para lidar com este cliente
                         let broadcast_rx = broadcast_tx_clone.subscribe();
                         let connected_clients_task = connected_clients_clone.clone();
                         let active_connections_task = active_connections_clone.clone();
@@ -568,8 +612,6 @@ impl WebSocketServer {
             server_handles.push(server_task);
         }
 
-        // Armazenar apenas o primeiro handle por compatibilidade
-        // (em uma implementação completa, você armazenaria todos os handles)
         if let Some(first_handle) = server_handles.into_iter().next() {
             self.server_handle = Some(first_handle);
         }
@@ -583,54 +625,69 @@ impl WebSocketServer {
     // 🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios TCP
     async fn start_smart_broadcasting(&mut self, broadcast_tx: broadcast::Sender<String>) -> Result<(), String> {
         let database = self.database.clone();
-        let tcp_server = self.tcp_server.clone();
         let is_running = self.is_running.clone();
         let smart_cache = self.smart_cache.clone();
 
         println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
+        println!("📦 Cache de tags habilitado - ZERO consultas ao banco por pacote!");
 
         // ✅ CANAL PARA SERIALIZAR ATUALIZAÇÕES DE CACHE
         let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(1000);
         
-        // TASK 1: CACHE UPDATER - Escuta eventos TCP (ZERO acesso direto ao TCP)
+        // TASK 1: CACHE UPDATER
         let is_running_cache = is_running.clone();
         let smart_cache_updater = smart_cache.clone();
         let database_updater = database.clone();
         let app_handle_cache = self.app_handle.clone();
         
-        // ✅ TASK 1A: PROCESSADOR ATÔMICO DE CACHE (Serializa todas as atualizações)
-        let atomic_cache_processor = tokio::spawn({
+        // ✅ TASK 1A: PROCESSADOR ATÔMICO DE CACHE
+        let _atomic_cache_processor = tokio::spawn({
             let smart_cache_clone = smart_cache_updater.clone();
             let database_clone = database_updater.clone();
             let is_running_clone = is_running_cache.clone();
             async move {
+                let mut packets_processed: u64 = 0;
+                let mut last_cache_refresh = std::time::Instant::now();
+                
                 while let Some(update_data) = update_rx.recv().await {
                     if !is_running_clone.load(Ordering::SeqCst) {
                         break;
                     }
                     
-                    // ✅ ATUALIZAÇÃO ATÔMICA: Uma de cada vez, sem race conditions
+                    packets_processed += 1;
+                    
+                    // 🆕 REFRESH CACHE A CADA 60 SEGUNDOS (não a cada pacote!)
+                    if last_cache_refresh.elapsed().as_secs() > 60 {
+                        println!("🔄 Refresh periódico do cache de tags ({} pacotes processados)", packets_processed);
+                        smart_cache_clone.load_tag_mappings_to_cache(&update_data.plc_ip, &database_clone).await;
+                        last_cache_refresh = std::time::Instant::now();
+                    }
+                    
+                    // ✅ ATUALIZAÇÃO ATÔMICA (usa cache, não banco!)
                     smart_cache_clone.update_from_tcp(
                         &update_data.plc_ip,
                         &update_data.variables,
                         &database_clone
                     ).await;
+                    
+                    // Log periódico (a cada 100 pacotes)
+                    if packets_processed % 100 == 0 {
+                        println!("📊 WebSocket processou {} pacotes TCP (cache ativo)", packets_processed);
+                    }
                 }
-                println!("✅ Atomic cache processor finalizado");
+                println!("✅ Atomic cache processor finalizado ({} pacotes)", packets_processed);
             }
         });
         
-        // ✅ TASK 1B: EVENT LISTENER (Apenas converte eventos para o canal)
+        // ✅ TASK 1B: EVENT LISTENER
         let cache_handle = tokio::spawn(async move {
             use tauri::Listener;
             
-            // Escutar evento do TCP - ZERO deadlocks!
             let _unlisten_id = app_handle_cache.listen("websocket-cache-update", move |event| {
                 let payload = event.payload();
                 if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
                     let plc_ip = data["plc_ip"].as_str().unwrap_or("");
                     if let Some(variables_array) = data["variables"].as_array() {
-                        // Converter para PlcVariable
                         let mut variables = Vec::new();
                         for var in variables_array {
                             if let (Some(name), Some(value), Some(data_type)) = (
@@ -647,54 +704,45 @@ impl WebSocketServer {
                             }
                         }
                         
-                        // ✅ ENVIAR PARA CANAL ATÔMICO - Evita race conditions
                         let update_data = CacheUpdateData {
                             plc_ip: plc_ip.to_string(),
                             variables,
                             timestamp: data["timestamp"].as_u64().unwrap_or(0),
                         };
                         
-                        // ✅ USAR CHANNEL PARA SERIALIZAR ATUALIZAÇÕES
                         let _ = update_tx.try_send(update_data);
                     }
                 }
             });
             
-            // Manter listener ativo
             while is_running_cache.load(Ordering::SeqCst) {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
             
-            // Nota: unlisten é um ID, não uma função no Tauri v2
             println!("Cache listener finalizado (ID: {})", _unlisten_id);
         });
         
-        // ✅ ARMAZENAR AMBOS OS HANDLES PARA CONTROLE COMPLETO
         self.cache_updater_handle = Some(cache_handle);
-        // atomic_cache_processor será gerenciado automaticamente quando o canal fechar
 
-        // TASK 2: BROADCASTING INTELIGENTE - Usa apenas cache (zero acesso TCP)
+        // TASK 2: BROADCASTING INTELIGENTE
         let smart_cache_broadcast = smart_cache.clone();
         let is_running_broadcast = is_running.clone();
         
-        // ✅ BATCH PROCESSOR INTELIGENTE - Agrupa múltiplos intervalos
         let mut handles = Vec::new();
         
-        
-        // BATCH 1: Intervalos rápidos (1-3s) - Processamento a cada 0.5s
+        // BATCH 1: Intervalos rápidos (1-3s)
         let fast_batch_handle = tokio::spawn({
             let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
             
             async move {
-                let mut batch_timer = time::interval(Duration::from_millis(500)); // ✅ 0.5s batch
+                let mut batch_timer = time::interval(Duration::from_millis(500));
                 let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    // ✅ COLETAR DADOS DE MÚLTIPLOS INTERVALOS EM BATCH
                     for interval_s in 1..=3u64 {
                         let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
                         for (key, value) in tag_data {
@@ -702,9 +750,7 @@ impl WebSocketServer {
                         }
                     }
                     
-                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
                     if !batch_accumulator.is_empty() {
-                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
                         let string_map: HashMap<String, String> = batch_accumulator.iter()
                             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
                             .collect();
@@ -719,12 +765,10 @@ impl WebSocketServer {
                                 println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
                             }
                             Err(_) => {
-                                // Fallback para JSON
                                 let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
                                 if broadcast_tx_clone.receiver_count() > 0 {
                                     let _ = broadcast_tx_clone.send(message);
                                 }
-                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
                             }
                         }
                         batch_accumulator.clear();
@@ -733,20 +777,19 @@ impl WebSocketServer {
             }
         });
         
-        // BATCH 2: Intervalos médios (4-7s) - Processamento a cada 2s
+        // BATCH 2: Intervalos médios (4-7s)
         let medium_batch_handle = tokio::spawn({
             let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
             
             async move {
-                let mut batch_timer = time::interval(Duration::from_secs(2)); // ✅ 2s batch
+                let mut batch_timer = time::interval(Duration::from_secs(2));
                 let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    // ✅ COLETAR DADOS DE INTERVALOS MÉDIOS EM BATCH
                     for interval_s in 4..=7u64 {
                         let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
                         for (key, value) in tag_data {
@@ -754,9 +797,7 @@ impl WebSocketServer {
                         }
                     }
                     
-                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
                     if !batch_accumulator.is_empty() {
-                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
                         let string_map: HashMap<String, String> = batch_accumulator.iter()
                             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
                             .collect();
@@ -768,15 +809,12 @@ impl WebSocketServer {
                                 if broadcast_tx_clone.receiver_count() > 0 {
                                     let _ = broadcast_tx_clone.send(msgpack_message);
                                 }
-                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
                             }
                             Err(_) => {
-                                // Fallback para JSON
                                 let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
                                 if broadcast_tx_clone.receiver_count() > 0 {
                                     let _ = broadcast_tx_clone.send(message);
                                 }
-                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
                             }
                         }
                         batch_accumulator.clear();
@@ -785,20 +823,19 @@ impl WebSocketServer {
             }
         });
         
-        // BATCH 3: Intervalos lentos (8-10s) - Processamento a cada 5s
+        // BATCH 3: Intervalos lentos (8-10s)
         let slow_batch_handle = tokio::spawn({
             let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
             
             async move {
-                let mut batch_timer = time::interval(Duration::from_secs(5)); // ✅ 5s batch
+                let mut batch_timer = time::interval(Duration::from_secs(5));
                 let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    // ✅ COLETAR DADOS DE INTERVALOS LENTOS EM BATCH
                     for interval_s in 8..=10u64 {
                         let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
                         for (key, value) in tag_data {
@@ -806,9 +843,7 @@ impl WebSocketServer {
                         }
                     }
                     
-                    // ✅ ENVIAR BATCH ACUMULADO SE HOUVER DADOS
                     if !batch_accumulator.is_empty() {
-                        // ✅ ENVIO MESSAGEPACK (JSON COMPRIMIDO)
                         let string_map: HashMap<String, String> = batch_accumulator.iter()
                             .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
                             .collect();
@@ -820,15 +855,12 @@ impl WebSocketServer {
                                 if broadcast_tx_clone.receiver_count() > 0 {
                                     let _ = broadcast_tx_clone.send(msgpack_message);
                                 }
-                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
                             }
                             Err(_) => {
-                                // Fallback para JSON
                                 let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
                                 if broadcast_tx_clone.receiver_count() > 0 {
                                     let _ = broadcast_tx_clone.send(message);
                                 }
-                                println!("📡 JSON FALLBACK BATCH: {} tags", batch_accumulator.len());
                             }
                         }
                         batch_accumulator.clear();
@@ -847,12 +879,11 @@ impl WebSocketServer {
         let is_running_change = is_running.clone();
         
         let change_handle = tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_millis(100)); // Verifica mudanças a cada 100ms
+            let mut interval = time::interval(Duration::from_millis(100));
             while is_running_change.load(Ordering::SeqCst) {
                 interval.tick().await;
                 
-                // ✅ SEGURO: Acesso APENAS ao cache para detectar mudanças
-                let changed_tags = smart_cache_change.get_tags_for_broadcast(0).await; // 0 = modo change
+                let changed_tags = smart_cache_change.get_tags_for_broadcast(0).await;
                 
                 if !changed_tags.is_empty() {
                     let message = serde_json::to_string(&changed_tags).unwrap_or_else(|_| "{}".to_string());
@@ -866,25 +897,30 @@ impl WebSocketServer {
         
         handles.push(change_handle);
         
-        // Salvar handles
         let mut guard = self.interval_handles.lock().unwrap();
         *guard = handles;
         
-        println!("✅ Sistema inteligente iniciado: 1 acesso TCP + {} tasks de broadcast", 11);
+        println!("✅ Sistema inteligente iniciado com cache de tags");
         Ok(())
     }
 
-    /// Para e reinicia as tasks de broadcast de intervalos, recarregando os tags do banco
+    /// Para e reinicia as tasks de broadcast, recarregando os tags do banco
     pub async fn reload_tag_groups(&mut self) -> Result<(), String> {
+        // 🆕 INVALIDAR TODO O CACHE PARA FORÇAR RELOAD
+        self.smart_cache.invalidate_all_cache();
+        
+        // Limpar cache de dados antigos
+        self.smart_cache.clear().await;
+
         // Parar tasks antigas
         {
             let mut guard = self.interval_handles.lock().unwrap();
             for handle in guard.iter() {
-                let handle: &tokio::task::JoinHandle<()> = handle;
                 handle.abort();
             }
             guard.clear();
         }
+        
         // Recriar tasks com os grupos atualizados
         if let Some(broadcast_tx) = &self.broadcast_sender {
             self.start_smart_broadcasting(broadcast_tx.clone()).await
@@ -924,7 +960,6 @@ impl WebSocketServer {
 
         println!("🔌 WebSocket handshake completo para cliente {}", client_id);
 
-        // Task para enviar mensagens broadcast para este cliente
         let send_task = tokio::spawn(async move {
             while let Ok(message) = broadcast_rx.recv().await {
                 let msg_len = message.len() as u64;
@@ -939,13 +974,11 @@ impl WebSocketServer {
             }
         });
 
-        // Task para receber mensagens do cliente (opcional - keepalive/ping)
         let connected_clients_recv = connected_clients.clone();
         let receive_task = tokio::spawn(async move {
             while let Some(msg) = ws_receiver.next().await {
                 match msg {
                     Ok(Message::Text(_text)) => {
-                        // Cliente enviou mensagem - podemos usar para stats
                         if let Some(client) = connected_clients_recv.get(&client_id) {
                             client.messages_received.fetch_add(1, Ordering::SeqCst);
                         }
@@ -955,8 +988,7 @@ impl WebSocketServer {
                         break;
                     },
                     Ok(Message::Ping(_data)) => {
-                        // Responder ping automaticamente seria feito pelo tungstenite
-                        println!("📶 Ping recebido de cliente {}", client_id);
+                        println!("🔶 Ping recebido de cliente {}", client_id);
                     },
                     Err(e) => {
                         println!("❌ Erro ao receber de cliente {}: {}", client_id, e);
@@ -967,19 +999,16 @@ impl WebSocketServer {
             }
         });
 
-        // Aguardar qualquer uma das tasks terminar
         tokio::select! {
             _ = send_task => {},
             _ = receive_task => {}
         }
 
-        // Cleanup
         connected_clients.remove(&client_id);
         active_connections.fetch_sub(1, Ordering::SeqCst);
 
         println!("🔌 Cliente {} desconectado", client_id);
 
-        // Emitir evento de desconexão
         let _ = app_handle.emit("websocket-client-disconnected", serde_json::json!({
             "client_id": client_id,
             "address": addr.to_string(),
@@ -994,10 +1023,8 @@ impl WebSocketServer {
             return Err("WebSocket server não está rodando".to_string());
         }
 
-        // Parar servidor
         self.is_running.store(false, Ordering::SeqCst);
 
-        // Cancelar tasks
         if let Some(handle) = self.server_handle.take() {
             handle.abort();
         }
@@ -1008,11 +1035,9 @@ impl WebSocketServer {
             handle.abort();
         }
 
-        // Fechar todas as conexões
         self.connected_clients.clear();
         self.active_connections.store(0, Ordering::SeqCst);
 
-        // Emitir evento de servidor parado
         let _ = self.app_handle.emit("websocket-server-stopped", serde_json::json!({
             "status": "stopped",
             "timestamp": chrono::Utc::now().to_rfc3339()

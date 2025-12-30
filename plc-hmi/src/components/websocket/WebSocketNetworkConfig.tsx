@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { 
   Network, 
-  Settings, 
   Check, 
   X, 
   ChevronDown, 
@@ -56,15 +55,6 @@ export const WebSocketNetworkConfig: React.FC<WebSocketNetworkConfigProps> = ({
     }
   }, [isVisible]);
 
-  const loadNetworkInterfaces = async () => {
-    // 🚫 DESABILITADO - SEM acessar sistema/banco
-    console.log('ℹ️ Usando interfaces hardcoded');
-  };
-
-  const loadSavedConfig = async () => {
-    // 🚫 DESABILITADO - SEM acessar banco
-    console.log('ℹ️ Usando config hardcoded');
-  };
 
   const loadInitialData = async () => {
     // 🚫 DESABILITADO - SEM acessar banco

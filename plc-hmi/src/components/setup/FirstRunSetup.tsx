@@ -12,14 +12,6 @@ import {
   Settings
 } from 'lucide-react';
 
-interface AppConfig {
-  database_path: string;
-  first_run_completed: boolean;
-  tcp_port: number;
-  websocket_port: number;
-  created_at: number;
-  updated_at: number;
-}
 
 interface SetupModalProps {
   onComplete: () => void;
@@ -30,7 +22,6 @@ export const FirstRunSetup: React.FC<SetupModalProps> = ({ onComplete }) => {
   const [dbPath, setDbPath] = useState('');
   const [tcpPort, setTcpPort] = useState(8502);
   const [wsPort, setWsPort] = useState(8765);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [validating, setValidating] = useState(false);
 
