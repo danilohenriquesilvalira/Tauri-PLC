@@ -1,5 +1,5 @@
 // ============================================================================
-// PYTHON PARSER - TIPOS
+// PYTHON/SCL PARSER - TIPOS
 // ============================================================================
 
 // Informação do tag vinda do backend (cache)
@@ -23,7 +23,7 @@ export interface TagData {
     quality?: string;
 }
 
-// Tipos de nós de lógica Python
+// Tipos de nós de lógica Python/SCL
 export type PythonNodeType = 
     | 'ASSIGNMENT'
     | 'IF_STATEMENT' 
@@ -76,18 +76,27 @@ export interface ParseResult {
 // Erro de parsing
 export interface ParseError {
     line: number;
-    column: number;
+    column?: number;
     message: string;
     type: 'SYNTAX' | 'SEMANTIC' | 'RUNTIME' | 'TAG_NOT_FOUND';
     severity: 'ERROR' | 'WARNING' | 'INFO';
 }
 
-// Aviso de parsing
+// Aviso de parsing - ATUALIZADO com mais tipos
 export interface ParseWarning {
     line: number;
-    column: number;
+    column?: number;
     message: string;
-    type: 'UNUSED_VARIABLE' | 'UNDEFINED_VARIABLE' | 'TYPE_MISMATCH' | 'BEST_PRACTICE';
+    type: 
+        | 'UNUSED_VARIABLE' 
+        | 'UNDEFINED_VARIABLE' 
+        | 'TYPE_MISMATCH' 
+        | 'BEST_PRACTICE'
+        | 'WARNING'           // Aviso genérico
+        | 'DIVISION_BY_ZERO'  // Divisão por zero
+        | 'NAN_RESULT'        // Resultado NaN
+        | 'OVERFLOW'          // Overflow numérico
+        | 'RUNTIME_WARNING';  // Aviso de runtime
 }
 
 // Estatísticas do parsing
