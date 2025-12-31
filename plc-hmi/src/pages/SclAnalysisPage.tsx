@@ -1,448 +1,113 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Code, Repeat, Terminal, Lightbulb, Zap, Activity, Cpu, Database, CheckCircle2, XCircle, Server, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    Play, Code, Terminal, Lightbulb, Zap, Activity, Cpu, Database, 
+    CheckCircle2, XCircle, Server, AlertTriangle, ArrowRight, Clock, 
+    RefreshCw, Eye, TrendingUp, Hash, Binary, Layers, BookOpen, 
+    X, FileCode, Bookmark, Copy, Check
+} from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
-// --- TIPOS ---
+// Importar do parser Python
+import { 
+    PythonParser,
+    getDataTypeColor,
+    EXAMPLE_CATEGORIES,
+    getExamplesByCategory
+} from '../components/python-parser';
+import type {
+    LogicNode, 
+    TagData, 
+    PlcTagInfo,
+    ExampleCode,
+    ExampleCategory
+} from '../components/python-parser';
 
-// Informação completa do tag (vem do backend)
-type SclTagInfo = {
-    tag_name: string;
-    value: string;
-    data_type: string;  // "BOOL", "INT", "WORD", "REAL", "DINT", "DWORD"
-    variable_path: string;
-};
-
-type TagData = {
-    name: string;
-    type: 'INPUT' | 'OUTPUT' | 'MEMORY' | 'DB' | 'UNKNOWN';
-    dataType: string;  // BOOL, INT, WORD, REAL, DINT, DWORD
-    description?: string;
-    currentValue: string;
-    numericValue?: number;
-    requiredValue?: string;
-    status: 'OK' | 'NOK' | 'NEUTRAL' | 'NOT_FOUND';
-    foundInCache: boolean;
-};
-
-type LogicNode = {
-    id: string;
-    type: 'ASSIGNMENT' | 'COMPARISON' | 'BOOLEAN' | 'UNKNOWN';
-    summary: string;
-    details: string;
-    children?: LogicNode[];
-    rawCode: string;
-    tagsInvolved: TagData[];
-    resultTag?: TagData;
-};
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 export const SclAnalysisPage: React.FC = () => {
-    const [sclCode, setSclCode] = useState<string>(
-        '// Exemplos:\n' +
-        '// Alarme := Sensor_1 AND Sensor_2;\n' +
-        '// Bomba := Nivel >= 50;\n' +
-        '// Aquecedor := Temp_Atual < Temp_Setpoint;\n\n' +
-        'SENSOR_0 := Sensor_1 AND Sensor_2;'
+    // Estados do código
+    const [pythonCode, setPythonCode] = useState<string>(
+        'resultado = Sensor_1 and Sensor_2'
     );
     const [parsedNodes, setParsedNodes] = useState<LogicNode[]>([]);
-    const [narrative, setNarrative] = useState<string>("");
+    const [parseWarnings, setParseWarnings] = useState<any[]>([]);
+    const [parseErrors, setParseErrors] = useState<any[]>([]);
     const [isAnalysing, setIsAnalysing] = useState(false);
 
-    // Estados para integração TCP
+    // Estados do PLC
     const [selectedPlc, setSelectedPlc] = useState<string>("");
     const [availablePlcs, setAvailablePlcs] = useState<string[]>([]);
     const [useRealData, setUseRealData] = useState<boolean>(false);
     const [loading, setLoading] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+    const [tagCache, setTagCache] = useState<Map<string, PlcTagInfo>>(new Map());
 
-    // Cache de tags com tipo de dado
-    const [tagCache, setTagCache] = useState<Map<string, SclTagInfo>>(new Map());
+    // Estados de modais
+    const [showExamples, setShowExamples] = useState(false);
+    const [showReference, setShowReference] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<ExampleCategory>('basic');
+    const [copiedExample, setCopiedExample] = useState<string | null>(null);
 
-    // Carregar PLCs conectados
+    // Parser Python instance
+    const parser = useMemo(() => new PythonParser(), []);
+
+    // ============================================================================
+    // EFEITOS
+    // ============================================================================
+
     useEffect(() => {
         loadAvailablePlcs();
     }, []);
 
-    // Buscar tags COM tipo de dado do cache TCP
-    const loadTagsFromCache = async (plcIp: string) => {
-        try {
-            console.log(`🎯 Buscando tags SCL para: ${plcIp}`);
 
-            // Tentar usar o novo comando que retorna tipo de dado
-            try {
-                const tags = await invoke<SclTagInfo[]>('get_scl_tags', { plcIp });
-                console.log(`✅ Tags SCL carregados:`, tags);
 
-                const cache = new Map<string, SclTagInfo>();
-                for (const tag of tags) {
-                    cache.set(tag.tag_name, tag);
-                    // Também adicionar por nome em lowercase para busca case-insensitive
-                    cache.set(tag.tag_name.toLowerCase(), tag);
-                }
-                setTagCache(cache);
-                return cache;
-            } catch (e) {
-                // Fallback: usar comando antigo
-                console.log('⚠️ Fallback para get_real_time_tag_values');
-                const tagValues = await invoke<{ [key: string]: string }>('get_real_time_tag_values', { plcIp });
+    useEffect(() => {
+        parser.setTagCache(tagCache);
+    }, [tagCache, parser]);
 
-                const cache = new Map<string, SclTagInfo>();
-                for (const [name, value] of Object.entries(tagValues)) {
-                    // Inferir tipo pelo valor
-                    let dataType = 'UNKNOWN';
-                    if (value === 'TRUE' || value === 'FALSE') {
-                        dataType = 'BOOL';
-                    } else if (value.includes('.')) {
-                        dataType = 'REAL';
-                    } else if (/^-?\d+$/.test(value)) {
-                        dataType = 'INT';
-                    }
-
-                    cache.set(name, {
-                        tag_name: name,
-                        value,
-                        data_type: dataType,
-                        variable_path: ''
-                    });
-                    cache.set(name.toLowerCase(), {
-                        tag_name: name,
-                        value,
-                        data_type: dataType,
-                        variable_path: ''
-                    });
-                }
-                setTagCache(cache);
-                return cache;
-            }
-        } catch (error) {
-            console.error('❌ Erro ao buscar tags:', error);
-            setTagCache(new Map());
-            return new Map();
-        }
-    };
+    // ============================================================================
+    // EXEMPLOS SIEMENS (pode ser usado em UI)
+    // ============================================================================
+    // Exemplo de uso: SIEMENS_VAR_EXAMPLES
+    // ============================================================================
+    // FUNÇÕES
+    // ============================================================================
 
     const loadAvailablePlcs = async () => {
+        setLoading(true);
         try {
-            console.log('🔍 Buscando PLCs conectados...');
             const plcs = await invoke<string[]>('get_connected_clients');
-            console.log('📡 PLCs encontrados:', plcs);
             setAvailablePlcs(plcs);
+
             if (plcs.length > 0 && !selectedPlc) {
                 setSelectedPlc(plcs[0]);
                 setUseRealData(true);
-                console.log(`✅ PLC selecionado automaticamente: ${plcs[0]}`);
                 await loadTagsFromCache(plcs[0]);
             }
         } catch (error) {
-            console.error('❌ Erro ao buscar PLCs:', error);
-            setUseRealData(false);
+            console.error('Erro ao carregar PLCs:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Função para buscar tag no cache (case-insensitive)
-    const findTagInCache = (tagName: string, cache: Map<string, SclTagInfo>): SclTagInfo | null => {
-        // Busca exata
-        if (cache.has(tagName)) {
-            return cache.get(tagName)!;
-        }
-        // Busca case-insensitive
-        if (cache.has(tagName.toLowerCase())) {
-            return cache.get(tagName.toLowerCase())!;
-        }
-        // Busca por similaridade (remover underscores)
-        const normalized = tagName.replace(/_/g, '').toLowerCase();
-        for (const [key, value] of cache.entries()) {
-            if (key.replace(/_/g, '').toLowerCase() === normalized) {
-                return value;
-            }
-        }
-        return null;
-    };
-
-    // Verifica se é um literal numérico
-    const isNumericLiteral = (str: string): boolean => {
-        return /^-?\d+(\.\d+)?$/.test(str.trim());
-    };
-
-    // Converte string para número
-    const toNumeric = (value: string): number | null => {
-        if (value === 'TRUE') return 1;
-        if (value === 'FALSE') return 0;
-        const num = parseFloat(value);
-        return isNaN(num) ? null : num;
-    };
-
-    // Analisar tag e buscar no cache
-    const analyzeTag = (tagName: string, cache: Map<string, SclTagInfo>): TagData => {
-        console.log(`🔍 analyzeTag: "${tagName}"`);
-
-        const cachedTag = findTagInCache(tagName, cache);
-        const foundInCache = cachedTag !== null;
-
-        let currentValue = 'N/A';
-        let dataType = 'UNKNOWN';
-        let numericValue: number | undefined;
-
-        if (foundInCache && cachedTag) {
-            currentValue = cachedTag.value;
-            dataType = cachedTag.data_type;
-            const num = toNumeric(currentValue);
-            if (num !== null) numericValue = num;
-            console.log(`✅ Encontrado: ${tagName} = ${currentValue} (${dataType})`);
-        } else {
-            console.log(`❌ Tag não encontrado: ${tagName}`);
-        }
-
-        // Inferir tipo de entrada/saída pelo nome
-        let type: TagData['type'] = 'MEMORY';
-        const lowerName = tagName.toLowerCase();
-        if (lowerName.includes('sensor') || lowerName.includes('input') || lowerName.startsWith('i_')) {
-            type = 'INPUT';
-        } else if (lowerName.includes('pump') || lowerName.includes('motor') || lowerName.includes('output') || lowerName.startsWith('q_')) {
-            type = 'OUTPUT';
-        } else if (lowerName.includes('db')) {
-            type = 'DB';
-        }
-
-        return {
-            name: tagName,
-            type,
-            dataType,
-            currentValue,
-            numericValue,
-            status: foundInCache ? 'NEUTRAL' : 'NOT_FOUND',
-            foundInCache
-        };
-    };
-
-    // Detectar tipo de operação
-    const detectOperationType = (expression: string): 'COMPARISON' | 'BOOLEAN' | 'SIMPLE' => {
-        // Comparações (ordem importa: >= e <= antes de > e <)
-        if (expression.includes('>=') || expression.includes('<=') ||
-            expression.includes('<>') || expression.includes('==') ||
-            /[^<>=][><][^<>=]/.test(' ' + expression + ' ') ||
-            expression.match(/^[A-Za-z_]\w*\s*[><]\s*/)) {
-            return 'COMPARISON';
-        }
-
-        // Booleano
-        const upper = expression.toUpperCase();
-        if (upper.includes(' AND ') || upper.includes(' OR ') || upper.includes('NOT ')) {
-            return 'BOOLEAN';
-        }
-
-        return 'SIMPLE';
-    };
-
-    // Avaliar comparação numérica
-    const evaluateComparison = (
-        expression: string,
-        tags: TagData[],
-        cache: Map<string, SclTagInfo>
-    ): { result: boolean; explanation: string } => {
-        const patterns = [
-            { regex: /(.+?)\s*>=\s*(.+)/, op: '>=', fn: (a: number, b: number) => a >= b, desc: 'maior ou igual a' },
-            { regex: /(.+?)\s*<=\s*(.+)/, op: '<=', fn: (a: number, b: number) => a <= b, desc: 'menor ou igual a' },
-            { regex: /(.+?)\s*<>\s*(.+)/, op: '<>', fn: (a: number, b: number) => a !== b, desc: 'diferente de' },
-            { regex: /(.+?)\s*==\s*(.+)/, op: '==', fn: (a: number, b: number) => a === b, desc: 'igual a' },
-            { regex: /(.+?)\s*>\s*(.+)/, op: '>', fn: (a: number, b: number) => a > b, desc: 'maior que' },
-            { regex: /(.+?)\s*<\s*(.+)/, op: '<', fn: (a: number, b: number) => a < b, desc: 'menor que' },
-        ];
-
-        for (const pattern of patterns) {
-            const match = expression.match(pattern.regex);
-            if (match) {
-                const leftExpr = match[1].trim();
-                const rightExpr = match[2].trim();
-
-                let leftValue: number;
-                let rightValue: number;
-                let leftDisplay: string;
-                let rightDisplay: string;
-
-                // Processar lado esquerdo
-                if (isNumericLiteral(leftExpr)) {
-                    leftValue = parseFloat(leftExpr);
-                    leftDisplay = leftExpr;
-                } else {
-                    const leftTag = tags.find(t => t.name === leftExpr);
-                    if (leftTag?.foundInCache && leftTag.numericValue !== undefined) {
-                        leftValue = leftTag.numericValue;
-                        leftDisplay = `${leftTag.name} (${leftTag.currentValue})`;
-                    } else {
-                        return { result: false, explanation: `❌ Tag não encontrado ou sem valor numérico: ${leftExpr}` };
-                    }
-                }
-
-                // Processar lado direito
-                if (isNumericLiteral(rightExpr)) {
-                    rightValue = parseFloat(rightExpr);
-                    rightDisplay = rightExpr;
-                } else {
-                    const rightTag = tags.find(t => t.name === rightExpr);
-                    if (rightTag?.foundInCache && rightTag.numericValue !== undefined) {
-                        rightValue = rightTag.numericValue;
-                        rightDisplay = `${rightTag.name} (${rightTag.currentValue})`;
-                    } else {
-                        return { result: false, explanation: `❌ Tag não encontrado ou sem valor numérico: ${rightExpr}` };
-                    }
-                }
-
-                const result = pattern.fn(leftValue, rightValue);
-                const explanation = `📊 **Comparação:** ${leftDisplay} ${pattern.desc} ${rightDisplay}\n` +
-                    `   ${leftValue} ${pattern.op} ${rightValue} = ${result ? '✅ VERDADEIRO' : '❌ FALSO'}`;
-
-                return { result, explanation };
-            }
-        }
-
-        return { result: false, explanation: '❌ Padrão de comparação não reconhecido' };
-    };
-
-    // Avaliar lógica booleana
-    const evaluateBoolean = (expression: string, tags: TagData[]): { result: boolean; explanation: string } => {
-        let jsExpr = expression;
-        const substitutions: string[] = [];
-
-        for (const tag of tags) {
-            if (tag.foundInCache) {
-                const boolValue = tag.currentValue === 'TRUE' || tag.currentValue === '1' ||
-                    (tag.numericValue !== undefined && tag.numericValue !== 0);
-                jsExpr = jsExpr.replace(new RegExp(`\\b${tag.name}\\b`, 'gi'), boolValue ? 'true' : 'false');
-                tag.status = boolValue ? 'OK' : 'NOK';
-                tag.requiredValue = 'TRUE';
-                substitutions.push(`${tag.name} = ${boolValue ? 'TRUE' : 'FALSE'}`);
-            } else {
-                jsExpr = jsExpr.replace(new RegExp(`\\b${tag.name}\\b`, 'gi'), 'false');
-                substitutions.push(`${tag.name} = N/A (FALSE)`);
-            }
-        }
-
-        jsExpr = jsExpr
-            .replace(/\bAND\b/gi, '&&')
-            .replace(/\bOR\b/gi, '||')
-            .replace(/\bNOT\b/gi, '!')
-            .replace(/\bTRUE\b/gi, 'true')
-            .replace(/\bFALSE\b/gi, 'false');
-
+    const loadTagsFromCache = async (plcIp: string) => {
         try {
-            const result = eval(jsExpr);
-            const explanation = `🔗 **Lógica Booleana:**\n` +
-                substitutions.map(s => `   • ${s}`).join('\n') +
-                `\n   Resultado: ${result ? '✅ TRUE' : '❌ FALSE'}`;
-            return { result: !!result, explanation };
+            const tags = await invoke<PlcTagInfo[]>('get_scl_tags', { plcIp });
+            const cache = new Map<string, PlcTagInfo>();
+            for (const tag of tags) {
+                cache.set(tag.tag_name, tag);
+                cache.set(tag.tag_name.toLowerCase(), tag);
+            }
+            setTagCache(cache);
+            setLastUpdate(new Date());
+            return cache;
         } catch (e) {
-            return { result: false, explanation: `❌ Erro ao avaliar expressão: ${e}` };
+            console.error('Erro ao carregar tags:', e);
+            return new Map();
         }
-    };
-
-    // Parser principal
-    const parseStatement = (stmt: string, cache: Map<string, SclTagInfo>): LogicNode => {
-        const clean = stmt.replace(/\s+/g, ' ').trim();
-        const id = Math.random().toString(36).substr(2, 9);
-        const tagsInvolved: TagData[] = [];
-        let resultTag: TagData | undefined;
-
-        // Ignorar comentários
-        if (clean.startsWith('//')) {
-            return { id, type: 'UNKNOWN', summary: 'Comentário', details: clean, rawCode: stmt, tagsInvolved: [] };
-        }
-
-        console.log(`🔍 PARSEANDO: "${clean}"`);
-
-        // ASSIGNMENT: target := expression
-        const assignMatch = clean.match(/^(.+?)\s*:=\s*(.+?)(?:\s*;)?$/);
-        if (assignMatch) {
-            const targetName = assignMatch[1].trim();
-            const expression = assignMatch[2].trim();
-
-            console.log(`🎯 TARGET: "${targetName}"`);
-            console.log(`🎯 EXPRESSÃO: "${expression}"`);
-
-            // Analisar tag de resultado
-            resultTag = analyzeTag(targetName, cache);
-
-            // Extrair identificadores da expressão
-            const identifiers = expression.match(/\b[A-Za-z_][A-Za-z0-9_]*\b/g) || [];
-            const reservedWords = ['AND', 'OR', 'NOT', 'TRUE', 'FALSE', 'IF', 'THEN', 'ELSE'];
-
-            for (const ident of identifiers) {
-                if (!reservedWords.includes(ident.toUpperCase())) {
-                    const tag = analyzeTag(ident, cache);
-                    if (!tagsInvolved.find(t => t.name === tag.name)) {
-                        tagsInvolved.push(tag);
-                    }
-                }
-            }
-
-            console.log(`📊 TAGS ENVOLVIDOS: ${tagsInvolved.length}`);
-
-            // Detectar tipo de operação
-            const opType = detectOperationType(expression);
-            let explanation = '';
-            let evalResult: boolean = false;
-
-            // Tags não encontrados
-            const notFoundTags = tagsInvolved.filter(t => !t.foundInCache);
-
-            if (opType === 'COMPARISON') {
-                const { result, explanation: exp } = evaluateComparison(expression, tagsInvolved, cache);
-                evalResult = result;
-                explanation = exp;
-
-                // Comparação retorna BOOL
-                if (resultTag) {
-                    resultTag.currentValue = result ? 'TRUE' : 'FALSE';
-                    resultTag.dataType = 'BOOL';
-                    resultTag.status = result ? 'OK' : 'NOK';
-                }
-            } else if (opType === 'BOOLEAN') {
-                const { result, explanation: exp } = evaluateBoolean(expression, tagsInvolved);
-                evalResult = result;
-                explanation = exp;
-
-                if (resultTag) {
-                    resultTag.currentValue = result ? 'TRUE' : 'FALSE';
-                    resultTag.dataType = 'BOOL';
-                    resultTag.status = result ? 'OK' : 'NOK';
-                }
-            } else {
-                // Atribuição simples
-                if (tagsInvolved.length === 1) {
-                    const sourceTag = tagsInvolved[0];
-                    explanation = `📝 **Atribuição:** ${targetName} recebe valor de ${sourceTag.name}`;
-                    if (resultTag && sourceTag.foundInCache) {
-                        resultTag.currentValue = sourceTag.currentValue;
-                        resultTag.dataType = sourceTag.dataType;
-                        resultTag.status = 'OK';
-                    }
-                } else {
-                    explanation = `📝 **Atribuição:** ${targetName} := ${expression}`;
-                }
-            }
-
-            // Adicionar aviso sobre tags não encontrados
-            if (notFoundTags.length > 0) {
-                explanation += `\n\n⚠️ **Tags não encontrados no cache:**\n`;
-                explanation += notFoundTags.map(t => `   • ${t.name}`).join('\n');
-            }
-
-            return {
-                id,
-                type: opType === 'COMPARISON' ? 'COMPARISON' : opType === 'BOOLEAN' ? 'BOOLEAN' : 'ASSIGNMENT',
-                summary: `${targetName} := ${expression}`,
-                details: explanation,
-                rawCode: stmt,
-                tagsInvolved,
-                resultTag
-            };
-        }
-
-        return { id, type: 'UNKNOWN', summary: 'Desconhecido', details: clean, rawCode: stmt, tagsInvolved: [] };
-    };
-
-    const splitStatements = (code: string) => {
-        return code.split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0 && !line.startsWith('//'));
     };
 
     const runParser = async () => {
@@ -450,286 +115,620 @@ export const SclAnalysisPage: React.FC = () => {
         setLoading(true);
 
         try {
-            // 1. Buscar dados do cache
-            let cache = tagCache;
+            // Atualizar cache se PLC selecionado
             if (selectedPlc) {
-                console.log(`🔄 Atualizando dados do PLC ${selectedPlc}...`);
-                cache = await loadTagsFromCache(selectedPlc);
+                const cache = await loadTagsFromCache(selectedPlc);
+                parser.setTagCache(cache);
             }
 
-            // 2. Processar código
-            const stmts = splitStatements(sclCode);
-            const nodes: LogicNode[] = [];
+            // Fazer parse do código Python
+            const result = parser.parse(pythonCode);
+            setParsedNodes(result.nodes);
+            setParseWarnings(result.warnings);
+            setParseErrors(result.errors);
 
-            for (const stmt of stmts) {
-                const node = parseStatement(stmt, cache);
-                if (node.type !== 'UNKNOWN') {
-                    nodes.push(node);
-                }
-            }
-
-            setParsedNodes(nodes);
-
-            // 3. Gerar narrativa
-            if (nodes.length > 0) {
-                setNarrative(nodes[0].details);
-            }
         } catch (error) {
-            console.error('Erro ao processar código SCL:', error);
+            console.error('Erro ao processar código:', error);
         } finally {
             setIsAnalysing(false);
             setLoading(false);
         }
     };
 
-    // --- COMPONENTES DE UI ---
+    const useExample = (example: ExampleCode) => {
+        setPythonCode(example.code);
+        setShowExamples(false);
+        setCopiedExample(example.id);
+        setTimeout(() => setCopiedExample(null), 2000);
+    };
+
+    const copyToClipboard = (text: string, id: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedExample(id);
+        setTimeout(() => setCopiedExample(null), 2000);
+    };
+
+    // ============================================================================
+    // COMPONENTES DE UI
+    // ============================================================================
+
     const TypeBadge = ({ dataType }: { dataType: string }) => {
-        switch (dataType) {
-            case 'BOOL': return <span className="flex items-center gap-1 text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded border border-purple-200 uppercase font-bold"><Zap size={10} /> BOOL</span>;
-            case 'INT': return <span className="flex items-center gap-1 text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded border border-cyan-200 uppercase font-bold"><Terminal size={10} /> INT</span>;
-            case 'WORD': return <span className="flex items-center gap-1 text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200 uppercase font-bold"><Database size={10} /> WORD</span>;
-            case 'DWORD': return <span className="flex items-center gap-1 text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 uppercase font-bold"><Database size={10} /> DWORD</span>;
-            case 'REAL': return <span className="flex items-center gap-1 text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded border border-orange-200 uppercase font-bold"><Activity size={10} /> REAL</span>;
-            case 'DINT': return <span className="flex items-center gap-1 text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded border border-teal-200 uppercase font-bold"><Terminal size={10} /> DINT</span>;
-            default: return <span className="flex items-center gap-1 text-[10px] bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded border border-gray-200 uppercase font-bold"><Database size={10} /> {dataType || '?'}</span>;
-        }
+        const colors = getDataTypeColor(dataType);
+        const icons: Record<string, React.ReactNode> = {
+            'BOOL': <Binary size={10} />,
+            'INT': <Hash size={10} />,
+            'DINT': <Hash size={10} />,
+            'REAL': <TrendingUp size={10} />,
+            'WORD': <Database size={10} />,
+            'DWORD': <Database size={10} />,
+        };
+
+        return (
+            <span className={`inline-flex items-center gap-1 text-[10px] ${colors.bg} ${colors.text} px-1.5 py-0.5 rounded border ${colors.border} uppercase font-bold`}>
+                {icons[dataType] || <Layers size={10} />} {dataType || '?'}
+            </span>
+        );
     };
 
     const ValueDisplay = ({ tag }: { tag: TagData }) => {
         if (!tag.foundInCache) {
-            return (
-                <span className="text-yellow-600 font-bold flex items-center gap-1">
-                    <AlertTriangle size={14} />
-                    NÃO ENCONTRADO
-                </span>
-            );
+            return <span className="text-gray-400 italic text-sm">N/A</span>;
         }
 
         if (tag.dataType === 'BOOL') {
-            return tag.currentValue === 'TRUE' ?
-                <span className="text-green-600 font-bold">TRUE (1)</span> :
-                <span className="text-red-500 font-bold">FALSE (0)</span>;
+            return tag.currentValue === 'TRUE' || tag.currentValue === '1' ?
+                <span className="text-green-600 font-bold">TRUE</span> :
+                <span className="text-red-500 font-bold">FALSE</span>;
         }
 
         if (tag.dataType === 'REAL') {
-            return <span className="text-orange-600 font-bold">{tag.currentValue}</span>;
+            return <span className="text-orange-600 font-bold font-mono">{tag.currentValue}</span>;
         }
 
-        if (tag.dataType === 'INT' || tag.dataType === 'DINT') {
-            return <span className="text-cyan-600 font-bold">{tag.currentValue}</span>;
-        }
-
-        if (tag.dataType === 'WORD' || tag.dataType === 'DWORD') {
-            return <span className="text-blue-600 font-bold">{tag.currentValue}</span>;
-        }
-
-        return <span className="text-gray-600 font-bold">{tag.currentValue}</span>;
+        return <span className="text-gray-700 font-bold font-mono">{tag.currentValue}</span>;
     };
 
     const StatusIcon = ({ status }: { status: TagData['status'] }) => {
         switch (status) {
-            case 'OK': return <CheckCircle2 size={18} className="text-green-500 mx-auto" />;
-            case 'NOK': return <XCircle size={18} className="text-red-500 mx-auto" />;
-            case 'NOT_FOUND': return <AlertTriangle size={18} className="text-yellow-500 mx-auto" />;
-            default: return <div className="w-4 h-4 rounded-full bg-gray-300 mx-auto" />;
+            case 'OK': return <CheckCircle2 size={16} className="text-green-500" />;
+            case 'NOK': return <XCircle size={16} className="text-red-500" />;
+            case 'NOT_FOUND': return <AlertTriangle size={16} className="text-yellow-500" />;
+            default: return <div className="w-3 h-3 rounded-full bg-gray-300" />;
         }
     };
 
+    const getLogicTypeLabel = (type: string) => {
+        const configs: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+            'ASSIGNMENT': { label: 'Atribuição', color: 'bg-green-500', icon: <ArrowRight size={14} /> },
+            'IF_STATEMENT': { label: 'IF', color: 'bg-indigo-500', icon: <Code size={14} /> },
+            'ELIF_STATEMENT': { label: 'ELIF', color: 'bg-indigo-400', icon: <Code size={14} /> },
+            'ELSE_STATEMENT': { label: 'ELSE', color: 'bg-indigo-300', icon: <Code size={14} /> },
+            'FOR_LOOP': { label: 'FOR Loop', color: 'bg-cyan-500', icon: <RefreshCw size={14} /> },
+            'WHILE_LOOP': { label: 'WHILE Loop', color: 'bg-cyan-600', icon: <RefreshCw size={14} /> },
+            'FUNCTION_DEF': { label: 'Definição Função', color: 'bg-teal-500', icon: <Terminal size={14} /> },
+            'CLASS_DEF': { label: 'Definição Classe', color: 'bg-purple-500', icon: <Layers size={14} /> },
+            'COMPARISON': { label: 'Comparação', color: 'bg-blue-500', icon: <Activity size={14} /> },
+            'ARITHMETIC': { label: 'Aritmética', color: 'bg-orange-500', icon: <Hash size={14} /> },
+            'LOGICAL': { label: 'Lógica Booleana', color: 'bg-purple-500', icon: <Zap size={14} /> },
+            'FUNCTION_CALL': { label: 'Chamada Função', color: 'bg-teal-400', icon: <Terminal size={14} /> },
+            'LIST_COMPREHENSION': { label: 'List Comprehension', color: 'bg-pink-500', icon: <Layers size={14} /> },
+            'DICTIONARY': { label: 'Dicionário', color: 'bg-yellow-500', icon: <Database size={14} /> },
+            'LIST': { label: 'Lista', color: 'bg-lime-500', icon: <Layers size={14} /> },
+            'TUPLE': { label: 'Tupla', color: 'bg-emerald-500', icon: <Layers size={14} /> },
+            'TRY_EXCEPT': { label: 'Try/Except', color: 'bg-red-500', icon: <AlertTriangle size={14} /> },
+            'WITH_STATEMENT': { label: 'With', color: 'bg-violet-500', icon: <Code size={14} /> },
+            'IMPORT': { label: 'Import', color: 'bg-gray-500', icon: <BookOpen size={14} /> },
+            'RETURN': { label: 'Return', color: 'bg-blue-600', icon: <ArrowRight size={14} /> },
+            'EXPRESSION': { label: 'Expressão', color: 'bg-gray-400', icon: <Code size={14} /> },
+        };
+        return configs[type] || { label: type, color: 'bg-gray-500', icon: <Code size={14} /> };
+    };
+
+    // ============================================================================
+    // RENDER
+    // ============================================================================
+
     return (
-        <div className="h-full flex flex-col space-y-4">
+        <div className="h-full flex flex-col gap-4">
             {/* Header */}
-            <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm border border-gray-200">
-                <div className="flex items-center gap-2">
-                    <Code className="text-edp-marine" size={24} />
-                    <span className="font-bold text-gray-700 text-lg">Diagnóstico de Lógica SCL</span>
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-edp-marine/10 rounded-lg">
+                        <Code className="text-edp-marine" size={24} />
+                    </div>
+                    <div>
+                        <h1 className="font-bold text-gray-800 text-lg">Análise Python</h1>
+                        <p className="text-xs text-gray-500">Parser Python com integração PLC em tempo real</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-3">
+                    {/* Badge Python */}
+                    <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                        <FileCode size={16} className="text-blue-600" />
+                        <span className="text-sm font-medium text-blue-700">Python 3.11</span>
+                    </div>
+
+                    {/* Botão Exemplos */}
+                    <button
+                        onClick={() => setShowExamples(true)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+                    >
+                        <BookOpen size={16} />
+                        Exemplos
+                    </button>
+
+                    {/* Botão Referência */}
+                    <button
+                        onClick={() => setShowReference(true)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+                    >
+                        <Bookmark size={16} />
+                        Guia
+                    </button>
+
+                    {/* Separador */}
+                    <div className="h-8 w-px bg-gray-200" />
+
+                    {/* Seletor de PLC */}
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                         <Server size={16} className="text-gray-500" />
                         <select
                             value={selectedPlc}
                             onChange={(e) => {
                                 setSelectedPlc(e.target.value);
                                 setUseRealData(e.target.value !== "");
-                                if (e.target.value) {
-                                    loadTagsFromCache(e.target.value);
-                                }
+                                if (e.target.value) loadTagsFromCache(e.target.value);
                             }}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-edp-marine/20"
+                            className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
                         >
-                            <option value="">Selecione um PLC</option>
+                            <option value="">Selecione PLC</option>
                             {availablePlcs.map((plc) => (
-                                <option key={plc} value={plc}>PLC: {plc}</option>
+                                <option key={plc} value={plc}>{plc}</option>
                             ))}
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${useRealData ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                        <span className="text-xs font-medium text-gray-600">
-                            {useRealData ? 'TCP Real' : 'Aguardando PLC'}
+                    {/* Status de Conexão */}
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${useRealData ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                        <div className={`w-2 h-2 rounded-full ${useRealData ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
+                        <span className={`text-xs font-semibold ${useRealData ? 'text-green-700' : 'text-yellow-700'}`}>
+                            {useRealData ? 'Online' : 'Offline'}
                         </span>
+                        {tagCache.size > 0 && (
+                            <span className="text-xs text-gray-500">({Math.floor(tagCache.size / 2)} tags)</span>
+                        )}
                     </div>
 
+                    {/* Atualizar */}
                     <button
                         onClick={loadAvailablePlcs}
                         disabled={loading}
-                        className="p-2 text-gray-500 hover:text-edp-marine hover:bg-gray-100 rounded-md"
+                        className="p-2 text-gray-500 hover:text-edp-marine hover:bg-gray-100 rounded-lg transition-colors"
                         title="Atualizar PLCs"
                     >
-                        <Repeat size={16} className={loading ? 'animate-spin' : ''} />
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
 
+                    {/* Botão Analisar */}
                     <button
                         onClick={runParser}
                         disabled={isAnalysing || loading}
-                        className="flex items-center gap-2 px-6 py-2 rounded-md font-medium text-white bg-edp-marine hover:bg-[#1a2332] disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-white bg-edp-marine hover:bg-[#1a2332] disabled:opacity-50 transition-colors"
                     >
-                        {isAnalysing ? 'Analisando...' : 'Analisar'}
-                        {!isAnalysing && <Play size={16} fill="currentColor" />}
+                        {isAnalysing ? (
+                            <>
+                                <RefreshCw size={16} className="animate-spin" />
+                                Analisando...
+                            </>
+                        ) : (
+                            <>
+                                <Play size={16} fill="currentColor" />
+                                Analisar
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
 
             {/* Layout Principal */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
-                {/* Editor */}
-                <div className="flex flex-col bg-[#1e1e1e] rounded-lg overflow-hidden border border-gray-700">
-                    <div className="px-4 py-2 bg-[#252526] border-b border-gray-700">
-                        <span className="text-gray-300 text-xs font-mono font-bold">CÓDIGO SCL</span>
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+                {/* Editor de Código */}
+                <div className="flex flex-col bg-[#1e1e1e] rounded-xl overflow-hidden border border-gray-700 shadow-lg">
+                    <div className="px-4 py-3 bg-[#252526] border-b border-gray-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Terminal size={16} className="text-gray-400" />
+                            <span className="text-gray-300 text-sm font-semibold">
+                                Código Python
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-gray-500 text-xs">{pythonCode.split('\n').length} linhas</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                                Python
+                            </span>
+                        </div>
                     </div>
                     <textarea
-                        value={sclCode}
-                        onChange={(e) => setSclCode(e.target.value)}
-                        className="flex-1 w-full bg-[#1e1e1e] text-[#9cdcfe] font-mono text-sm p-4 resize-none focus:outline-none"
+                        value={pythonCode}
+                        onChange={(e) => setPythonCode(e.target.value)}
+                        className="flex-1 w-full bg-[#1e1e1e] text-[#9cdcfe] font-mono text-sm p-4 resize-none focus:outline-none leading-relaxed"
                         spellCheck={false}
+                        placeholder="# Digite seu código Python aqui...&#10;# Use os nomes exatos das tags como estão mapeadas&#10;# O sistema reconhecerá automaticamente as tags do cache&#10;# Exemplo:&#10;# variavel = nome_da_tag&#10;# resultado = variavel and not outra_tag"
                     />
                 </div>
 
-                {/* Resultado */}
-                <div className="flex flex-col bg-white rounded-lg overflow-hidden border border-gray-200">
-                    {parsedNodes.length > 0 ? (
-                        <div className="flex-1 overflow-auto bg-gray-50/50 p-6 space-y-6">
-                            {/* Status */}
-                            <div className={`p-3 rounded-lg border-l-4 ${useRealData ? 'bg-green-50 border-green-500' : 'bg-yellow-50 border-yellow-500'}`}>
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${useRealData ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                                    <span className="text-xs font-bold text-gray-700">
-                                        {useRealData ? `🔗 Conectado ao PLC ${selectedPlc}` : '⚠️ Nenhum PLC selecionado'}
-                                    </span>
-                                    <span className="text-xs text-gray-500 ml-auto">
-                                        {tagCache.size / 2} tags no cache
-                                    </span>
-                                </div>
+                {/* Painel de Resultado */}
+                <div className="flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Eye size={16} className="text-gray-500" />
+                            <span className="text-gray-700 text-sm font-semibold">Resultado da Análise</span>
+                            {parsedNodes.length > 0 && (
+                                <span className="text-xs bg-edp-marine text-white px-2 py-0.5 rounded-full">
+                                    {parsedNodes.length} {parsedNodes.length === 1 ? 'instrução' : 'instruções'}
+                                </span>
+                            )}
+                        </div>
+                        {lastUpdate && (
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                                <Clock size={12} />
+                                {lastUpdate.toLocaleTimeString('pt-BR')}
                             </div>
+                        )}
+                    </div>
 
-                            {/* Explicação */}
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex gap-4">
-                                <div className="bg-blue-50 p-3 rounded-full h-fit">
-                                    <Lightbulb className="text-blue-600" size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="font-bold text-gray-800 text-sm mb-1">Análise da Lógica</h4>
-                                    <div className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
-                                        {narrative}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tabela de Tags */}
-                            {parsedNodes.map((node, i) => (
-                                <div key={i} className="space-y-4">
-                                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                                        <div className="h-px bg-gray-300 w-8"></div>
-                                        Tabela de Tags Envolvidos
-                                        <div className="h-px bg-gray-300 flex-1"></div>
+                    {/* Avisos e Sugestões */}
+                    {(parseWarnings.length > 0 || parseErrors.length > 0) && (
+                        <div className="p-4 border-b border-gray-200">
+                            {parseErrors.length > 0 && (
+                                <div className="mb-3">
+                                    <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-1">
+                                        <XCircle size={16} />
+                                        Erros ({parseErrors.length})
                                     </h4>
-
-                                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                                        <table className="w-full text-sm">
-                                            <thead className="bg-gray-50 text-gray-500 text-left">
-                                                <tr>
-                                                    <th className="px-4 py-2 font-medium text-xs uppercase">Tag</th>
-                                                    <th className="px-4 py-2 font-medium text-xs uppercase">Tipo Dado</th>
-                                                    <th className="px-4 py-2 font-medium text-xs uppercase">Valor Atual</th>
-                                                    <th className="px-4 py-2 font-medium text-xs uppercase">Esperado</th>
-                                                    <th className="px-4 py-2 font-medium text-xs uppercase text-center">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {node.tagsInvolved?.map((tag, idx) => (
-                                                    <tr key={idx} className={`hover:bg-gray-50/80 ${!tag.foundInCache ? 'bg-yellow-50' : ''}`}>
-                                                        <td className="px-4 py-3 font-mono font-medium text-gray-700">{tag.name}</td>
-                                                        <td className="px-4 py-3"><TypeBadge dataType={tag.dataType} /></td>
-                                                        <td className="px-4 py-3 font-mono"><ValueDisplay tag={tag} /></td>
-                                                        <td className="px-4 py-3 font-mono text-gray-400">{tag.requiredValue || '-'}</td>
-                                                        <td className="px-4 py-3"><StatusIcon status={tag.status} /></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-
-                                        {/* Resultado Final */}
-                                        {node.resultTag && (
-                                            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-gray-500 uppercase">Resultado:</span>
-                                                    <span className="font-mono font-bold text-gray-800">{node.resultTag.name}</span>
-                                                    <TypeBadge dataType={node.resultTag.dataType} />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-gray-500 uppercase">Valor:</span>
-                                                    <span className={`font-mono font-bold px-2 py-0.5 rounded ${node.resultTag.currentValue === 'TRUE' ? 'bg-green-100 text-green-700' :
-                                                            node.resultTag.currentValue === 'FALSE' ? 'bg-red-100 text-red-700' :
-                                                                'bg-blue-100 text-blue-700'
-                                                        }`}>
-                                                        {node.resultTag.currentValue}
-                                                    </span>
-                                                </div>
+                                    <div className="space-y-1">
+                                        {parseErrors.map((error, i) => (
+                                            <div key={i} className="text-sm text-red-700 bg-red-50 p-2 rounded border border-red-200">
+                                                <span className="font-mono text-xs text-red-500">Linha {error.line}:</span> {error.message}
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-
-                            {/* Tags Disponíveis */}
-                            {tagCache.size > 0 && (
-                                <div className="bg-gray-100 rounded-lg p-4">
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">
-                                        Tags Disponíveis (clique para usar)
+                            )}
+                            
+                            {parseWarnings.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-orange-600 mb-2 flex items-center gap-1">
+                                        <AlertTriangle size={16} />
+                                        Sugestões e Avisos ({parseWarnings.length})
                                     </h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {Array.from(tagCache.entries())
-                                            .filter(([key]) => !key.includes(key.toLowerCase()) || key === key.toLowerCase())
-                                            .slice(0, 50) // Limitar a 50 tags
-                                            .map(([_, tag]) => (
-                                                <button
-                                                    key={tag.tag_name}
-                                                    onClick={() => setSclCode(prev => prev + ' ' + tag.tag_name)}
-                                                    className="px-2 py-1 bg-white border border-gray-200 rounded text-xs font-mono hover:bg-blue-50 hover:border-blue-300"
-                                                    title={`${tag.data_type}: ${tag.value}`}
-                                                >
-                                                    {tag.tag_name}
-                                                    <span className={`ml-1 ${tag.data_type === 'BOOL' ? (tag.value === 'TRUE' ? 'text-green-600' : 'text-red-500') :
-                                                            tag.data_type === 'REAL' ? 'text-orange-600' :
-                                                                'text-blue-600'
-                                                        }`}>
-                                                        ({tag.value})
-                                                    </span>
-                                                </button>
-                                            ))}
+                                    <div className="space-y-1">
+                                        {parseWarnings.map((warning, i) => (
+                                            <div key={i} className={`text-sm p-2 rounded border ${
+                                                warning.type === 'BEST_PRACTICE' ? 
+                                                'text-blue-700 bg-blue-50 border-blue-200' : 
+                                                'text-orange-700 bg-orange-50 border-orange-200'
+                                            }`}>
+                                                {warning.line > 0 && <span className="font-mono text-xs opacity-60">Linha {warning.line}: </span>}
+                                                {warning.message}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Conteúdo do Resultado */}
+                    {parsedNodes.length > 0 ? (
+                        <div className="flex-1 overflow-auto p-4 space-y-4">
+                            {parsedNodes.map((node, nodeIndex) => {
+                                const logicType = getLogicTypeLabel(node.type);
+
+                                return (
+                                    <div key={node.id} className="space-y-3">
+                                        {/* Card da Lógica */}
+                                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                                            {/* Header do Card */}
+                                            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-xs text-gray-400 font-mono">#{nodeIndex + 1}</span>
+                                                        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-xs font-semibold ${logicType.color}`}>
+                                                            {logicType.icon}
+                                                            {logicType.label}
+                                                        </span>
+                                                    </div>
+                                                    {node.resultTag && (
+                                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                                                            node.resultTag.currentValue === 'TRUE' ? 'bg-green-100' :
+                                                            node.resultTag.currentValue === 'FALSE' ? 'bg-red-100' :
+                                                            'bg-blue-100'
+                                                        }`}>
+                                                            <StatusIcon status={node.resultTag.status} />
+                                                            <span className="text-sm font-bold">
+                                                                {node.resultTag.name} = <ValueDisplay tag={node.resultTag} />
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <code className="text-xs font-mono text-gray-500 mt-2 block truncate">
+                                                    {node.summary}
+                                                </code>
+                                            </div>
+
+                                            {/* Explicação da Lógica */}
+                                            <div className="p-4 bg-blue-50/50 border-b border-gray-100">
+                                                <div className="flex gap-3">
+                                                    <div className="p-2 bg-blue-100 rounded-lg h-fit flex-shrink-0">
+                                                        <Lightbulb size={18} className="text-blue-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="text-sm font-semibold text-gray-700 mb-1">Análise da Lógica</h4>
+                                                        <p className="text-sm text-gray-600 leading-relaxed break-words">
+                                                            {node.explanation || node.details}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Tabela de Tags */}
+                                            {node.tagsInvolved.length > 0 && (
+                                                <div className="p-4">
+                                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                        <Cpu size={14} />
+                                                        Tags Envolvidos ({node.tagsInvolved.length})
+                                                    </h4>
+
+                                                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                                        <table className="w-full text-sm">
+                                                            <thead className="bg-gray-50">
+                                                                <tr>
+                                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-12">Status</th>
+                                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Tag</th>
+                                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-20">Tipo</th>
+                                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-28">Cache</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-100">
+                                                                {node.tagsInvolved.map((tag: TagData, tagIndex: number) => (
+                                                                    <tr key={tagIndex} className={`${tag.foundInCache ? 'bg-white' : 'bg-yellow-50/50'} hover:bg-gray-50 transition-colors`}>
+                                                                        <td className="px-3 py-2 text-center">
+                                                                            <StatusIcon status={tag.status} />
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <code className="font-mono font-semibold text-gray-800">{tag.name}</code>
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <TypeBadge dataType={tag.dataType} />
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <ValueDisplay tag={tag} />
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            {tag.foundInCache ? (
+                                                                                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                                                    <CheckCircle2 size={12} />
+                                                                                    OK
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="inline-flex items-center gap-1 text-xs text-yellow-600 font-medium">
+                                                                                    <AlertTriangle size={12} />
+                                                                                    N/A
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                            <Activity size={48} className="mb-4 opacity-50" />
-                            <p className="text-sm font-medium">Clique em "Analisar" para processar o código</p>
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
+                            <div className="p-4 bg-gray-100 rounded-full mb-4">
+                                <Activity size={40} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-500 mb-1">Nenhuma análise realizada</p>
+                            <p className="text-xs text-gray-400 text-center max-w-xs">
+                                Escreva código no editor ou selecione um exemplo, depois clique em "Analisar"
+                            </p>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Modal de Exemplos */}
+            {showExamples && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <BookOpen size={24} className="text-edp-marine" />
+                                <h2 className="text-lg font-bold text-gray-800">Exemplos Python</h2>
+                            </div>
+                            <button onClick={() => setShowExamples(false)} className="p-2 hover:bg-gray-200 rounded-lg">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-1 overflow-hidden">
+                            {/* Categorias */}
+                            <div className="w-48 bg-gray-50 border-r border-gray-200 p-3 overflow-y-auto">
+                                {EXAMPLE_CATEGORIES.map((cat: { id: ExampleCategory; name: string; icon: string; description: string }) => (
+                                    <button
+                                        key={cat.id}
+                                        onClick={() => setSelectedCategory(cat.id)}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-1 transition-colors ${
+                                            selectedCategory === cat.id 
+                                                ? 'bg-edp-marine text-white' 
+                                                : 'text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        <span className="mr-2">{cat.icon}</span>
+                                        {cat.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Lista de Exemplos */}
+                            <div className="flex-1 p-4 overflow-y-auto">
+                                <div className="grid gap-3">
+                                    {getExamplesByCategory(selectedCategory).map((example: ExampleCode) => (
+                                        <div key={example.id} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:border-edp-marine transition-colors">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">{example.title}</h4>
+                                                    <p className="text-xs text-gray-500">{example.description}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                                        example.complexity === 'simple' ? 'bg-green-100 text-green-700' :
+                                                        example.complexity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {example.complexity === 'simple' ? 'Simples' :
+                                                         example.complexity === 'medium' ? 'Médio' : 'Complexo'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <pre className="bg-[#1e1e1e] text-[#9cdcfe] p-3 rounded text-xs font-mono overflow-x-auto mb-3">
+                                                {example.code}
+                                            </pre>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex gap-1">
+                                                    {example.dataTypes.map((dt: string) => (
+                                                        <TypeBadge key={dt} dataType={dt} />
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => copyToClipboard(example.code, example.id)}
+                                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                                    >
+                                                        {copiedExample === example.id ? <Check size={14} /> : <Copy size={14} />}
+                                                        {copiedExample === example.id ? 'Copiado!' : 'Copiar'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => useExample(example)}
+                                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-edp-marine rounded hover:bg-[#1a2332]"
+                                                    >
+                                                        <Play size={14} />
+                                                        Usar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Referência */}
+            {showReference && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Bookmark size={24} className="text-edp-marine" />
+                                <h2 className="text-lg font-bold text-gray-800">Referência Python</h2>
+                            </div>
+                            <button onClick={() => setShowReference(false)} className="p-2 hover:bg-gray-200 rounded-lg">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {/* Versão Python */}
+                            <div>
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <FileCode size={18} />
+                                    Versão Python
+                                </h3>
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                    <div className="font-semibold text-blue-800">Python 3.11</div>
+                                    <div className="text-xs text-blue-600">Parser Python otimizado para automação industrial</div>
+                                </div>
+                            </div>
+
+                            {/* Operadores */}
+                            <div>
+                                <h3 className="font-bold text-gray-800 mb-3">Operadores Python</h3>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="bg-purple-50 p-3 rounded-lg">
+                                        <div className="font-semibold text-purple-800 mb-1">Booleanos</div>
+                                        <code className="text-purple-600">and, or, not</code>
+                                    </div>
+                                    <div className="bg-blue-50 p-3 rounded-lg">
+                                        <div className="font-semibold text-blue-800 mb-1">Comparação</div>
+                                        <code className="text-blue-600">==, !=, &gt;, &lt;, &gt;=, &lt;=, in, is</code>
+                                    </div>
+                                    <div className="bg-orange-50 p-3 rounded-lg">
+                                        <div className="font-semibold text-orange-800 mb-1">Aritmética</div>
+                                        <code className="text-orange-600">+, -, *, /, //, %, **</code>
+                                    </div>
+                                    <div className="bg-green-50 p-3 rounded-lg">
+                                        <div className="font-semibold text-green-800 mb-1">Atribuição</div>
+                                        <code className="text-green-600">=, +=, -=, *=, /=</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Estruturas */}
+                            <div>
+                                <h3 className="font-bold text-gray-800 mb-3">Estruturas de Controle</h3>
+                                <div className="space-y-2 text-sm font-mono bg-gray-50 p-4 rounded-lg">
+                                    <div><span className="text-purple-600">if</span> condição<span className="text-purple-600">:</span></div>
+                                    <div>&nbsp;&nbsp;&nbsp;&nbsp;# código</div>
+                                    <div><span className="text-purple-600">elif</span> outra_condição<span className="text-purple-600">:</span></div>
+                                    <div>&nbsp;&nbsp;&nbsp;&nbsp;# código</div>
+                                    <div><span className="text-purple-600">else</span><span className="text-purple-600">:</span></div>
+                                    <div>&nbsp;&nbsp;&nbsp;&nbsp;# código</div>
+                                    <br />
+                                    <div><span className="text-purple-600">for</span> i <span className="text-purple-600">in</span> range(10)<span className="text-purple-600">:</span></div>
+                                    <div>&nbsp;&nbsp;&nbsp;&nbsp;# código</div>
+                                    <br />
+                                    <div><span className="text-purple-600">while</span> condição<span className="text-purple-600">:</span></div>
+                                    <div>&nbsp;&nbsp;&nbsp;&nbsp;# código</div>
+                                </div>
+                            </div>
+
+                            {/* Tipos de Dados */}
+                            <div>
+                                <h3 className="font-bold text-gray-800 mb-3">Tipos de Dados Suportados</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {['BOOL', 'INT', 'REAL', 'STRING', 'ARRAY', 'OBJECT', 'DINT', 'WORD', 'DWORD'].map((dt) => (
+                                        <TypeBadge key={dt} dataType={dt} />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Tags PLC */}
+                            <div>
+                                <h3 className="font-bold text-gray-800 mb-3">Integração com PLC</h3>
+                                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                                    <div className="text-sm text-green-800">
+                                        <strong>Tags PLC:</strong> Use os nomes EXATOS como estão mapeados no sistema<br />
+                                        <strong>Sistema:</strong> Reconhece automaticamente qualquer tag do cache<br />
+                                        <strong>Exemplo:</strong> <code className="bg-green-100 px-1 rounded">resultado = tag_sensor and not tag_parada</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
