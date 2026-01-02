@@ -15,6 +15,35 @@ use tauri::Emitter;
 use crate::tcp_server::{TcpServer, ConnectionStats};
 use crate::database::{Database, PlcStructureConfig, DataBlockConfig, TagMapping};
 use crate::websocket_server::{WebSocketServer, WebSocketConfig, WebSocketStats, NetworkInterface};
+
+// ✅ OTIMIZAÇÃO: Estruturas para monitoramento de memória
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SystemMemoryStats {
+    // TCP Server
+    pub tcp_buffer_pool_active: usize,
+    pub tcp_connected_clients: usize,
+    pub tcp_data_cache_size: usize,
+    
+    // WebSocket Server  
+    pub ws_tag_cache_size: usize,
+    pub ws_tag_cache_usage_pct: f64,
+    pub ws_mappings_cache_size: usize,
+    pub ws_change_tracking_size: usize,
+    pub ws_connected_clients: usize,
+    
+    // General
+    pub total_estimated_memory_kb: usize,
+    pub memory_health_status: String,
+    pub last_cleanup_seconds_ago: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MemoryHealthReport {
+    pub status: String, // "healthy", "warning", "critical"
+    pub memory_stats: SystemMemoryStats,
+    pub recommendations: Vec<String>,
+    pub auto_cleanup_enabled: bool,
+}
 use crate::database::WebSocketDbConfig;
 use crate::config::{ConfigManager, AppConfig};
 use tauri::{AppHandle, State};
@@ -419,6 +448,88 @@ pub async fn save_tag_mapping(
             ))
         },
         Err(e) => Err(format!("Erro ao salvar tag: {}", e))
+    }
+}
+
+#[tauri::command]
+pub async fn save_tag_mappings_bulk(
+    tags: Vec<TagMapping>,
+    db: State<'_, Arc<Database>>,
+    websocket_state: State<'_, WebSocketServerState>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    if tags.is_empty() {
+        return Err("Lista de tags vazia".to_string());
+    }
+
+    let plc_ip = tags[0].plc_ip.clone(); // Assumir que todos são do mesmo PLC
+    let timestamp = chrono::Utc::now().timestamp();
+    
+    // Preparar tags com timestamp
+    let tags_to_save: Vec<TagMapping> = tags
+        .into_iter()
+        .map(|mut tag| {
+            tag.created_at = timestamp;
+            tag
+        })
+        .collect();
+
+    // Verificar tags existentes de uma vez só
+    let existing_tags = db.load_tag_mappings(&plc_ip)
+        .map_err(|e| format!("Erro ao verificar tags existentes: {}", e))?;
+    
+    let existing_paths: std::collections::HashSet<String> = existing_tags
+        .iter()
+        .map(|t| t.variable_path.clone())
+        .collect();
+
+    // Filtrar duplicatas
+    let new_tags_only: Vec<TagMapping> = tags_to_save
+        .into_iter()
+        .filter(|tag| !existing_paths.contains(&tag.variable_path))
+        .collect();
+
+    if new_tags_only.is_empty() {
+        return Err("Todas as variáveis selecionadas já foram mapeadas".to_string());
+    }
+
+    println!("🔍 Backend: Salvando {} tags em lote (filtrados {} duplicatas)", 
+             new_tags_only.len(), existing_paths.len());
+
+    // Salvar em lote usando transação
+    match db.save_tag_mappings_bulk(&new_tags_only) {
+        Ok(tag_ids) => {
+            let successful_count = tag_ids.iter().filter(|&&id| id > 0).count();
+            
+            // Emitir eventos para tags criados com sucesso
+            for (tag, &tag_id) in new_tags_only.iter().zip(tag_ids.iter()) {
+                if tag_id > 0 {
+                    let _ = app_handle.emit(
+                        "tag-created",
+                        serde_json::json!({
+                            "id": tag_id,
+                            "plc_ip": tag.plc_ip,
+                            "variable_path": tag.variable_path,
+                            "tag_name": tag.tag_name,
+                            "description": tag.description,
+                            "unit": tag.unit,
+                            "enabled": tag.enabled,
+                            "created_at": tag.created_at,
+                            "collect_mode": tag.collect_mode,
+                            "collect_interval_s": tag.collect_interval_s
+                        })
+                    );
+                }
+            }
+
+            // ✅ CORREÇÃO: Só recarregar WebSocket UMA VEZ ao final
+            let _ = reload_websocket_tag_groups(websocket_state).await;
+            
+            println!("🔄 Tags em lote ativados, WebSocket recarregado UMA VEZ");
+
+            Ok(format!("{} tags criados com sucesso em lote", successful_count))
+        },
+        Err(e) => Err(format!("Erro ao salvar tags em lote: {}", e))
     }
 }
 
@@ -1396,6 +1507,150 @@ pub struct SclTagInfo {
 /// Comando para obter tags com tipo de dado para análise SCL
 /// Retorna informações completas incluindo o data_type inferido
 /// ✅ OTIMIZADO: Usa cache do WebSocket quando disponível, evitando consultas ao banco
+// ✅ OTIMIZAÇÃO: Comando para monitoramento de memória do sistema
+#[tauri::command]
+pub async fn get_system_memory_stats(
+    tcp_state: State<'_, TcpServerState>,
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<SystemMemoryStats, String> {
+    // Coletar estatísticas do TCP Server
+    let (tcp_buffer_active, tcp_clients, tcp_cache_size) = {
+        let tcp_server_guard = tcp_state.read().await;
+        if let Some(tcp_server) = tcp_server_guard.as_ref() {
+            let stats = tcp_server.get_memory_stats();
+            (stats.0, tcp_server.get_connected_clients_count(), stats.1)
+        } else {
+            (0, 0, 0)
+        }
+    };
+
+    // Coletar estatísticas do WebSocket Server
+    let (ws_cache_size, ws_cache_pct, ws_mappings, ws_tracking, ws_clients) = {
+        let ws_server_guard = websocket_state.read().await;
+        if let Some(ws_server) = ws_server_guard.as_ref() {
+            let cache_stats = ws_server.get_cache_memory_stats();
+            let ws_stats = ws_server.get_stats();
+            (cache_stats.0, cache_stats.3, cache_stats.1, cache_stats.2, ws_stats.active_connections as usize)
+        } else {
+            (0, 0.0, 0, 0, 0)
+        }
+    };
+
+    // Calcular estimativa de memória total (aproximada)
+    let total_memory_kb = (tcp_buffer_active * 8) + // ~8KB por buffer médio
+                         (tcp_cache_size / 1000) +  // Cache TCP ~1KB por entrada
+                         (ws_cache_size / 5) +      // ~200 bytes por tag cached
+                         (ws_mappings * 2) +        // ~2KB por mapping
+                         (ws_tracking / 10);        // ~100 bytes por tracking
+
+    // Determinar status de saúde
+    let health_status = if ws_cache_pct > 90.0 || total_memory_kb > 10240 {
+        "critical".to_string()
+    } else if ws_cache_pct > 75.0 || total_memory_kb > 5120 {
+        "warning".to_string()
+    } else {
+        "healthy".to_string()
+    };
+
+    Ok(SystemMemoryStats {
+        tcp_buffer_pool_active: tcp_buffer_active,
+        tcp_connected_clients: tcp_clients,
+        tcp_data_cache_size: tcp_cache_size,
+        ws_tag_cache_size: ws_cache_size,
+        ws_tag_cache_usage_pct: ws_cache_pct,
+        ws_mappings_cache_size: ws_mappings,
+        ws_change_tracking_size: ws_tracking,
+        ws_connected_clients: ws_clients,
+        total_estimated_memory_kb: total_memory_kb,
+        memory_health_status: health_status,
+        last_cleanup_seconds_ago: 0, // Implementar se necessário
+    })
+}
+
+#[tauri::command]
+pub async fn get_memory_health_report(
+    tcp_state: State<'_, TcpServerState>,
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<MemoryHealthReport, String> {
+    let memory_stats = get_system_memory_stats(tcp_state, websocket_state).await?;
+    
+    let mut recommendations = Vec::new();
+    let status = memory_stats.memory_health_status.clone();
+    
+    match status.as_str() {
+        "critical" => {
+            recommendations.push("Memória crítica! Reinicie o sistema se possível".to_string());
+            recommendations.push("Reduza o número de tags monitorados".to_string());
+            recommendations.push("Verifique se há vazamentos de memória".to_string());
+        },
+        "warning" => {
+            recommendations.push("Uso de memória alto. Monitore frequentemente".to_string());
+            recommendations.push("Considere reduzir intervalos de cache".to_string());
+        },
+        _ => {
+            recommendations.push("Sistema operando dentro dos parâmetros normais".to_string());
+        }
+    }
+
+    if memory_stats.ws_tag_cache_usage_pct > 80.0 {
+        recommendations.push("Cache de tags próximo do limite. Limpeza automática ativa".to_string());
+    }
+
+    Ok(MemoryHealthReport {
+        status,
+        memory_stats,
+        recommendations,
+        auto_cleanup_enabled: true, // Sempre ativo com as otimizações
+    })
+}
+
+#[tauri::command]
+pub async fn force_memory_cleanup(
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<String, String> {
+    let ws_server_guard = websocket_state.read().await;
+    if let Some(ws_server) = ws_server_guard.as_ref() {
+        let cleaned = ws_server.force_cache_cleanup().await;
+        if cleaned {
+            Ok("Limpeza de memória executada com sucesso".to_string())
+        } else {
+            Ok("Limpeza não necessária - memória dentro dos limites".to_string())
+        }
+    } else {
+        Err("WebSocket server não está ativo".to_string())
+    }
+}
+
+// ✅ MELHORIA: Comando para cliente se inscrever em PLCs específicos
+#[tauri::command]
+pub async fn subscribe_client_to_plcs(
+    client_id: u64,
+    plc_ips: Vec<String>,
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<String, String> {
+    let ws_server_guard = websocket_state.read().await;
+    if let Some(ws_server) = ws_server_guard.as_ref() {
+        ws_server.subscribe_to_plcs(client_id, plc_ips.clone()).await?;
+        Ok(format!("Cliente {} inscrito em PLCs: {:?}", client_id, plc_ips))
+    } else {
+        Err("WebSocket server não está ativo".to_string())
+    }
+}
+
+// ✅ MELHORIA: Comando para listar PLCs disponíveis
+#[tauri::command]
+pub async fn get_available_plcs(
+    tcp_state: State<'_, TcpServerState>,
+) -> Result<Vec<String>, String> {
+    let tcp_server_guard = tcp_state.read().await;
+    if let Some(tcp_server) = tcp_server_guard.as_ref() {
+        let connected_plcs = tcp_server.get_all_plc_data().await;
+        Ok(connected_plcs.keys().cloned().collect())
+    } else {
+        Ok(vec![]) // Retorna lista vazia se TCP não ativo
+    }
+}
+
 #[tauri::command]
 pub async fn get_scl_tags(
     plc_ip: String,

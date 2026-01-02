@@ -163,7 +163,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     }
   };
 
-  // Função para criar múltiplos tags
+  // ✅ CORREÇÃO: Função para criar múltiplos tags usando bulk save
   const handleBulkCreateTags = async () => {
     if (selectedVariables.length === 0) {
       setError('Selecione pelo menos uma variável');
@@ -174,36 +174,34 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       setSaving(true);
       setError(null);
 
-      let successCount = 0;
-      const errors = [];
+      // ✅ Preparar todos os tags de uma vez
+      const tagsToSave: TagMapping[] = selectedVariables.map(variable => {
+        const autoTagName = variable.replace(/[\[\]]/g, '_').toLowerCase();
+        
+        return {
+          plc_ip: plcIp,
+          variable_path: variable,
+          tag_name: autoTagName,
+          description: newTag.description || '',
+          unit: newTag.unit || '',
+          enabled: true,
+          collect_mode: newTag.collect_mode || 'on_change',
+          collect_interval_s: newTag.collect_interval_s || 1,
+          created_at: Date.now(),
+        };
+      });
 
-      for (const variable of selectedVariables) {
-        try {
-          const autoTagName = variable.replace(/[\[\]]/g, '_').toLowerCase();
+      console.log('🔍 Frontend: Enviando', tagsToSave.length, 'tags para salvamento em lote');
 
-          const tagToSave: TagMapping = {
-            plc_ip: plcIp,
-            variable_path: variable,
-            tag_name: autoTagName,
-            description: newTag.description || '',
-            unit: newTag.unit || '',
-            enabled: true,
-            collect_mode: newTag.collect_mode || 'on_change',
-            collect_interval_s: newTag.collect_interval_s || 1,
-            created_at: Date.now(),
-          };
+      // ✅ CORREÇÃO PRINCIPAL: Usar função de bulk save (UMA chamada em vez de N)
+      await invoke('save_tag_mappings_bulk', { tags: tagsToSave });
 
-          await invoke('save_tag_mapping', { tag: tagToSave });
-          successCount++;
+      console.log('✅ Frontend: Tags salvos em lote com sucesso');
 
-        } catch (err) {
-          errors.push(`${variable}: ${err}`);
-        }
-      }
-
-      // Recarregar tags
+      // ✅ Recarregar dados UMA VEZ só
       await loadData();
 
+      // ✅ Emitir evento UMA VEZ só
       if (window && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
       }
@@ -222,11 +220,10 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
         collect_interval_s: 1,
       });
 
-      if (errors.length > 0) {
-        setError(`${successCount} tags criados. Erros: ${errors.slice(0, 2).join(', ')}`);
-      }
+      console.log('🎉 Criação em lote completada sem travamentos');
 
     } catch (err) {
+      console.error('❌ Erro na criação em lote:', err);
       setError(String(err));
     } finally {
       setSaving(false);

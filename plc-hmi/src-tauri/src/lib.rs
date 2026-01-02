@@ -63,6 +63,7 @@ pub fn run() {
       commands::delete_plc_structure,
       commands::debug_show_plc_structure,
       commands::save_tag_mapping,
+      commands::save_tag_mappings_bulk,
       commands::load_tag_mappings,
       commands::delete_tag_mapping,
       commands::delete_tag_mappings_bulk,
@@ -92,6 +93,11 @@ pub fn run() {
       commands::inspect_postgres_database,
       commands::get_real_time_tag_values,
       commands::get_scl_tags,
+      commands::get_system_memory_stats,
+      commands::get_memory_health_report,
+      commands::force_memory_cleanup,
+      commands::subscribe_client_to_plcs,
+      commands::get_available_plcs,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

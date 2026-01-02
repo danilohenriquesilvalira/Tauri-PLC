@@ -4,7 +4,7 @@
 // ============================================================================
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -22,13 +22,17 @@ use crate::database::PlcStructureConfig;
 const MAX_PACKET_SIZE: usize = 1_048_576;
 const MAX_ACCUMULATOR_SIZE: usize = 65536;
 const BUFFER_CAPACITY: usize = 8192;
+// ✅ OTIMIZAÇÃO: Limites para controlar consumo de memória
+const MAX_BUFFER_POOL_SIZE: usize = 20; // Máximo 20 buffers por pool (400KB total)
+const MAX_TOTAL_BUFFERS: usize = 100; // Limite global de buffers (2MB total)
 
 const READ_TIMEOUT_SECS: u64 = 5;
 const INACTIVITY_TIMEOUT_SECS: u64 = 15;
 const FRAGMENT_WARN_SECS: u64 = 3;
 const FRAGMENT_CLEAR_SECS: u64 = 5;
 const WATCHDOG_CHECK_INTERVAL_MS: u64 = 2000;
-const EVENT_CHANNEL_CAPACITY: usize = 1000;
+// ✅ OTIMIZAÇÃO: Capacidade reduzida para evitar acúmulo de eventos
+const EVENT_CHANNEL_CAPACITY: usize = 500; // Reduzido de 1000 para 500
 
 // ============================================================================
 // BUFFER POOL
@@ -39,6 +43,8 @@ struct BufferPool {
     small_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,
     medium_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,
     large_buffers: Arc<Mutex<VecDeque<Vec<u8>>>>,
+    // ✅ OTIMIZAÇÃO: Contadores para controle de memória
+    total_buffers: Arc<AtomicUsize>, // Contador global de buffers ativos
 }
 
 impl BufferPool {
@@ -47,28 +53,49 @@ impl BufferPool {
             small_buffers: Arc::new(Mutex::new(VecDeque::new())),
             medium_buffers: Arc::new(Mutex::new(VecDeque::new())),
             large_buffers: Arc::new(Mutex::new(VecDeque::new())),
+            // ✅ OTIMIZAÇÃO: Inicializar contador
+            total_buffers: Arc::new(AtomicUsize::new(0)),
         }
     }
     
     async fn get_buffer(&self, size: usize) -> Vec<u8> {
+        // ✅ OTIMIZAÇÃO: Verificar limite global antes de criar novos buffers
+        let current_total = self.total_buffers.load(Ordering::Relaxed);
+        
         if size <= 1024 {
             if let Some(mut buf) = self.small_buffers.lock().await.pop_front() {
                 buf.clear();
                 return buf;
             }
-            Vec::with_capacity(1024)
+            // ✅ Só criar novo se não exceder limite
+            if current_total < MAX_TOTAL_BUFFERS {
+                self.total_buffers.fetch_add(1, Ordering::Relaxed);
+                Vec::with_capacity(1024)
+            } else {
+                Vec::with_capacity(512) // Buffer menor se limite atingido
+            }
         } else if size <= 8192 {
             if let Some(mut buf) = self.medium_buffers.lock().await.pop_front() {
                 buf.clear();
                 return buf;
             }
-            Vec::with_capacity(8192)
+            if current_total < MAX_TOTAL_BUFFERS {
+                self.total_buffers.fetch_add(1, Ordering::Relaxed);
+                Vec::with_capacity(8192)
+            } else {
+                Vec::with_capacity(2048) // Buffer menor se limite atingido
+            }
         } else {
             if let Some(mut buf) = self.large_buffers.lock().await.pop_front() {
                 buf.clear();
                 return buf;
             }
-            Vec::with_capacity(65536)
+            if current_total < MAX_TOTAL_BUFFERS {
+                self.total_buffers.fetch_add(1, Ordering::Relaxed);
+                Vec::with_capacity(65536)
+            } else {
+                Vec::with_capacity(8192) // Buffer menor se limite atingido
+            }
         }
     }
     
@@ -76,16 +103,39 @@ impl BufferPool {
         let capacity = buf.capacity();
         buf.clear();
         
+        // ✅ OTIMIZAÇÃO: Usar MAX_BUFFER_POOL_SIZE para controle uniforme
         if capacity <= 1024 {
             let mut pool = self.small_buffers.lock().await;
-            if pool.len() < 10 { pool.push_back(buf); }
+            if pool.len() < MAX_BUFFER_POOL_SIZE { 
+                pool.push_back(buf); 
+            } else {
+                // ✅ Buffer descartado - decrementar contador se foi criado por nós
+                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+            }
         } else if capacity <= 8192 {
             let mut pool = self.medium_buffers.lock().await;
-            if pool.len() < 5 { pool.push_back(buf); }
+            if pool.len() < MAX_BUFFER_POOL_SIZE { 
+                pool.push_back(buf); 
+            } else {
+                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+            }
         } else {
             let mut pool = self.large_buffers.lock().await;
-            if pool.len() < 2 { pool.push_back(buf); }
+            if pool.len() < MAX_BUFFER_POOL_SIZE { 
+                pool.push_back(buf); 
+            } else {
+                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+            }
         }
+    }
+
+    // ✅ OTIMIZAÇÃO: Nova função para monitorar uso de memória
+    fn get_memory_stats(&self) -> (usize, usize, usize, usize) {
+        // Retorna: (small_count, medium_count, large_count, total_active)
+        let total = self.total_buffers.load(Ordering::Relaxed);
+        // Nota: Para contar pools precisaríamos de try_lock, mas isso pode afetar performance
+        // Então retornamos só o total por enquanto
+        (0, 0, 0, total)
     }
 }
 
@@ -636,6 +686,20 @@ impl TcpServer {
     
     pub async fn get_connection_health(&self) -> Vec<ConnectionHealth> {
         self.connection_health.iter().map(|e| e.value().clone()).collect()
+    }
+
+    // ✅ OTIMIZAÇÃO: Métodos para monitoramento de memória
+    pub fn get_memory_stats(&self) -> (usize, usize) {
+        let buffer_stats = self.buffer_pool.get_memory_stats();
+        let cache_size = self.latest_data.len();
+        (buffer_stats.3, cache_size) // (total_buffers_active, cache_entries)
+    }
+
+    pub fn get_connected_clients_count(&self) -> usize {
+        // Contar conexões ativas baseado no health
+        self.connection_health.iter()
+            .filter(|entry| entry.value().is_alive)
+            .count()
     }
 }
 

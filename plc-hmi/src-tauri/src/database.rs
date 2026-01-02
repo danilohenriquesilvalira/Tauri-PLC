@@ -500,6 +500,59 @@ impl Database {
         Ok(())
     }
 
+    /// Salva múltiplos tags de uma vez (Bulk Save) - OTIMIZADO para evitar travamento do cache
+    pub fn save_tag_mappings_bulk(&self, tags: &[TagMapping]) -> Result<Vec<i64>> {
+        let mut conn = self.write_conn.lock().unwrap();
+        
+        if tags.is_empty() {
+            return Ok(vec![]);
+        }
+        
+        let mut tag_ids = Vec::new();
+        let mut successful_count = 0;
+        
+        // Usar transação para performance e atomicidade
+        let tx = conn.transaction()?;
+        
+        {
+            let mut stmt = tx.prepare(
+                "INSERT OR REPLACE INTO tag_mappings 
+                 (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+            )?;
+            
+            for tag in tags {
+                match stmt.execute((
+                    &tag.plc_ip,
+                    &tag.variable_path,
+                    &tag.tag_name,
+                    &tag.description,
+                    &tag.unit,
+                    tag.enabled as i32,
+                    tag.created_at,
+                    &tag.collect_mode,
+                    &tag.collect_interval_s,
+                )) {
+                    Ok(_) => {
+                        let tag_id = tx.last_insert_rowid();
+                        tag_ids.push(tag_id);
+                        successful_count += 1;
+                    }
+                    Err(e) => {
+                        println!("⚠️ Erro ao salvar tag '{}': {}", tag.tag_name, e);
+                        tag_ids.push(-1); // Indica erro
+                    }
+                }
+            }
+        }
+        
+        tx.commit()?;
+        
+        println!("💾 Bulk Save: {}/{} tags salvos com sucesso", successful_count, tags.len());
+        
+        Ok(tag_ids)
+    }
+
     /// Remove múltiplos tags de uma vez (Bulk Delete)
     pub fn delete_tag_mappings_bulk(&self, ids: Vec<i64>) -> Result<()> {
         let mut conn = self.write_conn.lock().unwrap();

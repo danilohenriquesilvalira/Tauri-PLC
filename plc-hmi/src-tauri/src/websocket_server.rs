@@ -3,7 +3,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::Mutex as TokioMutex;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
@@ -115,6 +115,11 @@ pub struct SmartCache {
     // 🆕 CACHE DE TAG MAPPINGS - EVITA CONSULTAS AO BANCO!
     tag_mappings_cache: Arc<DashMap<String, Vec<TagMapping>>>, // plc_ip -> tags
     tag_mappings_last_update: Arc<RwLock<std::time::Instant>>,
+    
+    // ✅ OTIMIZAÇÃO: Controle de memória e LRU
+    cache_size_limit: usize, // Máximo de entradas no cache
+    memory_pressure_threshold: AtomicUsize, // Threshold para limpeza automática
+    last_cleanup: Arc<RwLock<std::time::Instant>>, // Última limpeza de memória
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +128,15 @@ pub struct ConnectedClient {
     pub address: SocketAddr,
     pub connected_at: std::time::SystemTime,
     pub messages_received: Arc<AtomicU64>,
+    // ✅ MELHORIA: Namespacing por eclusa/PLC
+    pub subscribed_plcs: Arc<RwLock<std::collections::HashSet<String>>>,
+    pub client_type: ClientType,
+}
+
+#[derive(Debug, Clone)]
+pub enum ClientType {
+    Global,           // Recebe de todos PLCs (comportamento atual)
+    Filtered(Vec<String>), // Recebe apenas PLCs específicos (nova funcionalidade)
 }
 
 pub struct WebSocketServer {
@@ -143,6 +157,8 @@ pub struct WebSocketServer {
     interval_handles: Arc<TokioMutex<Vec<tokio::task::JoinHandle<()>>>>,
     smart_cache: Arc<SmartCache>,
     cache_updater_handle: Option<tokio::task::JoinHandle<()>>,
+    // ✅ MELHORIA: Broadcasting por PLC específico
+    plc_broadcast_channels: Arc<DashMap<String, broadcast::Sender<String>>>,
 }
 
 impl SmartCache {
@@ -154,6 +170,11 @@ impl SmartCache {
             // 🆕 INICIALIZAR CACHE DE MAPPINGS
             tag_mappings_cache: Arc::new(DashMap::new()),
             tag_mappings_last_update: Arc::new(RwLock::new(std::time::Instant::now())),
+            
+            // ✅ OTIMIZAÇÃO: Configurar limites de memória
+            cache_size_limit: 2000, // Máximo 2000 tags em cache (~400KB)
+            memory_pressure_threshold: AtomicUsize::new(1500), // Iniciar limpeza em 1500 tags
+            last_cleanup: Arc::new(RwLock::new(std::time::Instant::now())),
         }
     }
 
@@ -320,6 +341,70 @@ impl SmartCache {
         self.tag_mappings_cache.clear();
         println!("🔄 Todo cache de tags invalidado");
     }
+
+    // ✅ OTIMIZAÇÃO: Sistema LRU automático para controle de memória
+    pub async fn enforce_memory_limits(&self) -> bool {
+        let current_size = self.tag_cache.len();
+        
+        // Se não excedeu o limite, não fazer nada
+        if current_size <= self.cache_size_limit {
+            return false;
+        }
+        
+        // Calcular quantas entradas remover (20% das mais antigas)
+        let entries_to_remove = (current_size - self.cache_size_limit + current_size / 5).min(current_size / 2);
+        
+        println!("🧹 Limpeza de cache: {} entradas, removendo {} antigas", current_size, entries_to_remove);
+        
+        // Coletar entries ordenadas por last_sent (mais antigo primeiro)
+        let mut entries_by_age: Vec<(String, u128)> = self.tag_cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().last_sent))
+            .collect();
+        
+        // Ordenar por timestamp (mais antigo primeiro)
+        entries_by_age.sort_by_key(|(_, timestamp)| *timestamp);
+        
+        // Remover as mais antigas
+        let mut removed = 0;
+        for (key, _) in entries_by_age.into_iter().take(entries_to_remove) {
+            self.tag_cache.remove(&key);
+            self.change_tracking.remove(&key);
+            removed += 1;
+        }
+        
+        // Atualizar timestamp da última limpeza
+        let mut last_cleanup = self.last_cleanup.write().await;
+        *last_cleanup = std::time::Instant::now();
+        
+        println!("✅ Cache limpo: {} entradas removidas, {} restantes", removed, self.tag_cache.len());
+        true
+    }
+
+    // ✅ OTIMIZAÇÃO: Verificar se precisa de limpeza automática  
+    pub async fn should_cleanup(&self) -> bool {
+        let current_size = self.tag_cache.len();
+        let threshold = self.memory_pressure_threshold.load(Ordering::Relaxed);
+        
+        // Verificar se excedeu threshold
+        if current_size <= threshold {
+            return false;
+        }
+        
+        // Verificar se faz tempo suficiente desde última limpeza (mínimo 30 segundos)
+        let last_cleanup = self.last_cleanup.read().await;
+        last_cleanup.elapsed().as_secs() >= 30
+    }
+
+    // ✅ OTIMIZAÇÃO: Estatísticas de uso de memória
+    pub fn get_memory_stats(&self) -> (usize, usize, usize, f64) {
+        let tag_cache_size = self.tag_cache.len();
+        let mappings_cache_size = self.tag_mappings_cache.len();
+        let change_tracking_size = self.change_tracking.len();
+        let memory_usage_pct = (tag_cache_size as f64 / self.cache_size_limit as f64) * 100.0;
+        
+        (tag_cache_size, mappings_cache_size, change_tracking_size, memory_usage_pct)
+    }
 }
 
 impl WebSocketServer {
@@ -347,6 +432,49 @@ impl WebSocketServer {
             interval_handles: Arc::new(TokioMutex::new(Vec::new())),
             smart_cache: Arc::new(SmartCache::new()),
             cache_updater_handle: None,
+            // ✅ MELHORIA: Inicializar channels por PLC
+            plc_broadcast_channels: Arc::new(DashMap::new()),
+        }
+    }
+
+    // ✅ MELHORIA: Cliente se inscreve em PLCs específicos
+    pub async fn subscribe_to_plcs(&self, client_id: u64, plc_ips: Vec<String>) -> Result<(), String> {
+        if let Some(mut client) = self.connected_clients.get_mut(&client_id) {
+            // Primeiro, coletar PLCs e criar channels se necessário
+            for plc_ip in &plc_ips {
+                if !self.plc_broadcast_channels.contains_key(plc_ip) {
+                    let (tx, _) = broadcast::channel::<String>(100);
+                    self.plc_broadcast_channels.insert(plc_ip.clone(), tx);
+                }
+            }
+            
+            // Depois, atualizar subscrições do cliente
+            {
+                let mut subscribed_plcs = client.subscribed_plcs.write().await;
+                subscribed_plcs.clear();
+                for plc_ip in &plc_ips {
+                    subscribed_plcs.insert(plc_ip.clone());
+                }
+            } // RwLock é dropado aqui
+            
+            // Agora podemos modificar client_type
+            client.client_type = ClientType::Filtered(plc_ips);
+            Ok(())
+        } else {
+            Err("Cliente não encontrado".to_string())
+        }
+    }
+
+    // ✅ MELHORIA: Broadcasting otimizado por PLC
+    pub async fn broadcast_to_plc_subscribers(&self, plc_ip: &str, message: String) {
+        // Broadcast no channel específico do PLC
+        if let Some(tx) = self.plc_broadcast_channels.get(plc_ip) {
+            let _ = tx.send(message.clone());
+        }
+        
+        // Manter backward compatibility: broadcast global também
+        if let Some(tx) = &self.broadcast_sender {
+            let _ = tx.send(format!("{{\"plc_ip\":\"{}\",\"data\":{}}}", plc_ip, message));
         }
     }
 
@@ -520,7 +648,8 @@ impl WebSocketServer {
             return Err("Não foi possível fazer bind em nenhum endereço configurado".to_string());
         }
 
-        let (broadcast_tx, _) = broadcast::channel::<String>(1000);
+        // ✅ OTIMIZAÇÃO: Capacidade reduzida para controle de memória
+        let (broadcast_tx, _) = broadcast::channel::<String>(200); // Reduzido de 1000 para 200
         self.broadcast_sender = Some(broadcast_tx.clone());
 
         self.is_running.store(true, Ordering::SeqCst);
@@ -539,6 +668,8 @@ impl WebSocketServer {
         let bytes_sent = self.bytes_sent.clone();
         let app_handle = self.app_handle.clone();
         let max_clients = self.config.max_clients;
+        let database = self.database.clone(); // ✅ ADICIONAR DATABASE
+        let smart_cache = self.smart_cache.clone(); // ✅ ADICIONAR SMART_CACHE
 
         let mut server_handles = Vec::new();
         
@@ -552,6 +683,8 @@ impl WebSocketServer {
             let bytes_sent_clone = bytes_sent.clone();
             let app_handle_clone = app_handle.clone();
             let max_clients_clone = max_clients;
+            let database_clone = database.clone(); // ✅ CLONE DATABASE
+            let smart_cache_clone = smart_cache.clone(); // ✅ CLONE SMART_CACHE
 
             let server_task = tokio::spawn(async move {
                 while is_running_clone.load(Ordering::SeqCst) {
@@ -568,6 +701,9 @@ impl WebSocketServer {
                             address: addr,
                             connected_at: std::time::SystemTime::now(),
                             messages_received: Arc::new(AtomicU64::new(0)),
+                            // ✅ MELHORIA: Inicializar com comportamento global (backward compatible)
+                            subscribed_plcs: Arc::new(RwLock::new(std::collections::HashSet::new())),
+                            client_type: ClientType::Global, // Comportamento padrão mantido
                         };
 
                         connected_clients_clone.insert(client_id, client);
@@ -587,6 +723,8 @@ impl WebSocketServer {
                         let messages_sent_task = messages_sent_clone.clone();
                         let bytes_sent_task = bytes_sent_clone.clone();
                         let app_handle_task = app_handle_clone.clone();
+                        let database_task = database_clone.clone(); // ✅ CLONE PARA TASK
+                        let smart_cache_task = smart_cache_clone.clone(); // ✅ CLONE PARA TASK
 
                         tokio::spawn(async move {
                             if let Err(e) = Self::handle_client(
@@ -599,6 +737,8 @@ impl WebSocketServer {
                                 messages_sent_task,
                                 bytes_sent_task,
                                 app_handle_task,
+                                database_task, // ✅ PASSAR DATABASE
+                                smart_cache_task, // ✅ PASSAR SMART_CACHE
                             )
                             .await
                             {
@@ -631,8 +771,8 @@ impl WebSocketServer {
         println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
         println!("📦 Cache de tags habilitado - ZERO consultas ao banco por pacote!");
 
-        // ✅ CANAL PARA SERIALIZAR ATUALIZAÇÕES DE CACHE
-        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(1000);
+        // ✅ OTIMIZAÇÃO: Canal otimizado para atualizações de cache  
+        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(100); // Reduzido para 100
         
         // TASK 1: CACHE UPDATER
         let is_running_cache = is_running.clone();
@@ -663,6 +803,12 @@ impl WebSocketServer {
                         last_cache_refresh = std::time::Instant::now();
                     }
                     
+                    // ✅ OTIMIZAÇÃO: Verificar se precisa de limpeza de memória
+                    if packets_processed % 50 == 0 && smart_cache_clone.should_cleanup().await {
+                        println!("🧹 Iniciando limpeza automática de memória (pacote {})", packets_processed);
+                        smart_cache_clone.enforce_memory_limits().await;
+                    }
+                    
                     // ✅ ATUALIZAÇÃO ATÔMICA (usa cache, não banco!)
                     smart_cache_clone.update_from_tcp(
                         &update_data.plc_ip,
@@ -670,9 +816,11 @@ impl WebSocketServer {
                         &database_clone
                     ).await;
                     
-                    // Log periódico (a cada 100 pacotes)
+                    // ✅ OTIMIZAÇÃO: Log periódico com estatísticas de memória
                     if packets_processed % 100 == 0 {
-                        println!("📊 WebSocket processou {} pacotes TCP (cache ativo)", packets_processed);
+                        let (cache_size, mappings_size, tracking_size, memory_pct) = smart_cache_clone.get_memory_stats();
+                        println!("📊 WebSocket: {} pacotes | Cache: {} tags ({:.1}%) | Mappings: {} | Tracking: {}", 
+                                packets_processed, cache_size, memory_pct, mappings_size, tracking_size);
                     }
                 }
                 println!("✅ Atomic cache processor finalizado ({} pacotes)", packets_processed);
@@ -954,33 +1102,140 @@ impl WebSocketServer {
         messages_sent: Arc<AtomicU64>,
         bytes_sent: Arc<AtomicU64>,
         app_handle: AppHandle,
+        database: Arc<Database>, // ✅ NOVO PARÂMETRO
+        smart_cache: Arc<SmartCache>, // ✅ NOVO PARÂMETRO
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let websocket = accept_async(stream).await?;
-        let (mut ws_sender, mut ws_receiver) = websocket.split();
+        let (ws_sender, mut ws_receiver) = websocket.split();
+        
+        // ✅ Canal para envio de respostas ao cliente
+        let (response_tx, mut response_rx) = mpsc::channel::<String>(100);
+        let ws_sender = Arc::new(TokioMutex::new(ws_sender));
 
         println!("🔌 WebSocket handshake completo para cliente {}", client_id);
 
+        // ✅ TASK DE ENVIO - Unificada para broadcast e respostas
+        let ws_sender_clone = ws_sender.clone();
+        let messages_sent_clone = messages_sent.clone();
+        let bytes_sent_clone = bytes_sent.clone();
+        
         let send_task = tokio::spawn(async move {
-            while let Ok(message) = broadcast_rx.recv().await {
-                let msg_len = message.len() as u64;
-                
-                if let Err(e) = ws_sender.send(Message::Text(message)).await {
-                    println!("❌ Erro ao enviar para cliente {}: {}", client_id, e);
-                    break;
+            loop {
+                tokio::select! {
+                    // Mensagens de broadcast
+                    Ok(message) = broadcast_rx.recv() => {
+                        let msg_len = message.len() as u64;
+                        let mut sender = ws_sender_clone.lock().await;
+                        if let Err(e) = sender.send(Message::Text(message)).await {
+                            println!("❌ Erro ao enviar broadcast para cliente {}: {}", client_id, e);
+                            break;
+                        }
+                        messages_sent_clone.fetch_add(1, Ordering::SeqCst);
+                        bytes_sent_clone.fetch_add(msg_len, Ordering::SeqCst);
+                    }
+                    // Respostas diretas ao cliente
+                    Some(response) = response_rx.recv() => {
+                        let msg_len = response.len() as u64;
+                        let mut sender = ws_sender_clone.lock().await;
+                        if let Err(e) = sender.send(Message::Text(response)).await {
+                            println!("❌ Erro ao enviar resposta para cliente {}: {}", client_id, e);
+                            break;
+                        }
+                        messages_sent_clone.fetch_add(1, Ordering::SeqCst);
+                        bytes_sent_clone.fetch_add(msg_len, Ordering::SeqCst);
+                    }
                 }
-                
-                messages_sent.fetch_add(1, Ordering::SeqCst);
-                bytes_sent.fetch_add(msg_len, Ordering::SeqCst);
             }
         });
 
         let connected_clients_recv = connected_clients.clone();
+        let app_handle_recv = app_handle.clone();
+        let response_tx_clone = response_tx.clone();
+        let database_recv = database.clone(); // ✅ CLONE DATABASE
+        let smart_cache_recv = smart_cache.clone(); // ✅ CLONE SMART_CACHE
+        
         let receive_task = tokio::spawn(async move {
             while let Some(msg) = ws_receiver.next().await {
                 match msg {
-                    Ok(Message::Text(_text)) => {
+                    Ok(Message::Text(text)) => {
                         if let Some(client) = connected_clients_recv.get(&client_id) {
                             client.messages_received.fetch_add(1, Ordering::SeqCst);
+                        }
+                        
+                        // ✅ PROCESSAR COMANDOS DO CLIENTE
+                        if let Ok(cmd) = serde_json::from_str::<serde_json::Value>(&text) {
+                            let cmd_type = cmd.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                            
+                            match cmd_type {
+                                "LIST_PLCS" => {
+                                    println!("📋 Cliente {} solicitou lista de PLCs", client_id);
+                                    
+                                    // ✅ BUSCAR PLCs REAIS DO BANCO DE DADOS
+                                    let plcs: Vec<String> = match database_recv.list_configured_plcs() {
+                                        Ok(configured_plcs) => {
+                                            println!("📋 PLCs configurados no banco: {:?}", configured_plcs);
+                                            configured_plcs
+                                        }
+                                        Err(e) => {
+                                            println!("⚠️ Erro ao buscar PLCs do banco: {}", e);
+                                            // Fallback: buscar do cache de tag_mappings
+                                            smart_cache_recv.tag_mappings_cache
+                                                .iter()
+                                                .map(|entry| entry.key().clone())
+                                                .collect()
+                                        }
+                                    };
+                                    
+                                    println!("📡 Enviando lista de {} PLCs para cliente {}", plcs.len(), client_id);
+                                    
+                                    let response = serde_json::json!({
+                                        "type": "PLC_LIST",
+                                        "plcs": plcs,
+                                        "timestamp": SystemTime::now()
+                                            .duration_since(UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_millis()
+                                    });
+                                    
+                                    let _ = response_tx_clone.send(response.to_string()).await;
+                                }
+                                
+                                "SUBSCRIBE_PLCS" => {
+                                    if let Some(plc_ips) = cmd.get("plc_ips").and_then(|p| p.as_array()) {
+                                        let plcs: Vec<String> = plc_ips
+                                            .iter()
+                                            .filter_map(|ip| ip.as_str().map(|s| s.to_string()))
+                                            .collect();
+                                        
+                                        println!("📡 Cliente {} subscreveu em PLCs: {:?}", client_id, plcs);
+                                        
+                                        // Atualizar subscrições do cliente
+                                        if let Some(mut client) = connected_clients_recv.get_mut(&client_id) {
+                                            {
+                                                let mut subscribed = client.subscribed_plcs.write().await;
+                                                subscribed.clear();
+                                                for plc_ip in &plcs {
+                                                    subscribed.insert(plc_ip.clone());
+                                                }
+                                            }
+                                            client.client_type = ClientType::Filtered(plcs.clone());
+                                        }
+                                        
+                                        let response = serde_json::json!({
+                                            "type": "SUBSCRIBE_ACK",
+                                            "success": true,
+                                            "plcs": plcs,
+                                            "message": "Subscrição atualizada com sucesso"
+                                        });
+                                        
+                                        let _ = response_tx_clone.send(response.to_string()).await;
+                                    }
+                                }
+                                
+                                _ => {
+                                    // Comando desconhecido - ignorar silenciosamente
+                                }
+                            }
                         }
                     },
                     Ok(Message::Close(_)) => {
@@ -1101,5 +1356,14 @@ impl WebSocketServer {
     /// Retorna None se o cache estiver vazio para o PLC
     pub async fn get_cached_tag_mappings(&self, plc_ip: &str) -> Option<Vec<crate::database::TagMapping>> {
         self.smart_cache.get_cached_tags(plc_ip)
+    }
+
+    // ✅ OTIMIZAÇÃO: Métodos para monitoramento de memória
+    pub fn get_cache_memory_stats(&self) -> (usize, usize, usize, f64) {
+        self.smart_cache.get_memory_stats()
+    }
+
+    pub async fn force_cache_cleanup(&self) -> bool {
+        self.smart_cache.enforce_memory_limits().await
     }
 }
