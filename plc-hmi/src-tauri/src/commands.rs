@@ -1758,3 +1758,18 @@ pub async fn get_scl_tags(
     Ok(result)
 }
 
+// ============================================================================
+// COMANDOS DE LEITURA/ESCRITA DE ARQUIVOS
+// ============================================================================
+
+#[tauri::command]
+pub async fn write_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, &content)
+        .map_err(|e| format!("Erro ao escrever arquivo: {}", e))
+}
+
+#[tauri::command]
+pub async fn read_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path)
+        .map_err(|e| format!("Erro ao ler arquivo: {}", e))
+}

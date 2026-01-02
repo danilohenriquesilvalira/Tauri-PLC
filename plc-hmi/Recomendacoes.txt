@@ -1,1 +1,0 @@
-Próximo Passo Recomendado: Focar na implementação do Worker de Histórico Assíncrono para o PostgreSQL antes de colocar em produção pesada, pois é o único gargalo óbvio restante.

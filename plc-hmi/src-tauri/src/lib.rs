@@ -98,6 +98,8 @@ pub fn run() {
       commands::force_memory_cleanup,
       commands::subscribe_client_to_plcs,
       commands::get_available_plcs,
+      commands::write_file,
+      commands::read_file,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -30,6 +30,9 @@ pub struct TagMapping {
     pub created_at: i64,
     pub collect_mode: Option<String>, // "on_change" ou "interval"
     pub collect_interval_s: Option<i64>, // Intervalo em segundos, se aplicável
+    // 🆕 CAMPOS PARA SUBSCRIBE INTELIGENTE
+    pub area: Option<String>,     // ENH, ESV, PJU, PMO, SCO, EDR, GER (equipamento)
+    pub category: Option<String>, // PROC, FAULT, EVENT, ALARM, CMD (tipo de tag)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,30 +191,13 @@ impl Database {
                 created_at INTEGER NOT NULL,
                 collect_mode TEXT,
                 collect_interval_s INTEGER,
+                area TEXT,
+                category TEXT,
                 UNIQUE(plc_ip, variable_path),
                 FOREIGN KEY(plc_ip) REFERENCES plc_structures(plc_ip)
             )",
             [],
         ) {
-                    // Migração automática: garantir que as colunas collect_mode e collect_interval_s existam
-                    let mut stmt = write_conn_ref.prepare("PRAGMA table_info(tag_mappings)")?;
-                    let columns: Vec<String> = stmt.query_map([], |row| row.get(1))?.filter_map(Result::ok).collect();
-                    if !columns.iter().any(|c| c == "collect_mode") {
-                        match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_mode TEXT", []) {
-                            Ok(_) => println!("[MIGRATION] Coluna 'collect_mode' adicionada à tabela tag_mappings."),
-                            Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_mode': {}", e),
-                        }
-                    } else {
-                        println!("[MIGRATION] Coluna 'collect_mode' já existe.");
-                    }
-                    if !columns.iter().any(|c| c == "collect_interval_s") {
-                        match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_interval_s INTEGER", []) {
-                            Ok(_) => println!("[MIGRATION] Coluna 'collect_interval_s' adicionada à tabela tag_mappings."),
-                            Err(e) => println!("[MIGRATION][ERRO] Falha ao adicionar coluna 'collect_interval_s': {}", e),
-                        }
-                    } else {
-                        println!("[MIGRATION] Coluna 'collect_interval_s' já existe.");
-                    }
             let _ = app_handle.emit("sqlite-error", serde_json::json!({
                 "operation": "create_table_tag_mappings",
                 "message": format!("Erro ao criar tabela tag_mappings: {}", e),
@@ -219,6 +205,47 @@ impl Database {
             }));
             return Err(e);
         }
+        
+        // 🔄 MIGRAÇÃO AUTOMÁTICA - SEMPRE EXECUTAR para adicionar colunas novas em tabelas existentes
+        {
+            let mut stmt = write_conn_ref.prepare("PRAGMA table_info(tag_mappings)")?;
+            let columns: Vec<String> = stmt.query_map([], |row| row.get(1))?.filter_map(Result::ok).collect();
+            
+            // Migração: collect_mode
+            if !columns.iter().any(|c| c == "collect_mode") {
+                match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_mode TEXT", []) {
+                    Ok(_) => println!("[MIGRATION] Coluna 'collect_mode' adicionada à tabela tag_mappings."),
+                    Err(e) => println!("[MIGRATION][AVISO] Coluna 'collect_mode': {}", e),
+                }
+            }
+            
+            // Migração: collect_interval_s
+            if !columns.iter().any(|c| c == "collect_interval_s") {
+                match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN collect_interval_s INTEGER", []) {
+                    Ok(_) => println!("[MIGRATION] Coluna 'collect_interval_s' adicionada à tabela tag_mappings."),
+                    Err(e) => println!("[MIGRATION][AVISO] Coluna 'collect_interval_s': {}", e),
+                }
+            }
+            
+            // 🆕 Migração: area (para subscribe por equipamento)
+            if !columns.iter().any(|c| c == "area") {
+                match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN area TEXT", []) {
+                    Ok(_) => println!("[MIGRATION] ✅ Coluna 'area' adicionada à tabela tag_mappings."),
+                    Err(e) => println!("[MIGRATION][AVISO] Coluna 'area': {}", e),
+                }
+            }
+            
+            // 🆕 Migração: category (para tipo de tag: PROC, FAULT, EVENT, etc)
+            if !columns.iter().any(|c| c == "category") {
+                match write_conn_ref.execute("ALTER TABLE tag_mappings ADD COLUMN category TEXT", []) {
+                    Ok(_) => println!("[MIGRATION] ✅ Coluna 'category' adicionada à tabela tag_mappings."),
+                    Err(e) => println!("[MIGRATION][AVISO] Coluna 'category': {}", e),
+                }
+            }
+            
+            println!("[MIGRATION] ✅ Verificação de colunas concluída.");
+        }
+        
         if let Err(e) = write_conn_ref.execute(
             "CREATE TABLE IF NOT EXISTS websocket_config (
                 id INTEGER PRIMARY KEY,
@@ -431,8 +458,8 @@ impl Database {
         
         let _result = conn.execute(
             "INSERT OR REPLACE INTO tag_mappings 
-             (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             (
                 &tag.plc_ip,
                 &tag.variable_path,
@@ -443,6 +470,8 @@ impl Database {
                 tag.created_at,
                 &tag.collect_mode,
                 &tag.collect_interval_s,
+                &tag.area,
+                &tag.category,
             ),
         )?;
         
@@ -457,7 +486,7 @@ impl Database {
         let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category 
              FROM tag_mappings WHERE plc_ip = ?1 ORDER BY variable_path"
         )?;
 
@@ -473,6 +502,8 @@ impl Database {
                 created_at: row.get(7)?,
                 collect_mode: row.get(8).ok(),
                 collect_interval_s: row.get(9).ok(),
+                area: row.get(10).ok(),
+                category: row.get(11).ok(),
             })
         })?;
         
@@ -517,8 +548,8 @@ impl Database {
         {
             let mut stmt = tx.prepare(
                 "INSERT OR REPLACE INTO tag_mappings 
-                 (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+                 (plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
             )?;
             
             for tag in tags {
@@ -532,6 +563,8 @@ impl Database {
                     tag.created_at,
                     &tag.collect_mode,
                     &tag.collect_interval_s,
+                    &tag.area,
+                    &tag.category,
                 )) {
                     Ok(_) => {
                         let tag_id = tx.last_insert_rowid();
@@ -575,7 +608,7 @@ impl Database {
         let conn = self.read_conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s 
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category 
              FROM tag_mappings WHERE plc_ip = ?1 AND enabled = 1 ORDER BY tag_name"
         )?;
 
@@ -591,11 +624,84 @@ impl Database {
                 created_at: row.get(7)?,
                 collect_mode: row.get(8).ok(),
                 collect_interval_s: row.get(9).ok(),
+                area: row.get(10).ok(),
+                category: row.get(11).ok(),
             })
         })?;
         
         let tags: Result<Vec<TagMapping>> = tag_iter.collect();
         tags
+    }
+    
+    /// 🆕 Lista tags ativos filtrados por área e/ou categoria
+    pub fn get_active_tags_filtered(&self, plc_ip: &str, areas: Option<Vec<String>>, categories: Option<Vec<String>>) -> Result<Vec<TagMapping>> {
+        let conn = self.read_conn.lock().unwrap();
+        
+        // Construir query dinâmica baseada nos filtros
+        let mut sql = String::from(
+            "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category 
+             FROM tag_mappings WHERE plc_ip = ?1 AND enabled = 1"
+        );
+        
+        let has_area_filter = areas.as_ref().map(|a| !a.is_empty()).unwrap_or(false);
+        let has_category_filter = categories.as_ref().map(|c| !c.is_empty()).unwrap_or(false);
+        
+        if has_area_filter {
+            let area_list = areas.as_ref().unwrap();
+            let placeholders: Vec<String> = (0..area_list.len()).map(|i| format!("?{}", i + 2)).collect();
+            sql.push_str(&format!(" AND area IN ({})", placeholders.join(",")));
+        }
+        
+        if has_category_filter {
+            let cat_list = categories.as_ref().unwrap();
+            let offset = if has_area_filter { areas.as_ref().unwrap().len() + 2 } else { 2 };
+            let placeholders: Vec<String> = (0..cat_list.len()).map(|i| format!("?{}", i + offset)).collect();
+            sql.push_str(&format!(" AND category IN ({})", placeholders.join(",")));
+        }
+        
+        sql.push_str(" ORDER BY area, category, tag_name");
+        
+        let mut stmt = conn.prepare(&sql)?;
+        
+        // Bind dos parâmetros
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(plc_ip.to_string())];
+        
+        if let Some(ref area_list) = areas {
+            for area in area_list {
+                params.push(Box::new(area.clone()));
+            }
+        }
+        
+        if let Some(ref cat_list) = categories {
+            for cat in cat_list {
+                params.push(Box::new(cat.clone()));
+            }
+        }
+        
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        
+        let tag_iter = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok(TagMapping {
+                id: Some(row.get(0)?),
+                plc_ip: row.get(1)?,
+                variable_path: row.get(2)?,
+                tag_name: row.get(3)?,
+                description: row.get(4)?,
+                unit: row.get(5)?,
+                enabled: true,
+                created_at: row.get(7)?,
+                collect_mode: row.get(8).ok(),
+                collect_interval_s: row.get(9).ok(),
+                area: row.get(10).ok(),
+                category: row.get(11).ok(),
+            })
+        })?;
+        
+        let tags: Result<Vec<TagMapping>> = tag_iter.collect();
+        let result = tags?;
+        
+        println!("📖 Tags filtrados: {} (áreas: {:?}, categorias: {:?})", result.len(), areas, categories);
+        Ok(result)
     }
     
     // ============================================================================

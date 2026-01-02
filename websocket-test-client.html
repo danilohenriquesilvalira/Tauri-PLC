@@ -3,883 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Test Client - EDP PLC System</title>
+    <title>WebSocket Test</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a2332 0%, #2a3f52 100%);
-            color: #fff;
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .header h1 {
-            font-size: 28px;
-            margin-bottom: 8px;
-            color: #28FF52;
-        }
-
-        .header p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 14px;
-        }
-
-        .connection-panel {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .connection-controls {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .connection-controls input {
-            flex: 1;
-            min-width: 200px;
-            padding: 12px 16px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            font-size: 14px;
-        }
-
-        .connection-controls input::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-connect {
-            background: #28FF52;
-            color: #1a2332;
-        }
-
-        .btn-connect:hover {
-            background: #20d944;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(40, 255, 82, 0.4);
-        }
-
-        .btn-disconnect {
-            background: #ff4444;
-            color: #fff;
-        }
-
-        .btn-disconnect:hover {
-            background: #cc0000;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .status-indicator.connected {
-            background: rgba(40, 255, 82, 0.2);
-            color: #28FF52;
-            border: 1px solid #28FF52;
-        }
-
-        .status-indicator.disconnected {
-            background: rgba(255, 68, 68, 0.2);
-            color: #ff4444;
-            border: 1px solid #ff4444;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        .status-indicator.connected .status-dot {
-            background: #28FF52;
-        }
-
-        .status-indicator.disconnected .status-dot {
-            background: #ff4444;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: bold;
-            color: #28FF52;
-        }
-
-        .data-panel {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .data-panel h2 {
-            font-size: 20px;
-            margin-bottom: 16px;
-            color: #28FF52;
-        }
-
-        .data-display {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 16px;
-            max-height: 500px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-        }
-
-        .data-display::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .data-display::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-        }
-
-        .data-display::-webkit-scrollbar-thumb {
-            background: rgba(40, 255, 82, 0.5);
-            border-radius: 4px;
-        }
-
-        .data-display::-webkit-scrollbar-thumb:hover {
-            background: rgba(40, 255, 82, 0.7);
-        }
-
-        .message-item {
-            padding: 12px;
-            margin-bottom: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            border-left: 3px solid #28FF52;
-        }
-
-        .message-time {
-            color: #28FF52;
-            font-size: 11px;
-            margin-bottom: 4px;
-        }
-
-        .message-content {
-            color: #fff;
-        }
-
-        .json-key {
-            color: #8be9fd;
-        }
-
-        .json-string {
-            color: #50fa7b;
-        }
-
-        .json-number {
-            color: #bd93f9;
-        }
-
-        .json-boolean {
-            color: #ff79c6;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .clear-btn {
-            margin-top: 16px;
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .clear-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #F1F4F4; color: #212E3E; padding: 16px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; border: 1px solid #BECACC; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+        .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #212E3E; }
+        .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        input[type="text"] { flex: 1; padding: 8px 12px; border: 1px solid #BECACC; border-radius: 6px; font-size: 14px; }
+        button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #212E3E; color: white; }
+        .btn-success { background: #28FF52; color: #212E3E; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-secondary { background: #BECACC; color: #212E3E; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status.on { background: #d1fae5; color: #065f46; }
+        .status.off { background: #fee2e2; color: #991b1b; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .chip { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #BECACC; background: #F1F4F4; }
+        .chip.active { background: #212E3E; color: white; border-color: #212E3E; }
+        .chip input { display: none; }
+        .messages { max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 11px; background: #f8f9fa; border: 1px solid #BECACC; border-radius: 6px; }
+        .msg { padding: 8px 12px; border-bottom: 1px solid #eee; }
+        .msg:last-child { border-bottom: none; }
+        .msg-time { color: #7C9599; font-size: 10px; }
+        .msg-sys { background: #e0f2fe; color: #0369a1; }
+        .msg-err { background: #fee2e2; color: #991b1b; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+        .stat { background: white; border: 1px solid #BECACC; border-radius: 6px; padding: 12px; text-align: center; }
+        .stat-val { font-size: 20px; font-weight: 700; }
+        .stat-lbl { font-size: 10px; color: #7C9599; text-transform: uppercase; }
+        .section-title { font-size: 11px; font-weight: 600; color: #7C9599; text-transform: uppercase; margin-bottom: 6px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🚀 WebSocket Test Client</h1>
-            <p>Cliente de teste para monitoramento em tempo real do sistema PLC EDP</p>
+        <div class="stats">
+            <div class="stat"><div class="stat-val" id="msgCount">0</div><div class="stat-lbl">Mensagens</div></div>
+            <div class="stat"><div class="stat-val" id="tagCount">0</div><div class="stat-lbl">Tags</div></div>
+            <div class="stat"><div class="stat-val" id="plcCount">0</div><div class="stat-lbl">PLCs</div></div>
+            <div class="stat"><div class="stat-val" id="uptime">0s</div><div class="stat-lbl">Tempo</div></div>
         </div>
 
-        <!-- Connection Panel -->
-        <div class="connection-panel">
-            <div class="connection-controls">
-                <input type="text" id="wsUrl" placeholder="WebSocket URL" value="ws://localhost:8765">
-                <button class="btn btn-connect" id="connectBtn" onclick="connect()">Conectar</button>
-                <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnect()" disabled>Desconectar</button>
-                <div class="status-indicator disconnected" id="statusIndicator">
-                    <div class="status-dot"></div>
-                    <span id="statusText">Desconectado</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Mensagens Recebidas</div>
-                <div class="stat-value" id="msgCount">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Taxa de Atualização</div>
-                <div class="stat-value" id="updateRate">0 Hz</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Tempo Conectado</div>
-                <div class="stat-value" id="uptime">0s</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Protocolo Ativo</div>
-                <div class="stat-value" id="protocol" style="font-size: 16px; color: #28FF52;">Aguardando...</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Última Mensagem</div>
-                <div class="stat-value" id="lastMsg" style="font-size: 16px; color: rgba(255,255,255,0.7);">—</div>
+        <div class="card">
+            <h3>Conexao</h3>
+            <div class="row">
+                <input type="text" id="url" value="ws://localhost:8765" placeholder="ws://localhost:8765">
+                <button class="btn-primary" id="btnConnect" onclick="connect()">Conectar</button>
+                <button class="btn-danger" id="btnDisconnect" onclick="disconnect()" disabled>Desconectar</button>
+                <span class="status off" id="status">Desconectado</span>
             </div>
         </div>
 
-        <!-- Data Display Panel -->
-        <div class="data-panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2>📊 Dados em Tempo Real</h2>
-                <div style="display: flex; gap: 12px;">
-                    <button class="clear-btn" onclick="clearData()">Limpar Histórico</button>
-                </div>
+        <div class="card" id="filtersCard" style="display:none;">
+            <h3>Filtros de Subscricao</h3>
+            
+            <div class="section-title">PLCs</div>
+            <div class="chips" id="plcChips">Carregando...</div>
+            
+            <div class="section-title">Areas</div>
+            <div class="chips" id="areaChips">
+                <label class="chip active"><input type="checkbox" value="ENH" checked>ENH</label>
+                <label class="chip active"><input type="checkbox" value="ESV" checked>ESV</label>
+                <label class="chip active"><input type="checkbox" value="PJU" checked>PJU</label>
+                <label class="chip active"><input type="checkbox" value="PMO" checked>PMO</label>
+                <label class="chip active"><input type="checkbox" value="SCO" checked>SCO</label>
+                <label class="chip active"><input type="checkbox" value="EDR" checked>EDR</label>
+                <label class="chip active"><input type="checkbox" value="GER" checked>GER</label>
             </div>
-            <div class="data-display" id="dataDisplay">
-                <div class="no-data">Aguardando conexão...</div>
+            
+            <div class="section-title">Categorias</div>
+            <div class="chips" id="catChips">
+                <label class="chip active"><input type="checkbox" value="PROC" checked>PROC</label>
+                <label class="chip active"><input type="checkbox" value="FAULT" checked>FAULT</label>
+                <label class="chip active"><input type="checkbox" value="EVENT" checked>EVENT</label>
+                <label class="chip active"><input type="checkbox" value="ALARM" checked>ALARM</label>
+                <label class="chip active"><input type="checkbox" value="CMD" checked>CMD</label>
             </div>
+            
+            <div class="row" style="margin-top:12px;">
+                <button class="btn-success" onclick="subscribe()">Aplicar Filtros</button>
+                <button class="btn-secondary" onclick="selectAll()">Todos</button>
+                <button class="btn-secondary" onclick="selectNone()">Nenhum</button>
+                <label style="margin-left:auto;font-size:12px;display:flex;align-items:center;gap:4px;">
+                    <input type="checkbox" id="allFaults" checked> Sempre receber FAULT
+                </label>
+            </div>
+            <div id="subStatus" style="margin-top:8px;font-size:12px;color:#7C9599;">Clique em Aplicar Filtros</div>
+        </div>
+
+        <div class="card">
+            <div class="row" style="margin-bottom:8px;">
+                <h3 style="margin:0;">Dados Recebidos</h3>
+                <button class="btn-secondary" onclick="clearMsgs()" style="margin-left:auto;padding:4px 8px;font-size:11px;">Limpar</button>
+            </div>
+            <div class="messages" id="msgs"><div class="msg">Aguardando conexao...</div></div>
         </div>
     </div>
 
-    <!-- ✅ MESSAGEPACK LIBRARY - Implementação simples inline -->
-    
     <script>
-        // ✅ MESSAGEPACK DECODER COMPLETO
-        class SimpleMsgPack {
-            static decode(bytes) {
-                let pos = 0;
-                
-                function readByte() {
-                    if (pos >= bytes.length) throw new Error('Fim dos dados');
-                    return bytes[pos++];
-                }
-                
-                function readUint16() {
-                    const b1 = readByte();
-                    const b2 = readByte();
-                    return (b1 << 8) | b2;
-                }
-                
-                function readUint32() {
-                    const b1 = readByte();
-                    const b2 = readByte();
-                    const b3 = readByte();
-                    const b4 = readByte();
-                    return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4;
-                }
-                
-                function readFloat32() {
-                    const buffer = new ArrayBuffer(4);
-                    const view = new DataView(buffer);
-                    for (let i = 0; i < 4; i++) {
-                        view.setUint8(i, readByte());
-                    }
-                    return view.getFloat32(0, false); // big endian
-                }
-                
-                function readFloat64() {
-                    const buffer = new ArrayBuffer(8);
-                    const view = new DataView(buffer);
-                    for (let i = 0; i < 8; i++) {
-                        view.setUint8(i, readByte());
-                    }
-                    return view.getFloat64(0, false); // big endian
-                }
-                
-                function readString(len) {
-                    let str = '';
-                    for (let i = 0; i < len; i++) {
-                        str += String.fromCharCode(readByte());
-                    }
-                    return str;
-                }
-                
-                function readValue() {
-                    const byte = readByte();
-                    
-                    // Inteiro positivo fixo (0x00-0x7f)
-                    if ((byte & 0x80) === 0x00) {
-                        return byte;
-                    }
-                    
-                    // Map fixo (0x80-0x8f)
-                    if ((byte & 0xf0) === 0x80) {
-                        const size = byte & 0x0f;
-                        return readMap(size);
-                    }
-                    
-                    // Array fixo (0x90-0x9f)
-                    if ((byte & 0xf0) === 0x90) {
-                        const size = byte & 0x0f;
-                        return readArray(size);
-                    }
-                    
-                    // String fixa (0xa0-0xbf)
-                    if ((byte & 0xe0) === 0xa0) {
-                        const len = byte & 0x1f;
-                        return readString(len);
-                    }
-                    
-                    // Nil
-                    if (byte === 0xc0) return null;
-                    
-                    // Boolean
-                    if (byte === 0xc2) return false;
-                    if (byte === 0xc3) return true;
-                    
-                    // Float 32
-                    if (byte === 0xca) return readFloat32();
-                    
-                    // Float 64
-                    if (byte === 0xcb) return readFloat64();
-                    
-                    // Uint 8
-                    if (byte === 0xcc) return readByte();
-                    
-                    // Uint 16
-                    if (byte === 0xcd) return readUint16();
-                    
-                    // Uint 32
-                    if (byte === 0xce) return readUint32();
-                    
-                    // String 8
-                    if (byte === 0xd9) {
-                        const len = readByte();
-                        return readString(len);
-                    }
-                    
-                    // String 16
-                    if (byte === 0xda) {
-                        const len = readUint16();
-                        return readString(len);
-                    }
-                    
-                    // String 32
-                    if (byte === 0xdb) {
-                        const len = readUint32();
-                        return readString(len);
-                    }
-                    
-                    // Array 16
-                    if (byte === 0xdc) {
-                        const size = readUint16();
-                        return readArray(size);
-                    }
-                    
-                    // Array 32
-                    if (byte === 0xdd) {
-                        const size = readUint32();
-                        return readArray(size);
-                    }
-                    
-                    // Map 16
-                    if (byte === 0xde) {
-                        const size = readUint16();
-                        return readMap(size);
-                    }
-                    
-                    // Map 32
-                    if (byte === 0xdf) {
-                        const size = readUint32();
-                        return readMap(size);
-                    }
-                    
-                    // Negative fixint (0xe0-0xff)
-                    if ((byte & 0xe0) === 0xe0) {
-                        return byte - 256; // two's complement
-                    }
-                    
-                    throw new Error(`Tipo MessagePack não suportado: 0x${byte.toString(16)} na posição ${pos-1}`);
-                }
-                
-                function readArray(size) {
-                    const arr = [];
-                    for (let i = 0; i < size; i++) {
-                        arr.push(readValue());
-                    }
-                    return arr;
-                }
-                
-                function readMap(size) {
-                    const obj = {};
-                    for (let i = 0; i < size; i++) {
-                        const key = readValue();
-                        const value = readValue();
-                        obj[key] = value;
-                    }
-                    return obj;
-                }
-                
-                return readValue();
-            }
-        }
-        
         let ws = null;
-        let messageCount = 0;
+        let clientId = 'test-' + Math.random().toString(36).substr(2, 6);
+        let plcs = [];
         let startTime = null;
-        let lastMessageTime = null;
-        let messageHistory = [];
-        let uptimeInterval = null;
-        let rateInterval = null;
-        let messagesLastSecond = 0;
-        let msgpackMessageCount = 0;
-        let jsonMessageCount = 0;
+        let msgCount = 0;
+        let tagCount = 0;
+        let timer = null;
 
-        const wsUrlInput = document.getElementById('wsUrl');
-        const connectBtn = document.getElementById('connectBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const statusIndicator = document.getElementById('statusIndicator');
-        const statusText = document.getElementById('statusText');
-        const dataDisplay = document.getElementById('dataDisplay');
-        const msgCountEl = document.getElementById('msgCount');
-        const updateRateEl = document.getElementById('updateRate');
-        const uptimeEl = document.getElementById('uptime');
-        const lastMsgEl = document.getElementById('lastMsg');
-        const protocolEl = document.getElementById('protocol');
+        // Chips toggle
+        document.querySelectorAll('.chip').forEach(chip => {
+            chip.onclick = () => {
+                const cb = chip.querySelector('input');
+                cb.checked = !cb.checked;
+                chip.classList.toggle('active', cb.checked);
+            };
+        });
 
         function connect() {
-            const url = wsUrlInput.value.trim();
+            const url = document.getElementById('url').value;
+            ws = new WebSocket(url);
             
-            if (!url) {
-                alert('Por favor, insira uma URL WebSocket válida!');
-                return;
-            }
-
-            try {
-                ws = new WebSocket(url);
-
-                ws.onopen = () => {
-                    console.log('✅ Conectado ao WebSocket!');
-                    statusIndicator.className = 'status-indicator connected';
-                    statusText.textContent = 'Conectado';
-                    connectBtn.disabled = true;
-                    disconnectBtn.disabled = false;
-                    wsUrlInput.disabled = true;
-                    
-                    startTime = Date.now();
-                    messageCount = 0;
-                    messagesLastSecond = 0;
-                    msgpackMessageCount = 0;
-                    jsonMessageCount = 0;
-                    
-                    // Iniciar contador de uptime
-                    uptimeInterval = setInterval(updateUptime, 1000);
-                    
-                    // Calcular taxa de mensagens por segundo
-                    rateInterval = setInterval(() => {
-                        updateRateEl.textContent = `${messagesLastSecond} Hz`;
-                        messagesLastSecond = 0;
-                    }, 1000);
-                    
-                    addSystemMessage('Conexão estabelecida com sucesso!', 'success');
-                };
-
-                ws.onmessage = (event) => {
-                    messageCount++;
-                    messagesLastSecond++;
-                    lastMessageTime = new Date();
-                    
-                    msgCountEl.textContent = messageCount;
-                    lastMsgEl.textContent = formatTime(lastMessageTime);
-                    
-                    // ✅ DETECTAR MESSAGEPACK vs JSON
-                    if (typeof event.data === 'string' && event.data.startsWith('MSGPACK:')) {
-                        // MessagePack detectado
-                        msgpackMessageCount++;
-                        protocolEl.textContent = `MSGPACK ⚡ (${msgpackMessageCount}/${messageCount})`;
-                        protocolEl.style.color = '#bd93f9'; // Roxo para MessagePack
-                        processMsgPackMessage(event.data);
-                    } else {
-                        // JSON tradicional
-                        jsonMessageCount++;
-                        protocolEl.textContent = `JSON (${jsonMessageCount}/${messageCount})`;
-                        protocolEl.style.color = '#28FF52'; // Verde para JSON
-                        
-                        try {
-                            const data = JSON.parse(event.data);
-                            displayMessage(data, 'json');
-                        } catch (error) {
-                            displayRawMessage(event.data);
-                        }
-                    }
-                };
-
-                ws.onerror = (error) => {
-                    console.error('❌ Erro WebSocket:', error);
-                    addSystemMessage('Erro de conexão!', 'error');
-                };
-
-                ws.onclose = () => {
-                    console.log('🔌 WebSocket desconectado');
-                    handleDisconnect();
-                };
-
-            } catch (error) {
-                console.error('❌ Erro ao conectar:', error);
-                alert('Erro ao conectar: ' + error.message);
-            }
+            ws.onopen = () => {
+                updateStatus(true);
+                startTime = Date.now();
+                timer = setInterval(updateUptime, 1000);
+                ws.send(JSON.stringify({ type: 'LIST_PLCS', client_id: clientId }));
+                document.getElementById('filtersCard').style.display = 'block';
+                addMsg('[SISTEMA] Conectado!', 'sys');
+            };
+            
+            ws.onclose = () => {
+                updateStatus(false);
+                clearInterval(timer);
+                addMsg('[SISTEMA] Desconectado', 'err');
+            };
+            
+            ws.onerror = () => addMsg('[ERRO] Falha na conexao', 'err');
+            
+            ws.onmessage = (e) => handleMsg(e.data);
         }
 
         function disconnect() {
-            if (ws) {
-                ws.close();
-            }
-            handleDisconnect();
+            if (ws) ws.close();
         }
 
-        function handleDisconnect() {
-            statusIndicator.className = 'status-indicator disconnected';
-            statusText.textContent = 'Desconectado';
-            connectBtn.disabled = false;
-            disconnectBtn.disabled = true;
-            wsUrlInput.disabled = false;
-            
-            if (uptimeInterval) {
-                clearInterval(uptimeInterval);
-                uptimeInterval = null;
-            }
-            
-            if (rateInterval) {
-                clearInterval(rateInterval);
-                rateInterval = null;
-            }
-            
-            updateRateEl.textContent = '0 Hz';
-            addSystemMessage('Conexão encerrada', 'info');
+        function updateStatus(on) {
+            document.getElementById('status').className = 'status ' + (on ? 'on' : 'off');
+            document.getElementById('status').textContent = on ? 'Conectado' : 'Desconectado';
+            document.getElementById('btnConnect').disabled = on;
+            document.getElementById('btnDisconnect').disabled = !on;
         }
 
-        // ✅ FUNÇÃO PARA PROCESSAR MESSAGEPACK
-        function processMsgPackMessage(rawData) {
+        function handleMsg(data) {
+            // MessagePack
+            if (data.startsWith('MSGPACK:')) {
+                try {
+                    const bin = atob(data.substring(8));
+                    const bytes = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                    const decoded = decodeMsgPack(bytes);
+                    showData(decoded);
+                } catch(e) { console.error(e); }
+                return;
+            }
+            
+            // JSON
             try {
-                console.log('🔍 Processando MessagePack...', rawData.substring(0, 20));
+                const json = JSON.parse(data);
                 
-                // Extrair base64 após "MSGPACK:"
-                const base64Data = rawData.substring(8); // "MSGPACK:".length = 8
-                console.log('📊 Base64 length:', base64Data.length);
-                
-                // Decodificar base64 para bytes
-                const binaryString = atob(base64Data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+                if (json.type === 'PLC_LIST') {
+                    plcs = json.plcs || [];
+                    renderPlcs();
+                    document.getElementById('plcCount').textContent = plcs.length;
+                    addMsg('[SISTEMA] ' + plcs.length + ' PLCs encontrados', 'sys');
+                    return;
                 }
                 
-                console.log('📦 Bytes decodificados:', bytes.length, 'primeiros bytes:', Array.from(bytes.slice(0, 10)).map(b => '0x' + b.toString(16)).join(' '));
+                if (json.type === 'SUBSCRIBE_ACK') {
+                    const parts = [];
+                    if (json.plcs?.length) parts.push(json.plcs.length + ' PLCs');
+                    if (json.areas?.length) parts.push('Areas: ' + json.areas.join(','));
+                    if (json.categories?.length) parts.push('Cat: ' + json.categories.join(','));
+                    document.getElementById('subStatus').innerHTML = '<b style="color:#16a34a">OK:</b> ' + parts.join(' | ');
+                    addMsg('[SISTEMA] Filtros aplicados!', 'sys');
+                    return;
+                }
                 
-                // ✅ DECODIFICAR MESSAGEPACK → JSON NORMAL!
-                const data = SimpleMsgPack.decode(bytes);
-                
-                console.log('✅ Dados decodificados:', Object.keys(data).length, 'tags');
-                
-                // Mostrar estatísticas
-                const jsonStr = JSON.stringify(data);
-                const stats = {
-                    protocol: "MessagePack",
-                    msgpack_size: base64Data.length,
-                    json_size: jsonStr.length,
-                    decoded_tags: Object.keys(data).length,
-                    compression: `${Math.round(100 * (1 - base64Data.length / jsonStr.length))}%`,
-                    data: data // Os dados reais em JSON!
+                showData(json);
+            } catch(e) { console.error(e); }
+        }
+
+        function showData(data) {
+            msgCount++;
+            document.getElementById('msgCount').textContent = msgCount;
+            
+            const keys = Object.keys(data).filter(k => !['plc_ip','timestamp','type'].includes(k));
+            tagCount += keys.length;
+            document.getElementById('tagCount').textContent = tagCount;
+            
+            const div = document.createElement('div');
+            div.className = 'msg';
+            
+            let info = '';
+            if (data.plc_ip) info = '<b>[' + data.plc_ip + ']</b> ';
+            
+            div.innerHTML = '<span class="msg-time">' + new Date().toLocaleTimeString() + '</span> ' + info + '<br>' + JSON.stringify(data, null, 1);
+            
+            const msgs = document.getElementById('msgs');
+            if (msgs.children[0]?.textContent === 'Aguardando conexao...') msgs.innerHTML = '';
+            msgs.insertBefore(div, msgs.firstChild);
+            while (msgs.children.length > 30) msgs.removeChild(msgs.lastChild);
+        }
+
+        function addMsg(text, type) {
+            const div = document.createElement('div');
+            div.className = 'msg msg-' + type;
+            div.innerHTML = '<span class="msg-time">' + new Date().toLocaleTimeString() + '</span> ' + text;
+            const msgs = document.getElementById('msgs');
+            if (msgs.children[0]?.textContent === 'Aguardando conexao...') msgs.innerHTML = '';
+            msgs.insertBefore(div, msgs.firstChild);
+        }
+
+        function clearMsgs() {
+            document.getElementById('msgs').innerHTML = '<div class="msg">Limpo</div>';
+            msgCount = 0; tagCount = 0;
+            document.getElementById('msgCount').textContent = '0';
+            document.getElementById('tagCount').textContent = '0';
+        }
+
+        function renderPlcs() {
+            const container = document.getElementById('plcChips');
+            if (!plcs.length) { container.innerHTML = 'Nenhum PLC'; return; }
+            container.innerHTML = plcs.map(ip => '<label class="chip active"><input type="checkbox" value="' + ip + '" checked>' + ip + '</label>').join('');
+            container.querySelectorAll('.chip').forEach(chip => {
+                chip.onclick = () => {
+                    const cb = chip.querySelector('input');
+                    cb.checked = !cb.checked;
+                    chip.classList.toggle('active', cb.checked);
                 };
-                
-                displayMessage(data, 'msgpack', stats);
-                
-            } catch (error) {
-                console.error('❌ ERRO MessagePack:', error.message);
-                console.error('📍 Stack trace:', error.stack);
-                
-                const base64Data = rawData.substring(8);
-                console.log('🔬 Debug - Base64:', base64Data.substring(0, 50) + '...');
-                
-                try {
-                    const binaryString = atob(base64Data);
-                    const bytes = new Uint8Array(Math.min(20, binaryString.length));
-                    for (let i = 0; i < bytes.length; i++) {
-                        bytes[i] = binaryString.charCodeAt(i);
-                    }
-                    console.log('🔬 Debug - Primeiros bytes:', Array.from(bytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
-                } catch (e) {
-                    console.error('🔬 Erro ao fazer debug:', e);
-                }
-                
-                // FALLBACK: Tentar como JSON
-                try {
-                    console.log('🔄 Tentando fallback para JSON...');
-                    const base64Data = rawData.substring(8);
-                    const binaryString = atob(base64Data);
-                    const jsonData = JSON.parse(binaryString);
-                    console.log('✅ Fallback JSON funcionou!');
-                    displayMessage(jsonData, 'json');
-                } catch (jsonError) {
-                    console.error('❌ Fallback JSON também falhou:', jsonError.message);
-                    
-                    // Mostrar erro detalhado
-                    const errorMsg = `MSGPACK DECODE FAILED: ${error.message}`;
-                    addSystemMessage(errorMsg, 'error');
-                    displayRawMessage(`[ERRO] ${errorMsg} - Dados: ${rawData.substring(0, 100)}...`);
-                }
-            }
-        }
-
-        function displayMessage(data, type = 'json', stats = null) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-item';
-            
-            // Cor da borda baseada no tipo
-            if (type === 'msgpack') {
-                messageDiv.style.borderLeftColor = '#bd93f9'; // Roxo para MessagePack
-            } else {
-                messageDiv.style.borderLeftColor = '#28FF52'; // Verde para JSON
-            }
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = formatTime(new Date());
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            if (type === 'msgpack' && stats) {
-                // Header para MessagePack
-                contentDiv.innerHTML = `
-                    <div style="color: #bd93f9; font-weight: bold; margin-bottom: 8px;">
-                        📦 MSGPACK → JSON (${stats.compression} compressão, ${stats.decoded_tags} tags)
-                        <br>
-                        <small style="color: #8be9fd;">
-                            MessagePack: ${stats.msgpack_size} bytes → JSON: ${stats.json_size} bytes
-                        </small>
-                    </div>
-                    ${syntaxHighlight(JSON.stringify(data, null, 2))}
-                `;
-            } else {
-                contentDiv.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
-            }
-            
-            messageDiv.appendChild(timeDiv);
-            messageDiv.appendChild(contentDiv);
-            
-            // Remover mensagem "Aguardando conexão..."
-            const noData = dataDisplay.querySelector('.no-data');
-            if (noData) {
-                noData.remove();
-            }
-            
-            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
-            
-            // Limitar a 50 mensagens no histórico
-            while (dataDisplay.children.length > 50) {
-                dataDisplay.removeChild(dataDisplay.lastChild);
-            }
-        }
-
-        function displayRawMessage(data) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-item';
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = formatTime(new Date());
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = data;
-            
-            messageDiv.appendChild(timeDiv);
-            messageDiv.appendChild(contentDiv);
-            
-            const noData = dataDisplay.querySelector('.no-data');
-            if (noData) {
-                noData.remove();
-            }
-            
-            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
-            
-            while (dataDisplay.children.length > 50) {
-                dataDisplay.removeChild(dataDisplay.lastChild);
-            }
-        }
-
-        function addSystemMessage(message, type) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-item';
-            messageDiv.style.borderLeftColor = type === 'success' ? '#28FF52' : type === 'error' ? '#ff4444' : '#8be9fd';
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            timeDiv.textContent = formatTime(new Date());
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = `[SISTEMA] ${message}`;
-            
-            messageDiv.appendChild(timeDiv);
-            messageDiv.appendChild(contentDiv);
-            
-            const noData = dataDisplay.querySelector('.no-data');
-            if (noData) {
-                noData.remove();
-            }
-            
-            dataDisplay.insertBefore(messageDiv, dataDisplay.firstChild);
-        }
-
-        function syntaxHighlight(json) {
-            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-                let cls = 'json-number';
-                if (/^"/.test(match)) {
-                    if (/:$/.test(match)) {
-                        cls = 'json-key';
-                    } else {
-                        cls = 'json-string';
-                    }
-                } else if (/true|false/.test(match)) {
-                    cls = 'json-boolean';
-                } else if (/null/.test(match)) {
-                    cls = 'json-null';
-                }
-                return '<span class="' + cls + '">' + match + '</span>';
             });
         }
 
-        function formatTime(date) {
-            return date.toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
+        function subscribe() {
+            if (!ws || ws.readyState !== 1) { alert('Nao conectado!'); return; }
+            
+            const selPlcs = Array.from(document.querySelectorAll('#plcChips input:checked')).map(c => c.value);
+            const selAreas = Array.from(document.querySelectorAll('#areaChips input:checked')).map(c => c.value);
+            const selCats = Array.from(document.querySelectorAll('#catChips input:checked')).map(c => c.value);
+            const allFaults = document.getElementById('allFaults').checked;
+            
+            const msg = {
+                type: 'SUBSCRIBE',
+                client_id: clientId,
+                plc_ips: selPlcs,
+                areas: selAreas,
+                categories: selCats,
+                include_all_faults: allFaults
+            };
+            
+            console.log('Enviando:', msg);
+            ws.send(JSON.stringify(msg));
+            
+            document.getElementById('subStatus').textContent = 'Enviado... aguardando confirmacao';
+        }
+
+        function selectAll() {
+            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip').forEach(c => {
+                c.classList.add('active');
+                c.querySelector('input').checked = true;
+            });
+        }
+
+        function selectNone() {
+            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip').forEach(c => {
+                c.classList.remove('active');
+                c.querySelector('input').checked = false;
             });
         }
 
         function updateUptime() {
-            if (startTime) {
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const hours = Math.floor(elapsed / 3600);
-                const minutes = Math.floor((elapsed % 3600) / 60);
-                const seconds = elapsed % 60;
-                
-                if (hours > 0) {
-                    uptimeEl.textContent = `${hours}h ${minutes}m ${seconds}s`;
-                } else if (minutes > 0) {
-                    uptimeEl.textContent = `${minutes}m ${seconds}s`;
-                } else {
-                    uptimeEl.textContent = `${seconds}s`;
-                }
-            }
+            if (!startTime) return;
+            const s = Math.floor((Date.now() - startTime) / 1000);
+            const m = Math.floor(s / 60);
+            document.getElementById('uptime').textContent = m > 0 ? m + 'm' + (s%60) + 's' : s + 's';
         }
 
-        function clearData() {
-            dataDisplay.innerHTML = '<div class="no-data">Histórico limpo. Aguardando novas mensagens...</div>';
+        // Simple MsgPack decoder
+        function decodeMsgPack(bytes) {
+            let pos = 0;
+            function read() {
+                const t = bytes[pos++];
+                if (t <= 0x7f) return t;
+                if ((t & 0xf0) === 0x80) { const n = t & 0x0f; const o = {}; for(let i=0;i<n;i++) o[read()]=read(); return o; }
+                if ((t & 0xf0) === 0x90) { const n = t & 0x0f; const a = []; for(let i=0;i<n;i++) a.push(read()); return a; }
+                if ((t & 0xe0) === 0xa0) { const n = t & 0x1f; let s=''; for(let i=0;i<n;i++) s+=String.fromCharCode(bytes[pos++]); return s; }
+                if (t >= 0xe0) return t - 256;
+                if (t === 0xc0) return null;
+                if (t === 0xc2) return false;
+                if (t === 0xc3) return true;
+                if (t === 0xca) { const v = new DataView(new ArrayBuffer(4)); for(let i=0;i<4;i++) v.setUint8(i,bytes[pos++]); return v.getFloat32(0,false); }
+                if (t === 0xcb) { const v = new DataView(new ArrayBuffer(8)); for(let i=0;i<8;i++) v.setUint8(i,bytes[pos++]); return v.getFloat64(0,false); }
+                if (t === 0xcc) return bytes[pos++];
+                if (t === 0xcd) return (bytes[pos++]<<8)|bytes[pos++];
+                if (t === 0xce) return (bytes[pos++]<<24)|(bytes[pos++]<<16)|(bytes[pos++]<<8)|bytes[pos++];
+                if (t === 0xd9) { const n = bytes[pos++]; let s=''; for(let i=0;i<n;i++) s+=String.fromCharCode(bytes[pos++]); return s; }
+                if (t === 0xda) { const n = (bytes[pos++]<<8)|bytes[pos++]; let s=''; for(let i=0;i<n;i++) s+=String.fromCharCode(bytes[pos++]); return s; }
+                if (t === 0xdc) { const n = (bytes[pos++]<<8)|bytes[pos++]; const a = []; for(let i=0;i<n;i++) a.push(read()); return a; }
+                if (t === 0xde) { const n = (bytes[pos++]<<8)|bytes[pos++]; const o = {}; for(let i=0;i<n;i++) o[read()]=read(); return o; }
+                return null;
+            }
+            return read();
         }
 
-
-        // Auto-conectar se Enter for pressionado no input
-        wsUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !connectBtn.disabled) {
-                connect();
-            }
-        });
+        document.getElementById('url').onkeypress = (e) => { if (e.key === 'Enter') connect(); };
     </script>
 </body>
 </html>

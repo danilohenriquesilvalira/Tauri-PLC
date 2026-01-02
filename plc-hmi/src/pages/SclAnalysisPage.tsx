@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Play, Code, Terminal, Activity, Cpu, 
     CheckCircle2, XCircle, Server, AlertTriangle, Clock, 
-    RefreshCw, Eye, Hash, Binary, Layers, BookOpen, 
+    RefreshCw, Eye, BookOpen, 
     X, FileCode, Bookmark, Copy, Check
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
@@ -10,7 +10,6 @@ import { invoke } from '@tauri-apps/api/core';
 // Importar do parser SCL
 import { 
     SclParser,
-    getDataTypeColor,
     EXAMPLE_CATEGORIES,
     getExamplesByCategory
 } from '../components/python-parser';

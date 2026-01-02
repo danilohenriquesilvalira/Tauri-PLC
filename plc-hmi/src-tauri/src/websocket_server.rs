@@ -11,7 +11,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, RwLock};
 use tokio::time;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 use crate::database::Database;
 use crate::database::TagMapping;
@@ -37,6 +37,63 @@ fn base64_encode(data: &[u8]) -> String {
     }
     
     result
+}
+
+// 🆕 FUNÇÃO PARA ORDENAR TAGS POR ORDEM NATURAL (Word0, Word1, Word2...)
+fn sort_tags_naturally(tags: HashMap<String, String>) -> BTreeMap<String, String> {
+    use std::cmp::Ordering;
+    
+    let mut sorted_entries: Vec<(String, String)> = tags.into_iter().collect();
+    
+    // Função de comparação natural para tags como Word0, Word1, etc.
+    sorted_entries.sort_by(|a, b| {
+        let name_a = &a.0;
+        let name_b = &b.0;
+        
+        // Extrair parte numérica se existir (ex: Word0 -> 0, Word10 -> 10)
+        let get_numeric_suffix = |s: &str| -> Option<u32> {
+            let chars: Vec<char> = s.chars().collect();
+            let mut number_start = None;
+            
+            // Encontrar onde começam os dígitos
+            for (i, &c) in chars.iter().enumerate() {
+                if c.is_ascii_digit() {
+                    number_start = Some(i);
+                    break;
+                }
+            }
+            
+            if let Some(start) = number_start {
+                let number_str: String = chars[start..].iter().collect();
+                number_str.parse::<u32>().ok()
+            } else {
+                None
+            }
+        };
+        
+        // Extrair prefixo e número
+        let prefix_a = name_a.trim_end_matches(|c: char| c.is_ascii_digit());
+        let prefix_b = name_b.trim_end_matches(|c: char| c.is_ascii_digit());
+        let num_a = get_numeric_suffix(name_a);
+        let num_b = get_numeric_suffix(name_b);
+        
+        // Primeiro ordenar por prefixo (Word, Int, Real, etc.)
+        match prefix_a.cmp(prefix_b) {
+            Ordering::Equal => {
+                // Se prefixos são iguais, ordenar por número
+                match (num_a, num_b) {
+                    (Some(a), Some(b)) => a.cmp(&b),  // Ordem numérica: 0, 1, 2, 10, 11...
+                    (Some(_), None) => Ordering::Less,    // Números vêm antes
+                    (None, Some(_)) => Ordering::Greater, // Números vêm antes
+                    (None, None) => name_a.cmp(name_b),   // Ordem alfabética
+                }
+            }
+            other => other
+        }
+    });
+    
+    // Converter para BTreeMap ordenado
+    sorted_entries.into_iter().collect()
 }
 
 // ✅ ESTRUTURA PARA SERIALIZAR ATUALIZAÇÕES DE CACHE
@@ -101,6 +158,9 @@ pub struct CachedTagValue {
     pub interval_s: u64,
     pub last_sent: u128,
     pub changed: bool,
+    // 🆕 CAMPOS PARA FILTRAGEM INTELIGENTE
+    pub area: Option<String>,     // ENH, ESV, PJU, PMO, SCO, EDR
+    pub category: Option<String>, // PROC, FAULT, EVENT, ALARM
 }
 
 #[derive(Debug)]
@@ -122,7 +182,7 @@ pub struct SmartCache {
     last_cleanup: Arc<RwLock<std::time::Instant>>, // Última limpeza de memória
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ConnectedClient {
     pub id: u64,
     pub address: SocketAddr,
@@ -131,6 +191,12 @@ pub struct ConnectedClient {
     // ✅ MELHORIA: Namespacing por eclusa/PLC
     pub subscribed_plcs: Arc<RwLock<std::collections::HashSet<String>>>,
     pub client_type: ClientType,
+    // 🆕 FILTROS GRANULARES PARA SUBSCRIBE INTELIGENTE
+    pub subscribed_areas: Arc<RwLock<std::collections::HashSet<String>>>,     // ENH, ESV, PJU, PMO, SCO, EDR
+    pub subscribed_categories: Arc<RwLock<std::collections::HashSet<String>>>, // PROC, FAULT, EVENT, ALARM
+    pub include_all_faults: Arc<AtomicBool>, // Sempre receber TODAS as falhas (para painel de alarmes)
+    // 🆕 CANAL PARA ENVIO DE MENSAGENS FILTRADAS PARA ESTE CLIENTE
+    pub filtered_tx: Option<mpsc::Sender<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -280,10 +346,13 @@ impl SmartCache {
                     value: final_value,
                     data_type: if bit_index.is_some() { "BOOL".to_string() } else { variable.data_type.clone() },
                     timestamp_ns: now,
-                    collect_mode: tag.collect_mode.unwrap_or_default(),
+                    collect_mode: tag.collect_mode.clone().unwrap_or_default(),
                     interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
                     last_sent: 0,
                     changed: value_changed,
+                    // 🆕 GUARDAR ÁREA E CATEGORIA PARA FILTRAGEM
+                    area: tag.area.clone(),
+                    category: tag.category.clone(),
                 };
                 
                 self.tag_cache.insert(tag_key, cached);
@@ -312,6 +381,91 @@ impl SmartCache {
                 "change" => cached.changed && time_since_last >= interval_s as u128,
                 "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
                 _ => false,
+            };
+            
+            if should_send {
+                result.insert(cached.tag_name.clone(), cached.value.clone());
+                keys_to_update.push(entry.key().clone());
+            }
+        }
+        
+        for key in keys_to_update {
+            if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
+                cached_mut.last_sent = now;
+                cached_mut.changed = false;
+            }
+        }
+        
+        result
+    }
+    
+    // 🆕 OBTER TAGS FILTRADOS POR ÁREA E CATEGORIA (para SUBSCRIBE inteligente)
+    pub async fn get_tags_filtered(
+        &self, 
+        interval_s: u64,
+        plc_ips: &std::collections::HashSet<String>,
+        areas: &std::collections::HashSet<String>,
+        categories: &std::collections::HashSet<String>,
+        include_all_faults: bool
+    ) -> HashMap<String, String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        let mut result = HashMap::new();
+        let mut keys_to_update = Vec::new();
+        
+        let has_plc_filter = !plc_ips.is_empty();
+        let has_area_filter = !areas.is_empty();
+        let has_category_filter = !categories.is_empty();
+        
+        for entry in self.tag_cache.iter() {
+            let cached = entry.value();
+            
+            // 1. Filtrar por PLC
+            if has_plc_filter && !plc_ips.contains(&cached.plc_ip) {
+                continue;
+            }
+            
+            // 2. Filtrar por área (se configurado)
+            if has_area_filter {
+                let tag_area = cached.area.as_deref().unwrap_or("");
+                let area_match = areas.contains(tag_area);
+                
+                // Exceção: se include_all_faults e é uma falha, incluir independente da área
+                let is_fault = cached.category.as_deref() == Some("FAULT") || 
+                              cached.category.as_deref() == Some("ALARM");
+                
+                if !area_match && !(include_all_faults && is_fault) {
+                    continue;
+                }
+            }
+            
+            // 3. Filtrar por categoria (se configurado)
+            if has_category_filter {
+                let tag_category = cached.category.as_deref().unwrap_or("");
+                let category_match = categories.contains(tag_category);
+                
+                // Exceção: sempre incluir FAULT e ALARM se include_all_faults
+                let is_fault = tag_category == "FAULT" || tag_category == "ALARM";
+                
+                if !category_match && !(include_all_faults && is_fault) {
+                    continue;
+                }
+            }
+            
+            // 4. Verificar timing
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000
+            } else {
+                0
+            };
+            
+            let should_send = match cached.collect_mode.as_str() {
+                "change" => cached.changed && time_since_last >= interval_s as u128,
+                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                "on_change" => cached.changed && time_since_last >= interval_s as u128,
+                _ => time_since_last >= interval_s as u128, // Default: enviar baseado no intervalo
             };
             
             if should_send {
@@ -704,6 +858,12 @@ impl WebSocketServer {
                             // ✅ MELHORIA: Inicializar com comportamento global (backward compatible)
                             subscribed_plcs: Arc::new(RwLock::new(std::collections::HashSet::new())),
                             client_type: ClientType::Global, // Comportamento padrão mantido
+                            // 🆕 FILTROS GRANULARES - Inicialmente vazios (recebe tudo)
+                            subscribed_areas: Arc::new(RwLock::new(std::collections::HashSet::new())),
+                            subscribed_categories: Arc::new(RwLock::new(std::collections::HashSet::new())),
+                            include_all_faults: Arc::new(AtomicBool::new(false)),
+                            // 🆕 Canal será definido em handle_client
+                            filtered_tx: None,
                         };
 
                         connected_clients_clone.insert(client_id, client);
@@ -878,140 +1038,212 @@ impl WebSocketServer {
         
         let mut handles = Vec::new();
         
-        // BATCH 1: Intervalos rápidos (1-3s)
+        // BATCH 1: Intervalos rápidos (1-3s) - AGORA COM FILTRAGEM POR CLIENTE!
         let fast_batch_handle = tokio::spawn({
             let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
+            let connected_clients_clone = self.connected_clients.clone();
             
             async move {
                 let mut batch_timer = time::interval(Duration::from_millis(500));
-                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    for interval_s in 1..=3u64 {
-                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
-                        for (key, value) in tag_data {
-                            batch_accumulator.insert(key, serde_json::Value::String(value));
-                        }
-                    }
-                    
-                    if !batch_accumulator.is_empty() {
-                        let string_map: HashMap<String, String> = batch_accumulator.iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                            .collect();
+                    // 🆕 ITERAR SOBRE CADA CLIENTE CONECTADO E ENVIAR DADOS FILTRADOS
+                    for client_entry in connected_clients_clone.iter() {
+                        let client = client_entry.value();
                         
-                        match rmp_serde::to_vec(&string_map) {
-                            Ok(msgpack_bytes) => {
-                                let base64_data = base64_encode(&msgpack_bytes);
-                                let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(msgpack_message);
-                                }
-                                println!("📦 MSGPACK BATCH: {} tags → {} bytes", string_map.len(), msgpack_bytes.len());
+                        // Obter filtros do cliente
+                        let subscribed_plcs = client.subscribed_plcs.read().await;
+                        let subscribed_areas = client.subscribed_areas.read().await;
+                        let subscribed_categories = client.subscribed_categories.read().await;
+                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        
+                        let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
+                        
+                        // Coletar dados para este cliente
+                        let mut client_data: HashMap<String, String> = HashMap::new();
+                        
+                        if has_filters {
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            for interval_s in 1..=3u64 {
+                                let filtered_tags = smart_cache_clone.get_tags_filtered(
+                                    interval_s,
+                                    &subscribed_plcs,
+                                    &subscribed_areas,
+                                    &subscribed_categories,
+                                    include_all_faults
+                                ).await;
+                                client_data.extend(filtered_tags);
                             }
-                            Err(_) => {
-                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(message);
+                        } else {
+                            // 📡 CLIENTE SEM FILTROS - Recebe tudo (comportamento original)
+                            for interval_s in 1..=3u64 {
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                client_data.extend(tag_data);
+                            }
+                        }
+                        
+                        // Enviar dados filtrados para o cliente
+                        if !client_data.is_empty() {
+                            if let Some(ref tx) = client.filtered_tx {
+                                let sorted_map = sort_tags_naturally(client_data);
+                                
+                                match rmp_serde::to_vec(&sorted_map) {
+                                    Ok(msgpack_bytes) => {
+                                        let base64_data = base64_encode(&msgpack_bytes);
+                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                        let _ = tx.send(msgpack_message).await;
+                                    }
+                                    Err(_) => {
+                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                        let _ = tx.send(message).await;
+                                    }
                                 }
                             }
                         }
-                        batch_accumulator.clear();
                     }
                 }
             }
         });
         
-        // BATCH 2: Intervalos médios (4-7s)
+        // BATCH 2: Intervalos médios (4-7s) - AGORA COM FILTRAGEM POR CLIENTE!
         let medium_batch_handle = tokio::spawn({
-            let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
+            let connected_clients_clone = self.connected_clients.clone();
             
             async move {
                 let mut batch_timer = time::interval(Duration::from_secs(2));
-                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    for interval_s in 4..=7u64 {
-                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
-                        for (key, value) in tag_data {
-                            batch_accumulator.insert(key, serde_json::Value::String(value));
-                        }
-                    }
-                    
-                    if !batch_accumulator.is_empty() {
-                        let string_map: HashMap<String, String> = batch_accumulator.iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                            .collect();
+                    // 🆕 ITERAR SOBRE CADA CLIENTE CONECTADO E ENVIAR DADOS FILTRADOS
+                    for client_entry in connected_clients_clone.iter() {
+                        let client = client_entry.value();
                         
-                        match rmp_serde::to_vec(&string_map) {
-                            Ok(msgpack_bytes) => {
-                                let base64_data = base64_encode(&msgpack_bytes);
-                                let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(msgpack_message);
-                                }
+                        // Obter filtros do cliente
+                        let subscribed_plcs = client.subscribed_plcs.read().await;
+                        let subscribed_areas = client.subscribed_areas.read().await;
+                        let subscribed_categories = client.subscribed_categories.read().await;
+                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        
+                        let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
+                        
+                        // Coletar dados para este cliente
+                        let mut client_data: HashMap<String, String> = HashMap::new();
+                        
+                        if has_filters {
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            for interval_s in 4..=7u64 {
+                                let filtered_tags = smart_cache_clone.get_tags_filtered(
+                                    interval_s,
+                                    &subscribed_plcs,
+                                    &subscribed_areas,
+                                    &subscribed_categories,
+                                    include_all_faults
+                                ).await;
+                                client_data.extend(filtered_tags);
                             }
-                            Err(_) => {
-                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(message);
+                        } else {
+                            // 📡 CLIENTE SEM FILTROS - Recebe tudo
+                            for interval_s in 4..=7u64 {
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                client_data.extend(tag_data);
+                            }
+                        }
+                        
+                        // Enviar dados filtrados para o cliente
+                        if !client_data.is_empty() {
+                            if let Some(ref tx) = client.filtered_tx {
+                                let sorted_map = sort_tags_naturally(client_data);
+                                
+                                match rmp_serde::to_vec(&sorted_map) {
+                                    Ok(msgpack_bytes) => {
+                                        let base64_data = base64_encode(&msgpack_bytes);
+                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                        let _ = tx.send(msgpack_message).await;
+                                    }
+                                    Err(_) => {
+                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                        let _ = tx.send(message).await;
+                                    }
                                 }
                             }
                         }
-                        batch_accumulator.clear();
                     }
                 }
             }
         });
         
-        // BATCH 3: Intervalos lentos (8-10s)
+        // BATCH 3: Intervalos lentos (8-10s) - AGORA COM FILTRAGEM POR CLIENTE!
         let slow_batch_handle = tokio::spawn({
-            let broadcast_tx_clone = broadcast_tx.clone();
             let smart_cache_clone = smart_cache_broadcast.clone();
             let is_running_clone = is_running_broadcast.clone();
+            let connected_clients_clone = self.connected_clients.clone();
             
             async move {
                 let mut batch_timer = time::interval(Duration::from_secs(5));
-                let mut batch_accumulator: HashMap<String, serde_json::Value> = HashMap::new();
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
                     
-                    for interval_s in 8..=10u64 {
-                        let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
-                        for (key, value) in tag_data {
-                            batch_accumulator.insert(key, serde_json::Value::String(value));
-                        }
-                    }
-                    
-                    if !batch_accumulator.is_empty() {
-                        let string_map: HashMap<String, String> = batch_accumulator.iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                            .collect();
+                    // 🆕 ITERAR SOBRE CADA CLIENTE CONECTADO E ENVIAR DADOS FILTRADOS
+                    for client_entry in connected_clients_clone.iter() {
+                        let client = client_entry.value();
                         
-                        match rmp_serde::to_vec(&string_map) {
-                            Ok(msgpack_bytes) => {
-                                let base64_data = base64_encode(&msgpack_bytes);
-                                let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(msgpack_message);
-                                }
+                        // Obter filtros do cliente
+                        let subscribed_plcs = client.subscribed_plcs.read().await;
+                        let subscribed_areas = client.subscribed_areas.read().await;
+                        let subscribed_categories = client.subscribed_categories.read().await;
+                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        
+                        let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
+                        
+                        // Coletar dados para este cliente
+                        let mut client_data: HashMap<String, String> = HashMap::new();
+                        
+                        if has_filters {
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            for interval_s in 8..=10u64 {
+                                let filtered_tags = smart_cache_clone.get_tags_filtered(
+                                    interval_s,
+                                    &subscribed_plcs,
+                                    &subscribed_areas,
+                                    &subscribed_categories,
+                                    include_all_faults
+                                ).await;
+                                client_data.extend(filtered_tags);
                             }
-                            Err(_) => {
-                                let message = serde_json::to_string(&batch_accumulator).unwrap_or_else(|_| "{}".to_string());
-                                if broadcast_tx_clone.receiver_count() > 0 {
-                                    let _ = broadcast_tx_clone.send(message);
+                        } else {
+                            // 📡 CLIENTE SEM FILTROS - Recebe tudo
+                            for interval_s in 8..=10u64 {
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                client_data.extend(tag_data);
+                            }
+                        }
+                        
+                        // Enviar dados filtrados para o cliente
+                        if !client_data.is_empty() {
+                            if let Some(ref tx) = client.filtered_tx {
+                                let sorted_map = sort_tags_naturally(client_data);
+                                
+                                match rmp_serde::to_vec(&sorted_map) {
+                                    Ok(msgpack_bytes) => {
+                                        let base64_data = base64_encode(&msgpack_bytes);
+                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                        let _ = tx.send(msgpack_message).await;
+                                    }
+                                    Err(_) => {
+                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                        let _ = tx.send(message).await;
+                                    }
                                 }
                             }
                         }
-                        batch_accumulator.clear();
                     }
                 }
             }
@@ -1021,24 +1253,49 @@ impl WebSocketServer {
         handles.push(medium_batch_handle);
         handles.push(slow_batch_handle);
         
-        // TASK 3: BROADCASTING PARA TAGS EM MODO "CHANGE"
-        let broadcast_tx_change = broadcast_tx.clone();
+        // TASK 3: BROADCASTING PARA TAGS EM MODO "CHANGE" - AGORA COM FILTRAGEM POR CLIENTE!
         let smart_cache_change = smart_cache.clone();
         let is_running_change = is_running.clone();
+        let connected_clients_change = self.connected_clients.clone();
         
         let change_handle = tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_millis(100));
             while is_running_change.load(Ordering::SeqCst) {
                 interval.tick().await;
                 
-                let changed_tags = smart_cache_change.get_tags_for_broadcast(0).await;
-                
-                if !changed_tags.is_empty() {
-                    let message = serde_json::to_string(&changed_tags).unwrap_or_else(|_| "{}".to_string());
-                    if broadcast_tx_change.receiver_count() > 0 {
-                        let _ = broadcast_tx_change.send(message);
+                // 🆕 ITERAR SOBRE CADA CLIENTE CONECTADO E ENVIAR DADOS FILTRADOS
+                for client_entry in connected_clients_change.iter() {
+                    let client = client_entry.value();
+                    
+                    // Obter filtros do cliente
+                    let subscribed_plcs = client.subscribed_plcs.read().await;
+                    let subscribed_areas = client.subscribed_areas.read().await;
+                    let subscribed_categories = client.subscribed_categories.read().await;
+                    let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                    
+                    let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
+                    
+                    let changed_tags = if has_filters {
+                        // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered para changes
+                        smart_cache_change.get_tags_filtered(
+                            0,
+                            &subscribed_plcs,
+                            &subscribed_areas,
+                            &subscribed_categories,
+                            include_all_faults
+                        ).await
+                    } else {
+                        // 📡 CLIENTE SEM FILTROS - Recebe tudo
+                        smart_cache_change.get_tags_for_broadcast(0).await
+                    };
+                    
+                    if !changed_tags.is_empty() {
+                        if let Some(ref tx) = client.filtered_tx {
+                            let sorted_changed_tags = sort_tags_naturally(changed_tags);
+                            let message = serde_json::to_string(&sorted_changed_tags).unwrap_or_else(|_| "{}".to_string());
+                            let _ = tx.send(message).await;
+                        }
                     }
-                    println!("🔄 Change broadcast: {} tags alterados", changed_tags.len());
                 }
             }
         });
@@ -1113,6 +1370,12 @@ impl WebSocketServer {
         let ws_sender = Arc::new(TokioMutex::new(ws_sender));
 
         println!("🔌 WebSocket handshake completo para cliente {}", client_id);
+
+        // 🆕 ARMAZENAR O CANAL DE ENVIO NO CLIENTE PARA BROADCAST FILTRADO
+        if let Some(mut client) = connected_clients.get_mut(&client_id) {
+            client.filtered_tx = Some(response_tx.clone());
+            println!("📡 Canal de filtro configurado para cliente {}", client_id);
+        }
 
         // ✅ TASK DE ENVIO - Unificada para broadcast e respostas
         let ws_sender_clone = ws_sender.clone();
@@ -1230,6 +1493,84 @@ impl WebSocketServer {
                                         
                                         let _ = response_tx_clone.send(response.to_string()).await;
                                     }
+                                }
+                                
+                                // 🆕 SUBSCRIBE INTELIGENTE COM FILTROS DE ÁREA E CATEGORIA
+                                "SUBSCRIBE" => {
+                                    let plcs: Vec<String> = cmd.get("plc_ips")
+                                        .and_then(|p| p.as_array())
+                                        .map(|arr| arr.iter().filter_map(|ip| ip.as_str().map(|s| s.to_string())).collect())
+                                        .unwrap_or_default();
+                                    
+                                    let areas: Vec<String> = cmd.get("areas")
+                                        .and_then(|a| a.as_array())
+                                        .map(|arr| arr.iter().filter_map(|a| a.as_str().map(|s| s.to_string())).collect())
+                                        .unwrap_or_default();
+                                    
+                                    let categories: Vec<String> = cmd.get("categories")
+                                        .and_then(|c| c.as_array())
+                                        .map(|arr| arr.iter().filter_map(|c| c.as_str().map(|s| s.to_string())).collect())
+                                        .unwrap_or_default();
+                                    
+                                    let include_all_faults = cmd.get("include_all_faults")
+                                        .and_then(|f| f.as_bool())
+                                        .unwrap_or(false);
+                                    
+                                    println!("📡 Cliente {} SUBSCRIBE inteligente:", client_id);
+                                    println!("   PLCs: {:?}", plcs);
+                                    println!("   Áreas: {:?}", areas);
+                                    println!("   Categorias: {:?}", categories);
+                                    println!("   Include All Faults: {}", include_all_faults);
+                                    
+                                    // Atualizar subscrições do cliente
+                                    if let Some(mut client) = connected_clients_recv.get_mut(&client_id) {
+                                        // PLCs
+                                        {
+                                            let mut subscribed_plcs = client.subscribed_plcs.write().await;
+                                            subscribed_plcs.clear();
+                                            for plc_ip in &plcs {
+                                                subscribed_plcs.insert(plc_ip.clone());
+                                            }
+                                        }
+                                        
+                                        // Áreas (ENH, ESV, PJU, PMO, SCO, EDR)
+                                        {
+                                            let mut subscribed_areas = client.subscribed_areas.write().await;
+                                            subscribed_areas.clear();
+                                            for area in &areas {
+                                                subscribed_areas.insert(area.clone());
+                                            }
+                                        }
+                                        
+                                        // Categorias (PROC, FAULT, EVENT, ALARM)
+                                        {
+                                            let mut subscribed_categories = client.subscribed_categories.write().await;
+                                            subscribed_categories.clear();
+                                            for cat in &categories {
+                                                subscribed_categories.insert(cat.clone());
+                                            }
+                                        }
+                                        
+                                        // Flag para receber todas as falhas
+                                        client.include_all_faults.store(include_all_faults, Ordering::SeqCst);
+                                        
+                                        // Atualizar client_type
+                                        if !plcs.is_empty() {
+                                            client.client_type = ClientType::Filtered(plcs.clone());
+                                        }
+                                    }
+                                    
+                                    let response = serde_json::json!({
+                                        "type": "SUBSCRIBE_ACK",
+                                        "success": true,
+                                        "plcs": plcs,
+                                        "areas": areas,
+                                        "categories": categories,
+                                        "include_all_faults": include_all_faults,
+                                        "message": "Subscrição inteligente configurada com sucesso"
+                                    });
+                                    
+                                    let _ = response_tx_clone.send(response.to_string()).await;
                                 }
                                 
                                 _ => {
