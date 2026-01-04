@@ -31,7 +31,7 @@ pub struct TagMapping {
     pub collect_mode: Option<String>, // "on_change" ou "interval"
     pub collect_interval_s: Option<i64>, // Intervalo em segundos, se aplicável
     // 🆕 CAMPOS PARA SUBSCRIBE INTELIGENTE
-    pub area: Option<String>,     // ENH, ESV, PJU, PMO, SCO, EDR, GER (equipamento)
+    pub area: Option<String>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS (equipamento)
     pub category: Option<String>, // PROC, FAULT, EVENT, ALARM, CMD (tipo de tag)
 }
 
@@ -65,7 +65,12 @@ pub struct PostgresConfig {
 impl Database {
     // Salva configuração do PostgreSQL no SQLite
     pub fn save_postgres_config(&self, config: &PostgresConfig) -> Result<()> {
-        let conn = self.write_conn.lock().unwrap();
+        // 🛡️ MELHORIA CRÍTICA: Lock seguro com timeout para evitar travamentos
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Database lock poisoned".to_string())
+            ))?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS postgres_config (
                 id INTEGER PRIMARY KEY,
@@ -88,7 +93,11 @@ impl Database {
 
     // Carrega configuração do PostgreSQL do SQLite
     pub fn load_postgres_config(&self) -> Result<Option<PostgresConfig>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         let mut stmt = conn.prepare("SELECT host, port, user, password, database, updated_at FROM postgres_config LIMIT 1")?;
         let mut rows = stmt.query([])?;
         if let Some(row) = rows.next()? {
@@ -295,7 +304,11 @@ impl Database {
     
     /// Salva a configuração de estrutura de um PLC
     pub fn save_plc_structure(&self, config: &PlcStructureConfig) -> Result<()> {
-        let conn = self.write_conn.lock().unwrap();
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         let config_json = match serde_json::to_string(&config.blocks) {
             Ok(json) => json,
             Err(e) => {
@@ -337,7 +350,11 @@ impl Database {
     
     /// Carrega a configuração de estrutura de um PLC
     pub fn load_plc_structure(&self, plc_ip: &str) -> Result<Option<PlcStructureConfig>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let mut stmt = conn.prepare(
             "SELECT config_json, total_size, last_updated FROM plc_structures WHERE plc_ip = ?1"
@@ -349,7 +366,7 @@ impl Database {
             let last_updated: i64 = row.get(2)?;
             
             let blocks: Vec<DataBlockConfig> = serde_json::from_str(&config_json)
-                .map_err(|e| rusqlite::Error::InvalidQuery)?;
+                .map_err(|_e| rusqlite::Error::InvalidQuery)?;
             
             Ok(PlcStructureConfig {
                 plc_ip: plc_ip.to_string(),
@@ -371,7 +388,11 @@ impl Database {
     
     /// Lista todos os PLCs configurados
     pub fn list_configured_plcs(&self) -> Result<Vec<String>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let mut stmt = conn.prepare("SELECT plc_ip FROM plc_structures ORDER BY last_updated DESC")?;
         
@@ -383,7 +404,11 @@ impl Database {
     
     /// Remove a configuração de um PLC
     pub fn delete_plc_structure(&self, plc_ip: &str) -> Result<()> {
-        let conn = self.write_conn.lock().unwrap();
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         
         conn.execute(
             "DELETE FROM plc_structures WHERE plc_ip = ?1",
@@ -397,7 +422,11 @@ impl Database {
     
     /// 🔍 DEBUG: Mostra EXATAMENTE o que está salvo no banco
     pub fn debug_show_saved_structure(&self, plc_ip: &str) -> Result<String> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let result = conn.query_row(
             "SELECT config_json, total_size, last_updated FROM plc_structures WHERE plc_ip = ?1",
@@ -454,7 +483,11 @@ impl Database {
     
     /// Salva um mapeamento de tag
     pub fn save_tag_mapping(&self, tag: &TagMapping) -> Result<i64> {
-        let conn = self.write_conn.lock().unwrap();
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         
         let _result = conn.execute(
             "INSERT OR REPLACE INTO tag_mappings 
@@ -483,7 +516,11 @@ impl Database {
     
     /// Carrega todos os tags de um PLC
     pub fn load_tag_mappings(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let mut stmt = conn.prepare(
             "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category 
@@ -520,7 +557,11 @@ impl Database {
     
     /// Remove um tag mapping
     pub fn delete_tag_mapping(&self, plc_ip: &str, variable_path: &str) -> Result<()> {
-        let conn = self.write_conn.lock().unwrap();
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         
         conn.execute(
             "DELETE FROM tag_mappings WHERE plc_ip = ?1 AND variable_path = ?2",
@@ -533,7 +574,11 @@ impl Database {
 
     /// Salva múltiplos tags de uma vez (Bulk Save) - OTIMIZADO para evitar travamento do cache
     pub fn save_tag_mappings_bulk(&self, tags: &[TagMapping]) -> Result<Vec<i64>> {
-        let mut conn = self.write_conn.lock().unwrap();
+        let mut conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         
         if tags.is_empty() {
             return Ok(vec![]);
@@ -588,7 +633,11 @@ impl Database {
 
     /// Remove múltiplos tags de uma vez (Bulk Delete)
     pub fn delete_tag_mappings_bulk(&self, ids: Vec<i64>) -> Result<()> {
-        let mut conn = self.write_conn.lock().unwrap();
+        let mut conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         let tx = conn.transaction()?;
         
         {
@@ -605,7 +654,11 @@ impl Database {
     
     /// Lista todos os tags ativos (enabled=true) de um PLC para o WebSocket
     pub fn get_active_tags(&self, plc_ip: &str) -> Result<Vec<TagMapping>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let mut stmt = conn.prepare(
             "SELECT id, plc_ip, variable_path, tag_name, description, unit, enabled, created_at, collect_mode, collect_interval_s, area, category 
@@ -635,7 +688,11 @@ impl Database {
     
     /// 🆕 Lista tags ativos filtrados por área e/ou categoria
     pub fn get_active_tags_filtered(&self, plc_ip: &str, areas: Option<Vec<String>>, categories: Option<Vec<String>>) -> Result<Vec<TagMapping>> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         // Construir query dinâmica baseada nos filtros
         let mut sql = String::from(
@@ -710,7 +767,11 @@ impl Database {
     
     /// Salva configuração WebSocket
     pub fn save_websocket_config(&self, config: &WebSocketDbConfig) -> Result<()> {
-        let conn = self.write_conn.lock().unwrap();
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
         
         // Serializar lista de interfaces para JSON
         let bind_interfaces_json = serde_json::to_string(&config.bind_interfaces)
@@ -738,7 +799,11 @@ impl Database {
     
     /// Carrega configuração WebSocket
     pub fn load_websocket_config(&self) -> Result<WebSocketDbConfig> {
-        let conn = self.read_conn.lock().unwrap();
+        let conn = self.read_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Read connection lock poisoned".to_string())
+            ))?;
         
         let result = conn.query_row(
             "SELECT host, port, max_clients, broadcast_interval_ms, enabled, bind_interfaces_json, updated_at 

@@ -81,11 +81,19 @@ function App() {
 
           {/* Área de Conteúdo */}
           <main className="flex-1 overflow-y-auto p-8">
-            {/* Renderizar conteúdo baseado no menu ativo */}
-            {activeMenuItem === 'home' && <HomePage />}
-            {activeMenuItem === 'scl-analysis' && <SclAnalysisPage />}
-            {activeMenuItem === 'services' && <ServicesPage />}
-            {activeMenuItem === 'settings' && <TcpServerConfigCompact />}
+            {/* 🔥 RENDERIZAR TODAS PÁGINAS - SÓ MOSTRAR/OCULTAR (EVITA REMONTAGEM) */}
+            <div style={{ display: activeMenuItem === 'home' ? 'block' : 'none' }}>
+              <HomePage />
+            </div>
+            <div style={{ display: activeMenuItem === 'scl-analysis' ? 'block' : 'none' }}>
+              <SclAnalysisPage />
+            </div>
+            <div style={{ display: activeMenuItem === 'services' ? 'block' : 'none' }}>
+              <ServicesPage />
+            </div>
+            <div style={{ display: activeMenuItem === 'settings' ? 'block' : 'none' }}>
+              <TcpServerConfigCompact />
+            </div>
           </main>
         </div>
       </div>

@@ -40,19 +40,27 @@
 </head>
 <body>
     <div class="container">
-        <div class="stats">
-            <div class="stat"><div class="stat-val" id="msgCount">0</div><div class="stat-lbl">Mensagens</div></div>
-            <div class="stat"><div class="stat-val" id="tagCount">0</div><div class="stat-lbl">Tags</div></div>
-            <div class="stat"><div class="stat-val" id="plcCount">0</div><div class="stat-lbl">PLCs</div></div>
-            <div class="stat"><div class="stat-val" id="uptime">0s</div><div class="stat-lbl">Tempo</div></div>
+        <div class="card">
+            <h3>Status da Conexão WebSocket</h3>
+            <div class="stats">
+                <div class="stat"><div class="stat-val" id="msgCount">0</div><div class="stat-lbl">Mensagens Recebidas</div></div>
+                <div class="stat"><div class="stat-val" id="tagCount">0</div><div class="stat-lbl">Tags Processados</div></div>
+                <div class="stat"><div class="stat-val" id="plcCount">0</div><div class="stat-lbl">PLCs Conectados</div></div>
+                <div class="stat"><div class="stat-val" id="uptime">0s</div><div class="stat-lbl">Tempo de Conexão</div></div>
+            </div>
         </div>
 
         <div class="card">
-            <h3>Conexao</h3>
-            <div class="row">
-                <input type="text" id="url" value="ws://localhost:8765" placeholder="ws://localhost:8765">
-                <button class="btn-primary" id="btnConnect" onclick="connect()">Conectar</button>
-                <button class="btn-danger" id="btnDisconnect" onclick="disconnect()" disabled>Desconectar</button>
+            <h3>Configuração de Conexão</h3>
+            <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;">
+                <div>
+                    <label style="font-size:11px;color:#7C9599;display:block;margin-bottom:4px;">URL do WebSocket Server</label>
+                    <input type="text" id="url" value="ws://localhost:8765" placeholder="ws://localhost:8765" style="width:100%;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-primary" id="btnConnect" onclick="connect()">Conectar</button>
+                    <button class="btn-danger" id="btnDisconnect" onclick="disconnect()" disabled>Desconectar</button>
+                </div>
                 <span class="status off" id="status">Desconectado</span>
             </div>
         </div>
@@ -60,46 +68,72 @@
         <div class="card" id="filtersCard" style="display:none;">
             <h3>Filtros de Subscricao</h3>
             
-            <div class="section-title">PLCs</div>
-            <div class="chips" id="plcChips">Carregando...</div>
-            
-            <div class="section-title">Areas</div>
-            <div class="chips" id="areaChips">
-                <label class="chip active"><input type="checkbox" value="ENH" checked>ENH</label>
-                <label class="chip active"><input type="checkbox" value="ESV" checked>ESV</label>
-                <label class="chip active"><input type="checkbox" value="PJU" checked>PJU</label>
-                <label class="chip active"><input type="checkbox" value="PMO" checked>PMO</label>
-                <label class="chip active"><input type="checkbox" value="SCO" checked>SCO</label>
-                <label class="chip active"><input type="checkbox" value="EDR" checked>EDR</label>
-                <label class="chip active"><input type="checkbox" value="GER" checked>GER</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <!-- Coluna Esquerda: PLCs e Áreas -->
+                <div>
+                    <div class="section-title">PLCs Disponíveis</div>
+                    <div class="chips" id="plcChips">Carregando...</div>
+                    
+                    <div class="section-title" style="margin-top: 12px;">Áreas da Eclusa</div>
+                    <div class="chips" id="areaChips">
+                        <label class="chip active"><input type="checkbox" value="ENCH" checked>ENCH</label>
+                        <label class="chip active"><input type="checkbox" value="ESVZ" checked>ESVZ</label>
+                        <label class="chip active"><input type="checkbox" value="JUS" checked>JUS</label>
+                        <label class="chip active"><input type="checkbox" value="MONT" checked>MONT</label>
+                        <label class="chip active"><input type="checkbox" value="ESGT" checked>ESGT</label>
+                        <label class="chip active"><input type="checkbox" value="ECLUS" checked>ECLUS</label>
+                    </div>
+                </div>
+                
+                <!-- Coluna Direita: Categorias, Tipos e Configurações -->
+                <div>
+                    <div class="section-title">Categorias de Tags</div>
+                    <div class="chips" id="catChips">
+                        <label class="chip active"><input type="checkbox" value="PROC" checked>PROC</label>
+                        <label class="chip active"><input type="checkbox" value="FAULT" checked>FAULT</label>
+                        <label class="chip active"><input type="checkbox" value="EVENT" checked>EVENT</label>
+                        <label class="chip active"><input type="checkbox" value="ALARM" checked>ALARM</label>
+                        <label class="chip active"><input type="checkbox" value="CMD" checked>CMD</label>
+                    </div>
+                    
+                    <div class="section-title" style="margin-top: 12px;">Tipos de Dados PLC</div>
+                    <div class="chips" id="typeChips">
+                        <label class="chip active"><input type="checkbox" value="Word" checked>Word</label>
+                        <label class="chip active"><input type="checkbox" value="Int" checked>Int</label>
+                        <label class="chip active"><input type="checkbox" value="Real" checked>Real</label>
+                        <label class="chip active"><input type="checkbox" value="Bool" checked>Bool</label>
+                        <label class="chip active"><input type="checkbox" value="DWord" checked>DWord</label>
+                        <label class="chip active"><input type="checkbox" value="DInt" checked>DInt</label>
+                        <label class="chip active"><input type="checkbox" value="LReal" checked>LReal</label>
+                    </div>
+                    
+                    <div class="section-title" style="margin-top: 12px;">Configurações Especiais</div>
+                    <div>
+                        <label style="font-size:12px;display:flex;align-items:center;gap:6px;padding:6px 0;">
+                            <input type="checkbox" id="allFaults" checked> Sempre receber todas as FAULT (crítico)
+                        </label>
+                    </div>
+                </div>
             </div>
             
-            <div class="section-title">Categorias</div>
-            <div class="chips" id="catChips">
-                <label class="chip active"><input type="checkbox" value="PROC" checked>PROC</label>
-                <label class="chip active"><input type="checkbox" value="FAULT" checked>FAULT</label>
-                <label class="chip active"><input type="checkbox" value="EVENT" checked>EVENT</label>
-                <label class="chip active"><input type="checkbox" value="ALARM" checked>ALARM</label>
-                <label class="chip active"><input type="checkbox" value="CMD" checked>CMD</label>
-            </div>
-            
-            <div class="row" style="margin-top:12px;">
+            <!-- Botões de Ação -->
+            <div class="row" style="margin-top:8px;padding-top:12px;border-top:1px solid #BECACC;">
                 <button class="btn-success" onclick="subscribe()">Aplicar Filtros</button>
-                <button class="btn-secondary" onclick="selectAll()">Todos</button>
-                <button class="btn-secondary" onclick="selectNone()">Nenhum</button>
-                <label style="margin-left:auto;font-size:12px;display:flex;align-items:center;gap:4px;">
-                    <input type="checkbox" id="allFaults" checked> Sempre receber FAULT
-                </label>
+                <button class="btn-secondary" onclick="selectAll()">Selecionar Todos</button>
+                <button class="btn-secondary" onclick="selectNone()">Limpar Todos</button>
+                <div id="subStatus" style="margin-left:auto;font-size:12px;color:#7C9599;">Clique em "Aplicar Filtros"</div>
             </div>
-            <div id="subStatus" style="margin-top:8px;font-size:12px;color:#7C9599;">Clique em Aplicar Filtros</div>
         </div>
 
         <div class="card">
             <div class="row" style="margin-bottom:8px;">
-                <h3 style="margin:0;">Dados Recebidos</h3>
-                <button class="btn-secondary" onclick="clearMsgs()" style="margin-left:auto;padding:4px 8px;font-size:11px;">Limpar</button>
+                <h3 style="margin:0;">Monitor de Dados em Tempo Real</h3>
+                <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                    <span style="font-size:11px;color:#7C9599;">Últimas 30 mensagens</span>
+                    <button class="btn-secondary" onclick="clearMsgs()" style="padding:4px 8px;font-size:11px;">Limpar Histórico</button>
+                </div>
             </div>
-            <div class="messages" id="msgs"><div class="msg">Aguardando conexao...</div></div>
+            <div class="messages" id="msgs"><div class="msg">Aguardando conexão...</div></div>
         </div>
     </div>
 
@@ -186,6 +220,7 @@
                     if (json.plcs?.length) parts.push(json.plcs.length + ' PLCs');
                     if (json.areas?.length) parts.push('Areas: ' + json.areas.join(','));
                     if (json.categories?.length) parts.push('Cat: ' + json.categories.join(','));
+                    if (json.data_types?.length) parts.push('Tipos: ' + json.data_types.join(','));
                     document.getElementById('subStatus').innerHTML = '<b style="color:#16a34a">OK:</b> ' + parts.join(' | ');
                     addMsg('[SISTEMA] Filtros aplicados!', 'sys');
                     return;
@@ -252,6 +287,7 @@
             const selPlcs = Array.from(document.querySelectorAll('#plcChips input:checked')).map(c => c.value);
             const selAreas = Array.from(document.querySelectorAll('#areaChips input:checked')).map(c => c.value);
             const selCats = Array.from(document.querySelectorAll('#catChips input:checked')).map(c => c.value);
+            const selTypes = Array.from(document.querySelectorAll('#typeChips input:checked')).map(c => c.value);
             const allFaults = document.getElementById('allFaults').checked;
             
             const msg = {
@@ -260,6 +296,7 @@
                 plc_ips: selPlcs,
                 areas: selAreas,
                 categories: selCats,
+                data_types: selTypes,
                 include_all_faults: allFaults
             };
             
@@ -270,14 +307,14 @@
         }
 
         function selectAll() {
-            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip').forEach(c => {
+            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip, #typeChips .chip').forEach(c => {
                 c.classList.add('active');
                 c.querySelector('input').checked = true;
             });
         }
 
         function selectNone() {
-            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip').forEach(c => {
+            document.querySelectorAll('#plcChips .chip, #areaChips .chip, #catChips .chip, #typeChips .chip').forEach(c => {
                 c.classList.remove('active');
                 c.querySelector('input').checked = false;
             });

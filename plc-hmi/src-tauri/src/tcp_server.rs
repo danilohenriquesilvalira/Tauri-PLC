@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{RwLock, Mutex, mpsc};
 use dashmap::DashMap;
@@ -714,7 +714,7 @@ async fn handle_client_connection(
     is_running: Arc<AtomicBool>,
     bytes_received: Arc<RwLock<HashMap<String, u64>>>,
     latest_data: Arc<DashMap<String, PlcDataPacket>>,
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
     database: Option<Arc<Database>>,
     buffer_pool: Arc<BufferPool>,
     plc_configs_cache: Arc<DashMap<String, PlcStructureConfig>>,

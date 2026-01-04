@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { Tag, X, Plus, Trash2, Eye, CheckCircle, Power, Pencil, Filter, Download, Upload, FileSpreadsheet, AlertCircle, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Tag, X, Plus, Trash2, Eye, CheckCircle, Power, Pencil, Download, Upload, FileSpreadsheet, AlertCircle, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 // ============================================================================
 // INTERFACES
 // ============================================================================
 
 // 🆕 ÁREAS DOS EQUIPAMENTOS (para SUBSCRIBE inteligente)
-type AreaType = 'ENH' | 'ESV' | 'PJU' | 'PMO' | 'SCO' | 'EDR' | 'GER' | '';
+type AreaType = 'ENCH' | 'ESVZ' | 'JUS' | 'MONT' | 'ESGT' | 'ECLUS' | '';
 
 const AREAS: { key: AreaType; label: string; description: string }[] = [
   { key: '', label: 'Selecione...', description: '' },
-  { key: 'ENH', label: 'ENH - Enchimento', description: 'Sistema de enchimento da câmara' },
-  { key: 'ESV', label: 'ESV - Esvaziamento', description: 'Sistema de esvaziamento da câmara' },
-  { key: 'PJU', label: 'PJU - Porta Jusante', description: 'Porta do lado jusante' },
-  { key: 'PMO', label: 'PMO - Porta Montante', description: 'Porta do lado montante' },
-  { key: 'SCO', label: 'SCO - Sala de Comando', description: 'Sala de comando e controle' },
-  { key: 'EDR', label: 'EDR - Esgoto/Drenagem', description: 'Sistema de esgoto e drenagem' },
-  { key: 'GER', label: 'GER - Geral', description: 'Variáveis gerais do sistema' },
+  { key: 'ENCH', label: 'ENCH - Enchimento', description: 'Sistema de enchimento da câmara' },
+  { key: 'ESVZ', label: 'ESVZ - Esvaziamento', description: 'Sistema de esvaziamento da câmara' },
+  { key: 'JUS', label: 'JUS - Jusante', description: 'Sistema do lado jusante' },
+  { key: 'MONT', label: 'MONT - Montante', description: 'Sistema do lado montante' },
+  { key: 'ESGT', label: 'ESGT - Esgoto/Drenagem', description: 'Sistema de esgoto e drenagem' },
+  { key: 'ECLUS', label: 'ECLUS - Geral', description: 'Variáveis gerais da eclusa' },
 ];
 
 // 🆕 CATEGORIAS DOS TAGS (para SUBSCRIBE inteligente)
@@ -151,7 +150,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
   
   const extractAreaAndCategory = (tagName: string): { area: AreaType; category: CategoryType } => {
     // Formato esperado: {ÁREA}_{CATEGORIA}_{descrição} ou {ÁREA}_{descrição}
-    // Exemplos: ENH_PROC_nivel_agua, ENH_FAULT_bomba, PJU_motor_ligado
+    // Exemplos: ENCH_PROC_nivel_agua, ENCH_FAULT_bomba, JUS_motor_ligado
     
     const parts = tagName.toUpperCase().split('_');
     let area: AreaType = '';
@@ -160,7 +159,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     if (parts.length >= 1) {
       // Verificar se primeiro parte é uma área válida
       const possibleArea = parts[0] as AreaType;
-      if (['ENH', 'ESV', 'PJU', 'PMO', 'SCO', 'EDR', 'GER'].includes(possibleArea)) {
+      if (['ENCH', 'ESVZ', 'JUS', 'MONT', 'ESGT', 'ECLUS'].includes(possibleArea)) {
         area = possibleArea;
       }
     }
@@ -261,7 +260,9 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
         if (type.key === 'Bool') {
           cache[type.key] = unmappedVariables.filter(v => v.includes('.'));
         } else {
-          cache[type.key] = unmappedVariables.filter(v => v.startsWith(type.key + '['));
+          // 🔧 REGEX para pegar tipos com sufixos numéricos: Real, Real2, Real3, Real4, Real5, etc.
+          const typeRegex = new RegExp(`^${type.key}\\d*\\[`);
+          cache[type.key] = unmappedVariables.filter(v => typeRegex.test(v));
         }
       }
     });
@@ -286,6 +287,41 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
   const currentTypeCount = useMemo(() => {
     return getVariablesByType(exportType).length;
   }, [exportType, variablesByType]);
+
+  // 🆕 FUNÇÃO AUXILIAR: Ordenação natural para variable_path
+  const naturalSort = useCallback((a: TagMapping, b: TagMapping) => {
+    const pathA = a.variable_path;
+    const pathB = b.variable_path;
+    
+    // Extrair partes: Word[5].12 -> ["Word", 5, 12]
+    const parseVariablePath = (path: string) => {
+      const match = path.match(/^(Word|Int|Real|Bool|DWord|DInt|LReal)\[?(\d+)\]?\.?(\d+)?$/);
+      if (match) {
+        return {
+          type: match[1],
+          index: parseInt(match[2]) || 0,
+          bit: parseInt(match[3]) || 0
+        };
+      }
+      return { type: path, index: 0, bit: 0 };
+    };
+
+    const partA = parseVariablePath(pathA);
+    const partB = parseVariablePath(pathB);
+
+    // 1. Comparar tipo
+    if (partA.type !== partB.type) {
+      return partA.type.localeCompare(partB.type);
+    }
+
+    // 2. Comparar índice (Word[0] vs Word[1])
+    if (partA.index !== partB.index) {
+      return partA.index - partB.index;
+    }
+
+    // 3. Comparar bit (.0 vs .1)
+    return partA.bit - partB.bit;
+  }, []);
 
   const filteredTags = tags.filter(tag => {
     // Filtro por tipo
@@ -321,7 +357,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     }
     
     return true;
-  });
+  }).sort(naturalSort); // 🎯 APLICAR ORDENAÇÃO NATURAL NA TABELA TAMBÉM!
 
   // Paginação
   const totalPages = Math.ceil(filteredTags.length / tagsPerPage);
@@ -538,6 +574,60 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     }
   };
 
+
+  // 🆕 EXPORTAR CSV DOS TAGS ATIVOS
+  const handleExportActiveTags = async () => {
+    try {
+      if (tags.length === 0) {
+        setError('Nenhum tag ativo para exportar');
+        return;
+      }
+
+      const SEP = ';';
+      const headers = ['variable_path', 'tag_name', 'description', 'unit', 'collect_mode', 'collect_interval_s', 'enabled', 'area', 'category'];
+      const rows: string[] = [];
+
+      // 🎯 ORDENAÇÃO NATURAL CORRETA (igual à interface)
+      const tagsToExport = [...tags].sort(naturalSort);
+      
+      tagsToExport.forEach((tag: TagMapping) => {
+        rows.push([
+          tag.variable_path,
+          tag.tag_name,
+          tag.description || '',
+          tag.unit || '',
+          tag.collect_mode || 'on_change',
+          String(tag.collect_interval_s || 1),
+          tag.enabled ? 'true' : 'false',
+          tag.area || '',
+          tag.category || ''
+        ].join(SEP));
+      });
+
+      const csvContent = `sep=${SEP}\r\n` + [headers.join(SEP), ...rows].join('\r\n');
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const plcLabel = plcIp.replace(/\./g, '_');
+      
+      const filePath = await save({
+        defaultPath: `tags_ativos_${plcLabel}_${timestamp}.csv`,
+        filters: [{ name: 'CSV (Excel)', extensions: ['csv'] }],
+        title: 'Exportar Tags Ativos'
+      });
+
+      if (filePath) {
+        await invoke('write_file', { path: filePath, content: csvContent });
+        console.log('✅ CSV de tags ativos exportado:', rows.length, 'linhas');
+      }
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes('os error 32')) {
+        setError('Arquivo aberto no Excel. Feche e tente novamente.');
+      } else {
+        setError(`Erro ao exportar: ${msg}`);
+      }
+    }
+  };
+
   // Editar tag importado
   const updateImportedTag = (index: number, field: keyof ImportedTag, value: any) => {
     setImportedTags(prev => {
@@ -621,21 +711,44 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
 
   const handleDeleteTag = async (variablePath: string) => {
     try {
+      // 🚀 OTIMIZAÇÃO: Remover do estado local IMEDIATAMENTE (sem piscar)
+      setTags(prevTags => 
+        prevTags.filter(tag => tag.variable_path !== variablePath)
+      );
+      
+      // 💾 Deletar no backend em background (sem bloquear UI)
       await invoke('delete_tag_mapping', { plcIp, variablePath });
-      await loadData();
       window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
+      
+      // 📡 Recarregar dados silenciosamente (atualizar availableVariables)
+      loadData().catch(console.error);
+      
     } catch (err) {
       setError(String(err));
+      // 🔄 Se deu erro, recarregar para sincronizar
+      await loadData();
     }
   };
 
   const toggleTagEnabled = async (tag: TagMapping) => {
     try {
-      await invoke('save_tag_mapping', { tag: { ...tag, enabled: !tag.enabled } });
-      await loadData();
+      // 🚀 OTIMIZAÇÃO: Atualizar estado local IMEDIATAMENTE (sem piscar)
+      const updatedTag = { ...tag, enabled: !tag.enabled };
+      setTags(prevTags => 
+        prevTags.map(t => t.id === tag.id ? updatedTag : t)
+      );
+      
+      // 💾 Salvar no backend em background (sem bloquear UI)
+      await invoke('save_tag_mapping', { tag: updatedTag });
       window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
+      
+      // 📡 Recarregar dados silenciosamente (caso algo mudou)
+      loadData().catch(console.error);
+      
     } catch (err) {
       setError(String(err));
+      // 🔄 Se deu erro, recarregar para sincronizar
+      await loadData();
     }
   };
 
@@ -646,13 +759,29 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     }
     try {
       setSaving(true);
-      await invoke('save_tag_mapping', { tag: editTagData });
-      await loadData();
+      
+      // 🚀 OTIMIZAÇÃO: Atualizar estado local IMEDIATAMENTE (sem piscar)
+      setTags(prevTags => 
+        prevTags.map(tag => 
+          tag.id === editTagData.id ? { ...tag, ...editTagData } : tag
+        )
+      );
+      
+      // ✅ Sair do modo edição IMEDIATAMENTE (sem piscar)
       setEditingTagId(null);
       setEditTagData(null);
+      
+      // 💾 Salvar no backend em background (sem bloquear UI)
+      await invoke('save_tag_mapping', { tag: editTagData });
       window.dispatchEvent(new CustomEvent('plc-tags-updated', { detail: { plcIp } }));
+      
+      // 📡 Recarregar dados silenciosamente (caso algo mudou)
+      loadData().catch(console.error);
+      
     } catch (err) {
       setError(String(err));
+      // 🔄 Se deu erro, recarregar para sincronizar
+      await loadData();
     } finally {
       setSaving(false);
     }
@@ -788,41 +917,54 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
             </div>
           </div>
 
-          {/* Navegação por Abas */}
-          <div className="flex items-center justify-between mb-3 pb-3 border-b border-[#BECACC]">
-            <div className="flex w-full bg-[#F1F4F4] rounded-lg p-1 gap-1">
+          {/* 📱 Navegação Organizada */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Gerenciar Tags</h3>
+              {importedTags.length > 0 && (
+                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">
+                  {importedTags.length} importados
+                </span>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
               {[
-                { id: 'tags', label: 'Tags Registrados', icon: Tag },
-                { id: 'csv', label: 'Exportar/Importar CSV', icon: FileSpreadsheet },
-                { id: 'individual', label: 'Adicionar Individual', icon: Plus },
+                { id: 'tags', label: 'Tags Ativos', icon: Tag },
+                { id: 'csv', label: 'Import/Export CSV', icon: FileSpreadsheet },
+                { id: 'individual', label: 'Adicionar Tag', icon: Plus },
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setCurrentTab(tab.id as any)}
-                  className={`flex-1 px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
                     currentTab === tab.id
-                      ? 'bg-[#212E3E] text-white shadow-sm'
-                      : 'text-[#7C9599] hover:text-[#212E3E] hover:bg-white/50'
+                      ? 'bg-[#212E3E] text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
                   <tab.icon size={16} />
                   {tab.label}
                 </button>
               ))}
+              
+              {importedTags.length > 0 && (
+                <button
+                  onClick={() => setCurrentTab('import')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
+                    currentTab === 'import'
+                      ? 'bg-[#212E3E] text-white shadow-md'
+                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200'
+                  }`}
+                >
+                  <Eye size={16} />
+                  Revisar
+                  <span className="ml-1 px-2 py-0.5 bg-white/30 rounded-full text-xs">
+                    {importedTags.filter(t => t.isValid).length}/{importedTags.length}
+                  </span>
+                </button>
+              )}
             </div>
-            {importedTags.length > 0 && (
-              <button
-                onClick={() => setCurrentTab('import')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ml-2 ${
-                  currentTab === 'import'
-                    ? 'bg-[#212E3E] text-white shadow-sm'
-                    : 'bg-green-500/20 text-green-700 hover:bg-green-500/30'
-                }`}
-              >
-                <Upload size={16} />
-                Revisar ({importedTags.filter(t => t.isValid).length}/{importedTags.length})
-              </button>
-            )}
           </div>
 
           {/* ================================================================== */}
@@ -831,144 +973,122 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
           {currentTab === 'tags' && (
             <div className="space-y-3">
               {/* Filtros e Ações */}
-              <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC] flex items-center justify-between gap-3 min-h-[48px]">
-                <div className="flex items-center gap-2">
-                  {/* Campo de Busca */}
+              <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC]">
+                <div className="flex items-center justify-between gap-3">
+                  {/* Lado Esquerdo: Filtros */}
                   <div className="flex items-center gap-2">
-                    <Search size={16} className="text-[#7C9599]" />
-                    <input
-                      type="text"
-                      placeholder="Buscar tags..."
-                      value={searchText}
-                      onChange={(e) => {
-                        setSearchText(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-40 px-2 py-1 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:border-[#212E3E] transition-colors"
-                    />
-                    {searchText && (
-                      <button
-                        onClick={() => {
-                          setSearchText('');
+                    {/* Campo de Busca */}
+                    <div className="flex items-center gap-1">
+                      <Search size={14} className="text-[#7C9599]" />
+                      <input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={searchText}
+                        onChange={(e) => {
+                          setSearchText(e.target.value);
                           setCurrentPage(1);
                         }}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="w-28 px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-[#212E3E]"
+                      />
+                      {searchText && (
+                        <button
+                          onClick={() => {
+                            setSearchText('');
+                            setCurrentPage(1);
+                          }}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filtro por Tipo */}
+                    <select
+                      value={filterType}
+                      onChange={e => { setFilterType(e.target.value as DataType); setCurrentPage(1); }}
+                      className="px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-[#212E3E]"
+                    >
+                      <option value="ALL">Tipo: Todos</option>
+                      <option value="Bool">Bool</option>
+                      <option value="Word">Word</option>
+                      <option value="Int">Int</option>
+                      <option value="Real">Real</option>
+                    </select>
+
+                    {/* Filtro Status */}
+                    <select
+                      value={statusFilter}
+                      onChange={e => { setStatusFilter(e.target.value as 'all' | 'active' | 'inactive'); setCurrentPage(1); }}
+                      className="px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-[#212E3E]"
+                    >
+                      <option value="all">Status: Todos</option>
+                      <option value="active">Ativos</option>
+                      <option value="inactive">Inativos</option>
+                    </select>
+                    
+                    {/* Filtro por Área */}
+                    <select
+                      value={filterArea}
+                      onChange={(e) => { setFilterArea(e.target.value as AreaType | 'ALL'); setCurrentPage(1); }}
+                      className="px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-[#212E3E]"
+                    >
+                      <option value="ALL">Área: Todas</option>
+                      {AREAS.filter(a => a.key !== '').map(a => (
+                        <option key={a.key} value={a.key}>{a.key}</option>
+                      ))}
+                    </select>
+                    
+                    {/* Filtro por Categoria */}
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => { setFilterCategory(e.target.value as CategoryType | 'ALL'); setCurrentPage(1); }}
+                      className="px-2 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-[#212E3E]"
+                    >
+                      <option value="ALL">Cat: Todas</option>
+                      {CATEGORIES.filter(c => c.key !== '').map(c => (
+                        <option key={c.key} value={c.key}>{c.key}</option>
+                      ))}
+                    </select>
+
+                    {/* Indicador de resultados */}
+                    {(searchText || statusFilter !== 'all' || filterType !== 'ALL' || filterArea !== 'ALL' || filterCategory !== 'ALL') && (
+                      <span className="text-xs text-[#7C9599] bg-white px-2 py-1 rounded border">
+                        {filteredTags.length} encontrados
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Lado Direito: Ações */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={handleExportActiveTags}
+                      disabled={tags.length === 0}
+                      className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 flex items-center gap-1 whitespace-nowrap"
+                      title="Exportar todos os tags ativos para CSV"
+                    >
+                      <Download size={12} />
+                      Export Ativos
+                    </button>
+                    <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={filteredTags.length > 0 && selectedTags.size === filteredTags.length}
+                        onChange={handleSelectAll}
+                        className="w-3 h-3 rounded border-gray-300 text-[#212E3E] focus:ring-[#212E3E]"
+                      />
+                      Selecionar todos
+                    </label>
+                    {selectedTags.size > 0 && (
+                      <button
+                        onClick={handleBulkDelete}
+                        className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center gap-1 whitespace-nowrap"
                       >
-                        <X size={14} />
+                        <Trash2 size={12} />
+                        Excluir ({selectedTags.size})
                       </button>
                     )}
                   </div>
-
-                  {/* Filtros por Tipo */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-[#7C9599]">
-                      <Filter size={16} />
-                      Filtrar:
-                    </div>
-                    <div className="flex gap-1">
-                      {DATA_TYPES.slice(0, 4).map(type => (
-                        <button
-                          key={type.key}
-                          onClick={() => { setFilterType(type.key); setCurrentPage(1); }}
-                          className={`px-2 py-1 rounded text-xs font-bold transition-all ${
-                            filterType === type.key 
-                              ? 'bg-[#212E3E] text-white' 
-                              : 'bg-white text-gray-600 border border-gray-300 hover:border-[#212E3E]'
-                          }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Filtro Status */}
-                  <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={statusFilter === 'active' || statusFilter === 'all'}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            if (statusFilter === 'inactive') setStatusFilter('all');
-                            else setStatusFilter('active');
-                          } else {
-                            setStatusFilter('inactive');
-                          }
-                          setCurrentPage(1);
-                        }}
-                        className="w-3 h-3 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      />
-                      Ativos
-                    </label>
-                    <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={statusFilter === 'inactive' || statusFilter === 'all'}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            if (statusFilter === 'active') setStatusFilter('all');
-                            else setStatusFilter('inactive');
-                          } else {
-                            setStatusFilter('active');
-                          }
-                          setCurrentPage(1);
-                        }}
-                        className="w-3 h-3 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                      />
-                      Inativos
-                    </label>
-                  </div>
-                  
-                  {/* 🆕 Filtro por Área */}
-                  <select
-                    value={filterArea}
-                    onChange={(e) => { setFilterArea(e.target.value as AreaType | 'ALL'); setCurrentPage(1); }}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white focus:outline-none focus:border-[#212E3E]"
-                  >
-                    <option value="ALL">Área: Todas</option>
-                    {AREAS.filter(a => a.key !== '').map(a => (
-                      <option key={a.key} value={a.key}>{a.key}</option>
-                    ))}
-                  </select>
-                  
-                  {/* 🆕 Filtro por Categoria */}
-                  <select
-                    value={filterCategory}
-                    onChange={(e) => { setFilterCategory(e.target.value as CategoryType | 'ALL'); setCurrentPage(1); }}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white focus:outline-none focus:border-[#212E3E]"
-                  >
-                    <option value="ALL">Cat: Todas</option>
-                    {CATEGORIES.filter(c => c.key !== '').map(c => (
-                      <option key={c.key} value={c.key}>{c.key}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Indicador compacto */}
-                  {(searchText || statusFilter !== 'all' || filterType !== 'ALL' || filterArea !== 'ALL' || filterCategory !== 'ALL') && (
-                    <span className="text-xs text-[#7C9599] whitespace-nowrap">{filteredTags.length} encontrados</span>
-                  )}
-                  
-                  <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={filteredTags.length > 0 && selectedTags.size === filteredTags.length}
-                      onChange={handleSelectAll}
-                      className="w-3 h-3 rounded border-gray-300 text-[#212E3E] focus:ring-[#212E3E]"
-                    />
-                    Selecionar todos
-                  </label>
-                  {selectedTags.size > 0 && (
-                    <button
-                      onClick={handleBulkDelete}
-                      className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center gap-1 whitespace-nowrap"
-                    >
-                      <Trash2 size={12} />
-                      Excluir ({selectedTags.size})
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -984,14 +1104,14 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   <table className="w-full">
                     <thead className="bg-[#F1F4F4]">
                       <tr>
-                        <th className="w-8 px-2 py-2"></th>
-                        <th className="w-28 px-2 py-2 text-left text-xs font-bold text-[#7C9599] uppercase">Nome</th>
-                        <th className="w-28 px-2 py-2 text-left text-xs font-bold text-[#7C9599] uppercase">Variável</th>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-[#7C9599] uppercase">Descrição</th>
-                        <th className="w-12 px-1 py-2 text-center text-xs font-bold text-[#7C9599] uppercase">Área</th>
-                        <th className="w-14 px-1 py-2 text-center text-xs font-bold text-[#7C9599] uppercase">Cat.</th>
-                        <th className="w-16 px-2 py-2 text-center text-xs font-bold text-[#7C9599] uppercase">Status</th>
-                        <th className="w-24 px-2 py-2 text-right text-xs font-bold text-[#7C9599] uppercase">Ações</th>
+                        <th className="w-8 px-2 py-1.5"></th>
+                        <th className="w-28 px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Nome</th>
+                        <th className="w-28 px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Variável</th>
+                        <th className="px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Descrição</th>
+                        <th className="w-12 px-1 py-1.5 text-center text-xs font-bold text-[#7C9599] uppercase">Área</th>
+                        <th className="w-14 px-1 py-1.5 text-center text-xs font-bold text-[#7C9599] uppercase">Cat.</th>
+                        <th className="w-16 px-2 py-1.5 text-center text-xs font-bold text-[#7C9599] uppercase">Status</th>
+                        <th className="w-24 px-2 py-1.5 text-right text-xs font-bold text-[#7C9599] uppercase">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -999,7 +1119,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                         <tr key={tag.id} className={`border-t border-gray-100 hover:bg-[#F1F4F4] transition-colors ${
                           selectedTags.has(tag.id!) ? 'bg-blue-50' : ''
                         }`}>
-                          <td className="px-2 py-2">
+                          <td className="px-2 py-1.5">
                             <input
                               type="checkbox"
                               checked={selectedTags.has(tag.id!)}
@@ -1007,7 +1127,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                               className="w-3 h-3 rounded border-gray-300 text-[#212E3E] focus:ring-[#212E3E]"
                             />
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="px-2 py-1.5">
                             {editingTagId === tag.id ? (
                               <input
                                 type="text"
@@ -1024,10 +1144,10 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                               <span className="font-semibold text-xs text-[#212E3E] block truncate" title={tag.tag_name}>{tag.tag_name}</span>
                             )}
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="px-2 py-1.5">
                             <span className="font-mono text-xs text-[#7C9599] block truncate" title={tag.variable_path}>{tag.variable_path}</span>
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="px-2 py-1.5">
                             {editingTagId === tag.id ? (
                               <input
                                 type="text"
@@ -1042,7 +1162,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                             )}
                           </td>
                           {/* 🆕 Coluna Área */}
-                          <td className="px-1 py-2 text-center">
+                          <td className="px-1 py-1.5 text-center">
                             {editingTagId === tag.id ? (
                               <select
                                 value={editTagData?.area || ''}
@@ -1062,7 +1182,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                             )}
                           </td>
                           {/* 🆕 Coluna Categoria */}
-                          <td className="px-1 py-2 text-center">
+                          <td className="px-1 py-1.5 text-center">
                             {editingTagId === tag.id ? (
                               <select
                                 value={editTagData?.category || ''}
@@ -1086,14 +1206,14 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                               </span>
                             )}
                           </td>
-                          <td className="px-2 py-2 text-center">
+                          <td className="px-2 py-1.5 text-center">
                             <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded ${
                               tag.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                             }`}>
                               {tag.enabled ? 'Ativo' : 'Inativo'}
                             </span>
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="px-2 py-1.5">
                             <div className="flex items-center justify-end gap-0.5">
                               {editingTagId === tag.id ? (
                                 <>
@@ -1191,18 +1311,18 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                         <button
                           onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                           disabled={currentPage === 1}
-                          className="px-2 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                          className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                         >
                           <ChevronLeft size={14} />
                         </button>
-                        <span className="px-2 py-1 text-xs font-medium bg-[#212E3E] text-white rounded">
+                        <span className="px-2 py-1.5 text-xs font-medium bg-[#212E3E] text-white rounded">
                           {currentPage}
                         </span>
                         <span className="text-xs text-gray-500">/{totalPages}</span>
                         <button
                           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                           disabled={currentPage === totalPages}
-                          className="px-2 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                          className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                         >
                           <ChevronRight size={14} />
                         </button>
@@ -1233,173 +1353,152 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   </div>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  {/* 🎯 Configurações do Export */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                     {/* Tipo de dado */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de dado</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
                       <select
                         value={exportType}
                         onChange={e => setExportType(e.target.value as DataType)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:border-[#212E3E] bg-white"
                       >
                         {dataTypeOptions.map(type => (
-                          <option key={type.key} value={type.key}>
-                            {type.label}
-                          </option>
+                          <option key={type.key} value={type.key}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Área */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Área</label>
+                      <select
+                        value={exportArea}
+                        onChange={e => setExportArea(e.target.value as AreaType)}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:border-[#212E3E] bg-white"
+                      >
+                        {AREAS.map(area => (
+                          <option key={area.key} value={area.key}>{area.key || 'Nenhuma'}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Categoria */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+                      <select
+                        value={exportCategory}
+                        onChange={e => setExportCategory(e.target.value as CategoryType)}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:border-[#212E3E] bg-white"
+                      >
+                        {CATEGORIES.map(cat => (
+                          <option key={cat.key} value={cat.key}>{cat.key || 'Nenhuma'}</option>
                         ))}
                       </select>
                     </div>
 
                     {/* Modo de Coleta */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Modo de Coleta</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Modo</label>
                       <select
                         value={exportCollectMode}
                         onChange={e => setExportCollectMode(e.target.value as 'on_change' | 'interval')}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:border-[#212E3E] bg-white"
                       >
-                        <option value="on_change">On Change (ao mudar)</option>
-                        <option value="interval">Intervalo (cíclico)</option>
+                        <option value="on_change">On Change</option>
+                        <option value="interval">Intervalo</option>
                       </select>
                     </div>
 
-                    {/* Intervalo de Ciclo */}
+                    {/* Intervalo */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Intervalo (segundos)</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Segundos</label>
                       <input
                         type="number"
                         min="1"
                         max="3600"
                         value={exportCollectInterval}
                         onChange={e => setExportCollectInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:border-[#212E3E]"
                       />
                     </div>
 
-                    {/* Expandir Bits - só aparece para Word */}
+                    {/* Expandir Bits */}
                     {(exportType === 'Word' || exportType === 'ALL') && (
                       <div className="flex items-end">
-                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer h-[42px]">
+                        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={exportWithBits}
                             onChange={e => setExportWithBits(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="w-3 h-3 rounded border-gray-300 text-green-600 focus:ring-green-500"
                           />
-                          Expandir bits (0-15) para Word
+                          Bits Word
                         </label>
                       </div>
                     )}
+                  </div>
 
-                    {/* 🆕 ÁREA DO EQUIPAMENTO PARA EXPORTAÇÃO */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Área/Equipamento
-                        <span className="ml-1 text-xs text-gray-400">(prefixo)</span>
-                      </label>
-                      <select
-                        value={exportArea}
-                        onChange={e => setExportArea(e.target.value as AreaType)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
-                      >
-                        {AREAS.map(area => (
-                          <option key={area.key} value={area.key}>{area.label}</option>
-                        ))}
-                      </select>
+                  {/* 📊 Preview Compacto */}
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded mb-3 text-sm">
+                    <div className="flex items-center gap-4">
+                      <span><strong>{currentTypeCount}</strong> vars</span>
+                      <span><strong>{exportCollectInterval}s</strong></span>
+                      <span><strong>{exportCollectMode === 'on_change' ? 'Change' : 'Interval'}</strong></span>
                     </div>
-
-                    {/* 🆕 CATEGORIA DO TAG PARA EXPORTAÇÃO */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Categoria
-                        <span className="ml-1 text-xs text-gray-400">(PROC, FAULT...)</span>
-                      </label>
-                      <select
-                        value={exportCategory}
-                        onChange={e => setExportCategory(e.target.value as CategoryType)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
-                      >
-                        {CATEGORIES.map(cat => (
-                          <option key={cat.key} value={cat.key}>{cat.label}</option>
-                        ))}
-                      </select>
+                    <div className="flex items-center gap-1">
+                      {exportArea && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">{exportArea}</span>}
+                      {exportCategory && <span className={`px-2 py-0.5 rounded text-xs font-medium ${CATEGORIES.find(c => c.key === exportCategory)?.color || 'bg-gray-100 text-gray-800'}`}>{exportCategory}</span>}
                     </div>
                   </div>
 
-                  {/* Botões de Ação Principal */}
-                  <div className="flex gap-3 mb-4">
-                    {/* Botão Exportar */}
+                  {/* 🎯 Ações */}
+                  <div className="flex gap-2">
                     <button
                       onClick={handleExportCSV}
                       disabled={currentTypeCount === 0}
-                      className="flex-1 py-3 text-sm font-bold bg-edp-marine text-white rounded-lg hover:bg-edp-marine-100 disabled:opacity-50 disabled:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                      className="flex-1 py-2 px-3 text-sm font-medium bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center gap-2 transition-colors"
                     >
-                      <FileSpreadsheet size={18} className="text-white" />
-                      Exportar Template CSV
+                      <Download size={14} />
+                      Exportar
                     </button>
-
-                    {/* Separador */}
-                    <div className="flex items-center">
-                      <div className="w-px h-12 bg-gray-300"></div>
-                    </div>
-
-                    {/* Botão Importar */}
                     <button
                       onClick={handleImportCSV}
-                      className="flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
-                      style={{
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        border: '1px solid #2563eb'
-                      }}
+                      className="flex-1 py-2 px-3 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center gap-2 transition-colors"
                     >
-                      <Upload size={18} style={{ color: '#ffffff' }} />
-                      Selecionar e Importar Arquivo CSV
+                      <Upload size={14} />
+                      Importar
                     </button>
                   </div>
 
-                  {/* Números simples */}
-                  <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC]">
-                    <div className="flex items-center justify-between text-sm flex-wrap gap-2">
-                      <span className="text-[#7C9599]">{currentTypeCount} variáveis</span>
-                      <span className="text-[#7C9599]">{exportCollectInterval}s ciclo</span>
-                      <span className="text-[#7C9599]">{exportCollectMode === 'on_change' ? 'On Change' : 'Intervalo'}</span>
-                      {exportArea && <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-semibold">{exportArea}</span>}
-                      {exportCategory && <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CATEGORIES.find(c => c.key === exportCategory)?.color || 'bg-gray-100 text-gray-800'}`}>{exportCategory}</span>}
-                    </div>
-                  </div>
-
-                  {/* Botões Após Importar */}
+                  {/* ✅ Seção Compacta Após Importação */}
                   {importedTags.length > 0 && (
-                    <div className="border-t border-[#BECACC] pt-4 mt-4">
-                      <div className="text-sm font-bold text-[#212E3E] mb-3 text-center">
-                        {importedTags.length} Tags Importados
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle size={16} className="text-green-600" />
+                          <span className="font-medium text-green-800">{importedTags.length} importados</span>
+                        </div>
+                        <span className="text-xs text-green-700">
+                          {importedTags.filter(t => t.isValid).length} OK • {importedTags.filter(t => !t.isValid).length} problemas
+                        </span>
                       </div>
+
                       <div className="flex gap-2">
                         <button
                           onClick={() => setCurrentTab('import')}
-                          className="flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
-                          style={{
-                            backgroundColor: '#ea580c',
-                            color: '#ffffff',
-                            border: '1px solid #ea580c'
-                          }}
+                          className="flex-1 py-1.5 px-3 text-sm font-medium bg-orange-100 hover:bg-orange-200 text-orange-800 rounded flex items-center justify-center gap-1"
                         >
-                          <Eye size={16} style={{ color: '#ffffff' }} />
+                          <Eye size={14} />
                           Revisar
                         </button>
                         <button
                           onClick={handleCreateFromImport}
                           disabled={saving || importedTags.filter(t => t.isValid).length === 0}
-                          className="flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
-                          style={{
-                            backgroundColor: saving || importedTags.filter(t => t.isValid).length === 0 ? '#9ca3af' : '#16a34a',
-                            color: '#ffffff',
-                            border: saving || importedTags.filter(t => t.isValid).length === 0 ? '1px solid #9ca3af' : '1px solid #16a34a'
-                          }}
+                          className="flex-1 py-1.5 px-3 text-sm font-medium bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded flex items-center justify-center gap-1"
                         >
-                          <CheckCircle size={16} style={{ color: '#ffffff' }} />
-                          Criar
+                          <CheckCircle size={14} />
+                          {saving ? 'Criando...' : 'Criar'}
                         </button>
                       </div>
                     </div>
@@ -1407,28 +1506,6 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                 </div>
               </div>
 
-              {/* Seção Importar CSV */}
-              <div className="bg-white rounded-lg border border-[#BECACC] overflow-hidden">
-                <div className="bg-[#F1F4F4] px-4 py-3 border-b border-[#BECACC]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Upload size={16} className="text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-[#212E3E]">Formato CSV Esperado</h3>
-                      <p className="text-xs text-[#7C9599]">Informações sobre o formato correto</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="text-xs text-[#7C9599] space-y-1">
-                    <p>• Colunas: variable_path, tag_name, description, unit, collect_mode, collect_interval_s, enabled</p>
-                    <p>• Separador: ponto e vírgula (;) ou vírgula (,)</p>
-                    <p>• Primeira linha: cabeçalho (será ignorada)</p>
-                    <p>• Exemplo: Word[100];temperatura_motor;Temperatura do motor;°C;on_change;1;true</p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -1451,9 +1528,9 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   </div>
                 </div>
                 <div className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Variável PLC *</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Variável PLC *</label>
                       <select
                         value={newTag.variable_path}
                         onChange={e => {
@@ -1464,7 +1541,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                             tag_name: v ? v.replace(/[\[\].]/g, '_').toLowerCase() : ''
                           });
                         }}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
                       >
                         <option value="">Selecione uma variável...</option>
                         {unmappedVariables.slice(0, 100).map(v => (
@@ -1477,45 +1554,45 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Tag *</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nome do Tag *</label>
                       <input
                         type="text"
                         value={newTag.tag_name}
                         onChange={e => setNewTag({ ...newTag, tag_name: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
                         placeholder="nome_do_tag"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Descrição</label>
                       <input
                         type="text"
                         value={newTag.description}
                         onChange={e => setNewTag({ ...newTag, description: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
                         placeholder="Descrição opcional do tag"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
                       <input
                         type="text"
                         value={newTag.unit}
                         onChange={e => setNewTag({ ...newTag, unit: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
                         placeholder="°C, bar, rpm, etc."
                       />
                     </div>
 
                     {/* Modo de Coleta */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Modo de Coleta</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Modo de Coleta</label>
                       <select
                         value={newTag.collect_mode}
                         onChange={e => setNewTag({ ...newTag, collect_mode: e.target.value as 'on_change' | 'interval' })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E] bg-white"
                       >
                         <option value="on_change">On Change (ao mudar)</option>
                         <option value="interval">Intervalo (cíclico)</option>
@@ -1524,27 +1601,27 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
 
                     {/* Intervalo de Ciclo */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Intervalo (segundos)</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Intervalo (segundos)</label>
                       <input
                         type="number"
                         min="1"
                         max="3600"
                         value={newTag.collect_interval_s}
                         onChange={e => setNewTag({ ...newTag, collect_interval_s: Math.max(1, parseInt(e.target.value) || 1) })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
                       />
                     </div>
 
                     {/* 🆕 ÁREA DO EQUIPAMENTO */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
                         Área/Equipamento
                         <span className="ml-1 text-xs text-gray-400">(para SUBSCRIBE)</span>
                       </label>
                       <select
                         value={newTag.area || ''}
                         onChange={e => setNewTag({ ...newTag, area: e.target.value as AreaType })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E] bg-white"
                       >
                         {AREAS.map(area => (
                           <option key={area.key} value={area.key}>{area.label}</option>
@@ -1554,14 +1631,14 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
 
                     {/* 🆕 CATEGORIA DO TAG */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
                         Categoria
                         <span className="ml-1 text-xs text-gray-400">(PROC, FAULT, EVENT...)</span>
                       </label>
                       <select
                         value={newTag.category || ''}
                         onChange={e => setNewTag({ ...newTag, category: e.target.value as CategoryType })}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E] bg-white"
                       >
                         {CATEGORIES.map(cat => (
                           <option key={cat.key} value={cat.key}>{cat.label}</option>
@@ -1575,7 +1652,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                     <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
                       <p className="text-xs text-blue-700">
                         💡 <strong>Dica:</strong> Use o padrão <code className="bg-blue-100 px-1 rounded">ÁREA_CATEGORIA_descrição</code> no nome do tag
-                        (ex: <code className="bg-blue-100 px-1 rounded">ENH_PROC_nivel_agua</code>) para auto-extração.
+                        (ex: <code className="bg-blue-100 px-1 rounded">ENCH_PROC_nivel_agua</code>) para auto-extração.
                       </p>
                       {(() => {
                         const extracted = extractAreaAndCategory(newTag.tag_name || '');
@@ -1601,7 +1678,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   <button
                     onClick={handleAddTag}
                     disabled={!newTag.variable_path || !newTag.tag_name || saving}
-                    className="mt-4 w-full py-2.5 text-sm font-bold rounded-lg flex items-center justify-center gap-2"
+                    className="mt-4 w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2"
                     style={{
                       backgroundColor: (!newTag.variable_path || !newTag.tag_name || saving) ? '#9ca3af' : '#212E3E',
                       color: '#ffffff',
@@ -1612,15 +1689,6 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                     {saving ? 'Adicionando...' : 'Adicionar Tag'}
                   </button>
 
-                  {/* Info sobre variáveis disponíveis */}
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm font-semibold text-gray-700 mb-2">📋 Informações:</div>
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <p>• <span className="font-semibold">{unmappedVariables.length}</span> variáveis PLC não mapeadas</p>
-                      <p>• <strong>Áreas:</strong> ENH (Enchimento), ESV (Esvaziamento), PJU (Porta Jusante), PMO (Porta Montante), SCO (Sala Comando), EDR (Esgoto/Drenagem)</p>
-                      <p>• <strong>Categorias:</strong> PROC (Processo), FAULT (Falha), EVENT (Evento), ALARM (Alarme), CMD (Comando)</p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1632,14 +1700,14 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
           {currentTab === 'import' && importedTags.length > 0 && (
             <div className="space-y-4">
               {/* Header da Importação */}
-              <div className="bg-[#F1F4F4] rounded-lg p-4 border border-[#BECACC] flex items-center justify-between">
+              <div className="bg-[#F1F4F4] rounded-lg p-3 border border-[#BECACC] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <FileSpreadsheet size={20} className="text-white" />
+                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <FileSpreadsheet size={16} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-[#212E3E]">{importFileName}</h3>
-                    <p className="text-sm text-[#7C9599]">
+                    <h3 className="font-bold text-[#212E3E] text-sm">{importFileName}</h3>
+                    <p className="text-xs text-[#7C9599]">
                       <span className="text-green-600 font-semibold">{importedTags.filter(t => t.isValid).length}</span> válidos de {importedTags.length} tags
                     </p>
                   </div>
@@ -1647,21 +1715,21 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setImportedTags([]); setImportFileName(''); setCurrentTab('tags'); }}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100"
+                    className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded hover:bg-gray-100"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleCreateFromImport}
                     disabled={saving || importedTags.filter(t => t.isValid).length === 0}
-                    className="px-6 py-3 text-base font-bold rounded-lg flex items-center gap-2 shadow-md"
+                    className="px-4 py-2 text-xs font-bold rounded flex items-center gap-2"
                     style={{
                       backgroundColor: (saving || importedTags.filter(t => t.isValid).length === 0) ? '#9ca3af' : '#16a34a',
                       color: '#ffffff',
                       border: (saving || importedTags.filter(t => t.isValid).length === 0) ? '1px solid #9ca3af' : '1px solid #16a34a'
                     }}
                   >
-                    <CheckCircle size={20} style={{ color: '#ffffff' }} />
+                    <CheckCircle size={14} style={{ color: '#ffffff' }} />
                     {saving ? 'Criando...' : `Criar ${importedTags.filter(t => t.isValid).length} Tags`}
                   </button>
                 </div>
@@ -1672,57 +1740,57 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                 <table className="w-full">
                   <thead className="bg-[#F1F4F4]">
                     <tr>
-                      <th className="w-10 px-4 py-3"></th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-[#7C9599] uppercase">Variável</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-[#7C9599] uppercase">Nome do Tag</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-[#7C9599] uppercase">Descrição</th>
-                      <th className="px-4 py-3 text-center text-xs font-bold text-[#7C9599] uppercase">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-[#7C9599] uppercase">Ação</th>
+                      <th className="w-10 px-2 py-1.5"></th>
+                      <th className="px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Variável</th>
+                      <th className="px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Nome do Tag</th>
+                      <th className="px-2 py-1.5 text-left text-xs font-bold text-[#7C9599] uppercase">Descrição</th>
+                      <th className="px-2 py-1.5 text-center text-xs font-bold text-[#7C9599] uppercase">Status</th>
+                      <th className="px-2 py-1.5 text-right text-xs font-bold text-[#7C9599] uppercase">Ação</th>
                     </tr>
                   </thead>
                   <tbody>
                     {importedTags.slice(0, 50).map((tag, index) => (
                       <tr key={index} className={`border-t border-gray-100 ${tag.isValid ? 'bg-white' : 'bg-red-50'}`}>
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-1.5">
                           <div className={`w-2 h-2 rounded-full ${tag.isValid ? 'bg-green-500' : 'bg-red-500'}`}/>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-sm text-[#7C9599]">{tag.variable_path}</span>
+                        <td className="px-2 py-1.5">
+                          <span className="font-mono text-xs text-[#7C9599]">{tag.variable_path}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-1.5">
                           <input
                             type="text"
                             value={tag.tag_name}
                             onChange={e => updateImportedTag(index, 'tag_name', e.target.value)}
-                            className={`w-full px-2 py-1 text-sm border rounded ${tag.isValid ? 'border-gray-300' : 'border-red-300'} focus:outline-none focus:border-[#212E3E]`}
+                            className={`w-full px-2 py-1.5 text-xs border rounded ${tag.isValid ? 'border-gray-300' : 'border-red-300'} focus:outline-none focus:border-[#212E3E]`}
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-1.5">
                           <input
                             type="text"
                             value={tag.description}
                             onChange={e => updateImportedTag(index, 'description', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-[#212E3E]"
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-[#212E3E]"
                             placeholder="Descrição"
                           />
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-2 py-1.5 text-center">
                           {tag.isValid ? (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
+                            <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded bg-green-100 text-green-700">
                               Válido
                             </span>
                           ) : (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700" title={tag.error}>
+                            <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded bg-red-100 text-red-700" title={tag.error}>
                               {tag.error}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-2 py-1.5 text-right">
                           <button
                             onClick={() => removeImportedTag(index)}
-                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"
+                            className="p-1 text-red-600 hover:bg-red-100 rounded"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </td>
                       </tr>
@@ -1730,7 +1798,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   </tbody>
                 </table>
                 {importedTags.length > 50 && (
-                  <div className="p-3 bg-gray-50 text-center text-sm text-gray-500">
+                  <div className="p-2 bg-gray-50 text-center text-xs text-gray-500">
                     Mostrando 50 de {importedTags.length} tags. Os demais serão importados normalmente.
                   </div>
                 )}

@@ -16,6 +16,7 @@ import {
   Settings,
   Tags,
   Database,
+  Power,
 } from 'lucide-react';
 import PlcIcon from '../../assets/Plc.svg';
 import { PlcStructureModal } from './PlcStructureModal';
@@ -47,10 +48,16 @@ interface PlcDataPacket {
   variables: PlcVariable[];
 }
 
-export const PlcConnectionTable: React.FC = () => {
+// 🎯 CACHE GLOBAL PARA PERSISTIR PLCs ENTRE NAVEGAÇÕES
+let globalPlcCache = new Map<string, ConnectedPlc>();
+let hasEverInitialized = false; // 🔥 FLAG GLOBAL PARA EVITAR FLASH ENTRE NAVEGAÇÕES
+
+const PlcConnectionTableComponent: React.FC = () => {
     // Estado para PLCs com tags desativadas
     const [plcsWithDisabledTags, setPlcsWithDisabledTags] = useState<Set<string>>(new Set());
-    const [knownPlcs, setKnownPlcs] = useState<Map<string, ConnectedPlc>>(new Map());
+    const [knownPlcs, setKnownPlcs] = useState<Map<string, ConnectedPlc>>(globalPlcCache);
+    // 🆕 CORREÇÃO: Só mostrar loading se nunca inicializou E cache está vazio
+    const [isInitialLoading, setIsInitialLoading] = useState(!hasEverInitialized && globalPlcCache.size === 0);
     const [selectedPlcIp, setSelectedPlcIp] = useState<string | null>(null);
     const [plcData, setPlcData] = useState<PlcDataPacket | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -195,7 +202,7 @@ export const PlcConnectionTable: React.FC = () => {
   }, [isServerRunning]);
 
   // Atualizar PLCs conhecidos (manter histórico)
-  useEffect(() => {
+  useEffect(() => {    
     const fetchConnectedPlcs = async () => {
       if (!isServerRunning) {
         // Marcar todos como desconectados quando servidor para
@@ -205,6 +212,8 @@ export const PlcConnectionTable: React.FC = () => {
             plc.status = 'disconnected';
             plc.isActive = false;
           });
+          // 🎯 ATUALIZAR CACHE GLOBAL
+          globalPlcCache = new Map(updated);
           return updated;
         });
         return;
@@ -251,10 +260,28 @@ export const PlcConnectionTable: React.FC = () => {
             }
           });
           
+          // 🎯 ATUALIZAR CACHE GLOBAL PARA PERSISTIR ENTRE NAVEGAÇÕES
+          globalPlcCache = new Map(updated);
+          
           return updated;
         });
       } catch (error) {
         console.error('❌ Erro ao buscar PLCs:', error);
+      } finally {
+        // 🆕 CORREÇÃO: Marcar como inicializado e remover loading imediatamente se há cache
+        if (!hasEverInitialized) {
+          hasEverInitialized = true;
+          
+          // Se já tem PLCs no cache, remover loading imediatamente
+          if (globalPlcCache.size > 0) {
+            setIsInitialLoading(false);
+          } else {
+            // Só fazer delay se for verdadeiramente a primeira vez sem dados
+            setTimeout(() => {
+              setIsInitialLoading(false);
+            }, 300); // Reduzido de 800ms para 300ms
+          }
+        }
       }
     };
 
@@ -596,14 +623,39 @@ export const PlcConnectionTable: React.FC = () => {
           ))}
         </div>
 
-        {/* Mensagem se não há PLCs */}
+        {/* Loading ou mensagem se não há PLCs */}
         {knownPlcs.size === 0 && (
           <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-              <Wifi className="text-gray-400" size={32} />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum PLC conectado</h3>
-            <p className="text-sm text-gray-500">Aguardando conexões na porta 8502</p>
+            {isInitialLoading ? (
+              // 🎯 LOADING STATE - Evita flash de "nenhum PLC"
+              <div className="inline-flex flex-col items-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Carregando PLCs...</h3>
+                <p className="text-sm text-gray-500">Verificando conexões disponíveis</p>
+              </div>
+            ) : (
+              // 🆕 EMPTY STATE - Só aparece após carregamento completo e servidor rodando
+              isServerRunning ? (
+                <div className="inline-flex flex-col items-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                    <Wifi className="text-gray-400" size={32} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum PLC conectado</h3>
+                  <p className="text-sm text-gray-500">Aguardando conexões na porta 8502</p>
+                </div>
+              ) : (
+                // 🔥 SERVIDOR PARADO - Mostrar estado apropriado
+                <div className="inline-flex flex-col items-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
+                    <Power className="text-yellow-600" size={32} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">Servidor TCP não iniciado</h3>
+                  <p className="text-sm text-gray-500">Inicie o servidor para detectar PLCs</p>
+                </div>
+              )
+            )}
           </div>
         )}
       </div>
@@ -1166,3 +1218,5 @@ export const PlcConnectionTable: React.FC = () => {
     </div>
   );
 };
+
+export const PlcConnectionTable = React.memo(PlcConnectionTableComponent);

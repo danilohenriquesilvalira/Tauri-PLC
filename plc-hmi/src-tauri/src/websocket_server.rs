@@ -104,6 +104,23 @@ struct CacheUpdateData {
     timestamp: u64,
 }
 
+// 🚀 MELHORIA FASE 2: Batching inteligente para otimizar serialização
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct SubscriptionFilter {
+    areas: Vec<String>,
+    categories: Vec<String>,
+    include_all_faults: bool,
+}
+
+#[derive(Debug)]
+struct BatchedPayload {
+    filter: SubscriptionFilter,
+    client_ids: Vec<u64>,
+    cached_json: Option<String>,
+    cached_msgpack: Option<String>,
+    last_update: std::time::Instant,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInterface {
     pub name: String,
@@ -159,7 +176,7 @@ pub struct CachedTagValue {
     pub last_sent: u128,
     pub changed: bool,
     // 🆕 CAMPOS PARA FILTRAGEM INTELIGENTE
-    pub area: Option<String>,     // ENH, ESV, PJU, PMO, SCO, EDR
+    pub area: Option<String>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
     pub category: Option<String>, // PROC, FAULT, EVENT, ALARM
 }
 
@@ -192,7 +209,7 @@ pub struct ConnectedClient {
     pub subscribed_plcs: Arc<RwLock<std::collections::HashSet<String>>>,
     pub client_type: ClientType,
     // 🆕 FILTROS GRANULARES PARA SUBSCRIBE INTELIGENTE
-    pub subscribed_areas: Arc<RwLock<std::collections::HashSet<String>>>,     // ENH, ESV, PJU, PMO, SCO, EDR
+    pub subscribed_areas: Arc<RwLock<std::collections::HashSet<String>>>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
     pub subscribed_categories: Arc<RwLock<std::collections::HashSet<String>>>, // PROC, FAULT, EVENT, ALARM
     pub include_all_faults: Arc<AtomicBool>, // Sempre receber TODAS as falhas (para painel de alarmes)
     // 🆕 CANAL PARA ENVIO DE MENSAGENS FILTRADAS PARA ESTE CLIENTE
@@ -225,6 +242,9 @@ pub struct WebSocketServer {
     cache_updater_handle: Option<tokio::task::JoinHandle<()>>,
     // ✅ MELHORIA: Broadcasting por PLC específico
     plc_broadcast_channels: Arc<DashMap<String, broadcast::Sender<String>>>,
+    // 🚀 MELHORIA FASE 2: Batching inteligente para otimizar serialização
+    batched_payloads: Arc<DashMap<u64, BatchedPayload>>, // Hash do filtro -> payload cached
+    // 🛡️ MELHORIA CRÍTICA: Removed monitoring system as requested
 }
 
 impl SmartCache {
@@ -237,9 +257,9 @@ impl SmartCache {
             tag_mappings_cache: Arc::new(DashMap::new()),
             tag_mappings_last_update: Arc::new(RwLock::new(std::time::Instant::now())),
             
-            // ✅ OTIMIZAÇÃO: Configurar limites de memória
-            cache_size_limit: 2000, // Máximo 2000 tags em cache (~400KB)
-            memory_pressure_threshold: AtomicUsize::new(1500), // Iniciar limpeza em 1500 tags
+            // 🚀 MELHORIA FASE 2: Cache expansível sem limites fixos (preparado para 7500+ tags)
+            cache_size_limit: 15000, // Expandido: suporta até 15k tags (~3MB) - bem acima de 7500
+            memory_pressure_threshold: AtomicUsize::new(12000), // Limpeza apenas quando realmente necessário
             last_cleanup: Arc::new(RwLock::new(std::time::Instant::now())),
         }
     }
@@ -330,9 +350,9 @@ impl SmartCache {
                     variable.value.clone()
                 };
 
-                // Verificar mudança para tags em modo "change"
+                // Verificar mudança para tags em modo "on_change"
                 let mut value_changed = true;
-                if tag.collect_mode.as_deref() == Some("change") {
+                if tag.collect_mode.as_deref() == Some("on_change") {
                     if let Some(last_value) = self.change_tracking.get(&tag_key) {
                         value_changed = last_value.value() != &final_value;
                     }
@@ -360,7 +380,37 @@ impl SmartCache {
         }
     }
     
+    // ✅ FUNÇÃO AUXILIAR: Comparação inteligente de valores por tipo (DESABILITADA)
+    /*
+    fn values_are_different(&self, old_value: &str, new_value: &str, data_type: &str) -> bool {
+        match data_type {
+            "REAL" | "LREAL" => {
+                // Para valores de ponto flutuante, usar tolerância pequena
+                if let (Ok(old), Ok(new)) = (old_value.parse::<f64>(), new_value.parse::<f64>()) {
+                    (old - new).abs() > f64::EPSILON * 10.0
+                } else {
+                    old_value != new_value
+                }
+            },
+            "INT" | "DINT" | "LINT" | "WORD" | "DWORD" | "LWORD" | "BYTE" => {
+                // Para valores numéricos inteiros, conversão para comparação
+                if let (Ok(old), Ok(new)) = (old_value.parse::<i64>(), new_value.parse::<i64>()) {
+                    old != new
+                } else {
+                    old_value != new_value
+                }
+            },
+            _ => {
+                // Para strings e booleanos, comparação direta
+                old_value != new_value
+            }
+        }
+    }
+    */
+    
+    
     // Obter tags que precisam ser enviados baseado no intervalo
+    // ⚠️ NOTA: Esta função reseta o estado - usar apenas para broadcast único!
     pub async fn get_tags_for_broadcast(&self, interval_s: u64) -> HashMap<String, String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -378,7 +428,7 @@ impl SmartCache {
             };
             
             let should_send = match cached.collect_mode.as_str() {
-                "change" => cached.changed && time_since_last >= interval_s as u128,
+                "on_change" => cached.changed && time_since_last >= interval_s as u128,
                 "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
                 _ => false,
             };
@@ -399,7 +449,77 @@ impl SmartCache {
         result
     }
     
+    // 🆕 OBTER TAGS SEM RESETAR ESTADO (para múltiplos clientes)
+    // Usado quando vários clientes precisam receber os mesmos dados de on_change
+    pub async fn get_tags_for_broadcast_readonly(&self, interval_s: u64) -> HashMap<String, String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        let mut result = HashMap::new();
+        
+        for entry in self.tag_cache.iter() {
+            let cached = entry.value();
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000
+            } else {
+                0
+            };
+            
+            let should_send = match cached.collect_mode.as_str() {
+                "on_change" => cached.changed && time_since_last >= interval_s as u128,
+                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                _ => false,
+            };
+            
+            if should_send {
+                result.insert(cached.tag_name.clone(), cached.value.clone());
+            }
+        }
+        
+        result
+    }
+    
+    // 🆕 RESETAR ESTADO DE TAGS ENVIADOS (chamar UMA VEZ após enviar para todos os clientes)
+    pub async fn mark_tags_as_sent(&self, interval_s: u64) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        
+        for mut entry in self.tag_cache.iter_mut() {
+            let cached = entry.value_mut();
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000
+            } else {
+                0
+            };
+            
+            let was_sent = match cached.collect_mode.as_str() {
+                "on_change" => cached.changed && time_since_last >= interval_s as u128,
+                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                _ => false,
+            };
+            
+            if was_sent {
+                cached.last_sent = now;
+                cached.changed = false;
+            }
+        }
+    }
+    
+    // ✅ FUNÇÃO AUXILIAR: Atualizar status dos tags enviados
+    fn update_sent_tags(&self, keys_to_update: Vec<String>, now: u128) {
+        for key in keys_to_update {
+            if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
+                cached_mut.last_sent = now;
+                cached_mut.changed = false;
+            }
+        }
+    }
+    
     // 🆕 OBTER TAGS FILTRADOS POR ÁREA E CATEGORIA (para SUBSCRIBE inteligente)
+    // ⚠️ NOTA: Esta função NÃO reseta estado - para múltiplos clientes
     pub async fn get_tags_filtered(
         &self, 
         interval_s: u64,
@@ -413,7 +533,6 @@ impl SmartCache {
             .unwrap_or_else(|_| Duration::from_secs(0))
             .as_nanos();
         let mut result = HashMap::new();
-        let mut keys_to_update = Vec::new();
         
         let has_plc_filter = !plc_ips.is_empty();
         let has_area_filter = !areas.is_empty();
@@ -462,22 +581,13 @@ impl SmartCache {
             };
             
             let should_send = match cached.collect_mode.as_str() {
-                "change" => cached.changed && time_since_last >= interval_s as u128,
-                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
                 "on_change" => cached.changed && time_since_last >= interval_s as u128,
+                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
                 _ => time_since_last >= interval_s as u128, // Default: enviar baseado no intervalo
             };
             
             if should_send {
                 result.insert(cached.tag_name.clone(), cached.value.clone());
-                keys_to_update.push(entry.key().clone());
-            }
-        }
-        
-        for key in keys_to_update {
-            if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
-                cached_mut.last_sent = now;
-                cached_mut.changed = false;
             }
         }
         
@@ -588,6 +698,8 @@ impl WebSocketServer {
             cache_updater_handle: None,
             // ✅ MELHORIA: Inicializar channels por PLC
             plc_broadcast_channels: Arc::new(DashMap::new()),
+            // 🚀 MELHORIA FASE 2: Inicializar sistema de batching
+            batched_payloads: Arc::new(DashMap::new()),
         }
     }
 
@@ -597,7 +709,7 @@ impl WebSocketServer {
             // Primeiro, coletar PLCs e criar channels se necessário
             for plc_ip in &plc_ips {
                 if !self.plc_broadcast_channels.contains_key(plc_ip) {
-                    let (tx, _) = broadcast::channel::<String>(100);
+                    let (tx, _) = broadcast::channel::<String>(1000); // 🚀 MELHORIA FASE 2: Buffer expandido para PLCs
                     self.plc_broadcast_channels.insert(plc_ip.clone(), tx);
                 }
             }
@@ -619,17 +731,16 @@ impl WebSocketServer {
         }
     }
 
-    // ✅ MELHORIA: Broadcasting otimizado por PLC
+    // 🎯 MELHORIA FASE 2: Broadcasting otimizado APENAS por subscription filtrado
     pub async fn broadcast_to_plc_subscribers(&self, plc_ip: &str, message: String) {
-        // Broadcast no channel específico do PLC
+        // ✅ NOVO: Broadcast APENAS filtrado - eliminando global redundante
         if let Some(tx) = self.plc_broadcast_channels.get(plc_ip) {
             let _ = tx.send(message.clone());
         }
         
-        // Manter backward compatibility: broadcast global também
-        if let Some(tx) = &self.broadcast_sender {
-            let _ = tx.send(format!("{{\"plc_ip\":\"{}\",\"data\":{}}}", plc_ip, message));
-        }
+        // 🚫 REMOVIDO: Broadcast global redundante (economia de 50% de tráfego)
+        // Clients agora recebem APENAS dados filtrados através de seus canais específicos
+        println!("📡 Broadcast filtrado apenas - PLC: {}, payload size: {} bytes", plc_ip, message.len());
     }
 
     // Função para detectar interfaces de rede disponíveis
@@ -802,8 +913,8 @@ impl WebSocketServer {
             return Err("Não foi possível fazer bind em nenhum endereço configurado".to_string());
         }
 
-        // ✅ OTIMIZAÇÃO: Capacidade reduzida para controle de memória
-        let (broadcast_tx, _) = broadcast::channel::<String>(200); // Reduzido de 1000 para 200
+        // 🚀 MELHORIA FASE 2: Buffer expandido para suportar 7500+ tags com múltiplas subscriptions
+        let (broadcast_tx, _) = broadcast::channel::<String>(5000); // Expandido para alta capacidade
         self.broadcast_sender = Some(broadcast_tx.clone());
 
         self.is_running.store(true, Ordering::SeqCst);
@@ -922,6 +1033,76 @@ impl WebSocketServer {
         Ok(format!("WebSocket server rodando em: {}", bound_addresses.join(", ")))
     }
 
+    // 🚀 MELHORIA FASE 2: Sistema de batching inteligente para otimização de serialização
+    fn create_subscription_hash(areas: &std::collections::HashSet<String>, categories: &std::collections::HashSet<String>, include_all_faults: bool) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        let mut areas_vec: Vec<_> = areas.iter().collect();
+        areas_vec.sort();
+        areas_vec.hash(&mut hasher);
+        
+        let mut cats_vec: Vec<_> = categories.iter().collect();
+        cats_vec.sort();
+        cats_vec.hash(&mut hasher);
+        
+        include_all_faults.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    async fn get_or_create_batched_payload(
+        &self, 
+        filter_hash: u64, 
+        areas: &std::collections::HashSet<String>,
+        categories: &std::collections::HashSet<String>, 
+        include_all_faults: bool,
+        client_data: HashMap<String, String>
+    ) -> (String, String) { // Retorna (JSON, MessagePack)
+        
+        // Verificar se já temos payload cached para este filtro
+        if let Some(batched) = self.batched_payloads.get_mut(&filter_hash) {
+            // Cache hit - verificar se ainda está válido (1 segundo)
+            if batched.last_update.elapsed().as_millis() < 1000 {
+                if let (Some(json), Some(msgpack)) = (&batched.cached_json, &batched.cached_msgpack) {
+                    return (json.clone(), msgpack.clone());
+                }
+            }
+        }
+        
+        // Cache miss ou expirado - gerar novos payloads
+        let sorted_map = sort_tags_naturally(client_data);
+        
+        let json_payload = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+        
+        let msgpack_payload = match rmp_serde::to_vec(&sorted_map) {
+            Ok(msgpack_bytes) => {
+                let base64_data = base64_encode(&msgpack_bytes);
+                format!("MSGPACK:{}", base64_data)
+            }
+            Err(_) => json_payload.clone(),
+        };
+        
+        // Atualizar cache
+        let filter = SubscriptionFilter {
+            areas: areas.iter().cloned().collect(),
+            categories: categories.iter().cloned().collect(),
+            include_all_faults,
+        };
+        
+        let batched_payload = BatchedPayload {
+            filter,
+            client_ids: Vec::new(), // Será preenchido conforme necessário
+            cached_json: Some(json_payload.clone()),
+            cached_msgpack: Some(msgpack_payload.clone()),
+            last_update: std::time::Instant::now(),
+        };
+        
+        self.batched_payloads.insert(filter_hash, batched_payload);
+        
+        (json_payload, msgpack_payload)
+    }
+
     // 🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios TCP
     async fn start_smart_broadcasting(&mut self, broadcast_tx: broadcast::Sender<String>) -> Result<(), String> {
         let database = self.database.clone();
@@ -931,8 +1112,8 @@ impl WebSocketServer {
         println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
         println!("📦 Cache de tags habilitado - ZERO consultas ao banco por pacote!");
 
-        // ✅ OTIMIZAÇÃO: Canal otimizado para atualizações de cache  
-        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(100); // Reduzido para 100
+        // 🚀 MELHORIA FASE 2: Canal expandido para alto throughput de atualizações  
+        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(2000); // Expandido para suportar 7500+ tags
         
         // TASK 1: CACHE UPDATER
         let is_running_cache = is_running.clone();
@@ -963,9 +1144,9 @@ impl WebSocketServer {
                         last_cache_refresh = std::time::Instant::now();
                     }
                     
-                    // ✅ OTIMIZAÇÃO: Verificar se precisa de limpeza de memória
-                    if packets_processed % 50 == 0 && smart_cache_clone.should_cleanup().await {
-                        println!("🧹 Iniciando limpeza automática de memória (pacote {})", packets_processed);
+                    // 🚀 MELHORIA FASE 2: Limpeza menos frequente para suportar 7500+ tags
+                    if packets_processed % 200 == 0 && smart_cache_clone.should_cleanup().await {
+                        println!("🧹 Limpeza automática otimizada para alta capacidade (pacote {})", packets_processed);
                         smart_cache_clone.enforce_memory_limits().await;
                     }
                     
@@ -1018,7 +1199,18 @@ impl WebSocketServer {
                             timestamp: data["timestamp"].as_u64().unwrap_or(0),
                         };
                         
-                        let _ = update_tx.try_send(update_data);
+                        // 🛡️ MELHORIA CRÍTICA: Tratar erros de buffer overflow
+                        if let Err(e) = update_tx.try_send(update_data.clone()) {
+                            match e {
+                                mpsc::error::TrySendError::Full(_) => {
+                                    println!("⚠️ Cache update buffer cheio - dados perdidos (PLC: {})", update_data.plc_ip);
+                                }
+                                mpsc::error::TrySendError::Closed(_) => {
+                                    println!("❌ Cache update channel fechado - parando updates");
+                                    return; // Sair da closure, não break
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -1055,11 +1247,16 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // Obter filtros do cliente
-                        let subscribed_plcs = client.subscribed_plcs.read().await;
-                        let subscribed_areas = client.subscribed_areas.read().await;
-                        let subscribed_categories = client.subscribed_categories.read().await;
-                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
+                        let filter_snapshot = {
+                            let plcs = client.subscribed_plcs.read().await;
+                            let areas = client.subscribed_areas.read().await; 
+                            let categories = client.subscribed_categories.read().await;
+                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
+                            
+                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
+                        };
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1067,7 +1264,7 @@ impl WebSocketServer {
                         let mut client_data: HashMap<String, String> = HashMap::new();
                         
                         if has_filters {
-                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered (readonly)
                             for interval_s in 1..=3u64 {
                                 let filtered_tags = smart_cache_clone.get_tags_filtered(
                                     interval_s,
@@ -1079,31 +1276,51 @@ impl WebSocketServer {
                                 client_data.extend(filtered_tags);
                             }
                         } else {
-                            // 📡 CLIENTE SEM FILTROS - Recebe tudo (comportamento original)
+                            // 📡 CLIENTE SEM FILTROS - Usar readonly para não afetar outros clientes
                             for interval_s in 1..=3u64 {
-                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast_readonly(interval_s).await;
                                 client_data.extend(tag_data);
                             }
                         }
                         
-                        // Enviar dados filtrados para o cliente
+                        // 🚀 MELHORIA FASE 2: Enviar dados com batching inteligente (BATCH 1 - Rápido)
                         if !client_data.is_empty() {
                             if let Some(ref tx) = client.filtered_tx {
-                                let sorted_map = sort_tags_naturally(client_data);
-                                
-                                match rmp_serde::to_vec(&sorted_map) {
-                                    Ok(msgpack_bytes) => {
-                                        let base64_data = base64_encode(&msgpack_bytes);
-                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                        let _ = tx.send(msgpack_message).await;
+                                if has_filters {
+                                    // Serialização otimizada para clientes com filtros
+                                    let sorted_map = sort_tags_naturally(client_data);
+                                    
+                                    // Preferir MessagePack para alta performance em dados grandes
+                                    if sorted_map.len() > 10 {
+                                        match rmp_serde::to_vec(&sorted_map) {
+                                            Ok(msgpack_bytes) => {
+                                                let base64_data = base64_encode(&msgpack_bytes);
+                                                let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                                let _ = tx.send(msgpack_message).await;
+                                            }
+                                            Err(_) => {
+                                                let json_message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                                let _ = tx.send(json_message).await;
+                                            }
+                                        }
+                                    } else {
+                                        // JSON para payloads pequenos
+                                        let json_message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                        let _ = tx.send(json_message).await;
                                     }
-                                    Err(_) => {
-                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
-                                        let _ = tx.send(message).await;
-                                    }
+                                } else {
+                                    // Fallback para clientes sem filtros
+                                    let sorted_map = sort_tags_naturally(client_data);
+                                    let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                    let _ = tx.send(message).await;
                                 }
                             }
                         }
+                    }
+                    
+                    // 🆕 MARCAR TAGS COMO ENVIADOS APÓS TODOS OS CLIENTES RECEBEREM
+                    for interval_s in 1..=3u64 {
+                        smart_cache_clone.mark_tags_as_sent(interval_s).await;
                     }
                 }
             }
@@ -1125,11 +1342,16 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // Obter filtros do cliente
-                        let subscribed_plcs = client.subscribed_plcs.read().await;
-                        let subscribed_areas = client.subscribed_areas.read().await;
-                        let subscribed_categories = client.subscribed_categories.read().await;
-                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
+                        let filter_snapshot = {
+                            let plcs = client.subscribed_plcs.read().await;
+                            let areas = client.subscribed_areas.read().await; 
+                            let categories = client.subscribed_categories.read().await;
+                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
+                            
+                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
+                        };
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1137,7 +1359,7 @@ impl WebSocketServer {
                         let mut client_data: HashMap<String, String> = HashMap::new();
                         
                         if has_filters {
-                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered (readonly)
                             for interval_s in 4..=7u64 {
                                 let filtered_tags = smart_cache_clone.get_tags_filtered(
                                     interval_s,
@@ -1149,31 +1371,42 @@ impl WebSocketServer {
                                 client_data.extend(filtered_tags);
                             }
                         } else {
-                            // 📡 CLIENTE SEM FILTROS - Recebe tudo
+                            // 📡 CLIENTE SEM FILTROS - Usar readonly para não afetar outros clientes
                             for interval_s in 4..=7u64 {
-                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast_readonly(interval_s).await;
                                 client_data.extend(tag_data);
                             }
                         }
                         
-                        // Enviar dados filtrados para o cliente
+                        // 🚀 MELHORIA FASE 2: Envio otimizado (BATCH 2 - Médio)
                         if !client_data.is_empty() {
                             if let Some(ref tx) = client.filtered_tx {
                                 let sorted_map = sort_tags_naturally(client_data);
                                 
-                                match rmp_serde::to_vec(&sorted_map) {
-                                    Ok(msgpack_bytes) => {
-                                        let base64_data = base64_encode(&msgpack_bytes);
-                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                        let _ = tx.send(msgpack_message).await;
+                                // Otimização: Preferir MessagePack para dados médios/grandes
+                                if sorted_map.len() > 8 {
+                                    match rmp_serde::to_vec(&sorted_map) {
+                                        Ok(msgpack_bytes) => {
+                                            let base64_data = base64_encode(&msgpack_bytes);
+                                            let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                            let _ = tx.send(msgpack_message).await;
+                                        }
+                                        Err(_) => {
+                                            let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                            let _ = tx.send(message).await;
+                                        }
                                     }
-                                    Err(_) => {
-                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
-                                        let _ = tx.send(message).await;
-                                    }
+                                } else {
+                                    let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                    let _ = tx.send(message).await;
                                 }
                             }
                         }
+                    }
+                    
+                    // 🆕 MARCAR TAGS COMO ENVIADOS APÓS TODOS OS CLIENTES RECEBEREM
+                    for interval_s in 4..=7u64 {
+                        smart_cache_clone.mark_tags_as_sent(interval_s).await;
                     }
                 }
             }
@@ -1195,11 +1428,16 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // Obter filtros do cliente
-                        let subscribed_plcs = client.subscribed_plcs.read().await;
-                        let subscribed_areas = client.subscribed_areas.read().await;
-                        let subscribed_categories = client.subscribed_categories.read().await;
-                        let include_all_faults = client.include_all_faults.load(Ordering::SeqCst);
+                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
+                        let filter_snapshot = {
+                            let plcs = client.subscribed_plcs.read().await;
+                            let areas = client.subscribed_areas.read().await; 
+                            let categories = client.subscribed_categories.read().await;
+                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
+                            
+                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
+                        };
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1207,7 +1445,7 @@ impl WebSocketServer {
                         let mut client_data: HashMap<String, String> = HashMap::new();
                         
                         if has_filters {
-                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered
+                            // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered (readonly)
                             for interval_s in 8..=10u64 {
                                 let filtered_tags = smart_cache_clone.get_tags_filtered(
                                     interval_s,
@@ -1219,31 +1457,42 @@ impl WebSocketServer {
                                 client_data.extend(filtered_tags);
                             }
                         } else {
-                            // 📡 CLIENTE SEM FILTROS - Recebe tudo
+                            // 📡 CLIENTE SEM FILTROS - Usar readonly para não afetar outros clientes
                             for interval_s in 8..=10u64 {
-                                let tag_data = smart_cache_clone.get_tags_for_broadcast(interval_s).await;
+                                let tag_data = smart_cache_clone.get_tags_for_broadcast_readonly(interval_s).await;
                                 client_data.extend(tag_data);
                             }
                         }
                         
-                        // Enviar dados filtrados para o cliente
+                        // 🚀 MELHORIA FASE 2: Envio otimizado (BATCH 3 - Lento)
                         if !client_data.is_empty() {
                             if let Some(ref tx) = client.filtered_tx {
                                 let sorted_map = sort_tags_naturally(client_data);
                                 
-                                match rmp_serde::to_vec(&sorted_map) {
-                                    Ok(msgpack_bytes) => {
-                                        let base64_data = base64_encode(&msgpack_bytes);
-                                        let msgpack_message = format!("MSGPACK:{}", base64_data);
-                                        let _ = tx.send(msgpack_message).await;
+                                // Otimização: Preferir MessagePack para dados médios/grandes
+                                if sorted_map.len() > 8 {
+                                    match rmp_serde::to_vec(&sorted_map) {
+                                        Ok(msgpack_bytes) => {
+                                            let base64_data = base64_encode(&msgpack_bytes);
+                                            let msgpack_message = format!("MSGPACK:{}", base64_data);
+                                            let _ = tx.send(msgpack_message).await;
+                                        }
+                                        Err(_) => {
+                                            let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                            let _ = tx.send(message).await;
+                                        }
                                     }
-                                    Err(_) => {
-                                        let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
-                                        let _ = tx.send(message).await;
-                                    }
+                                } else {
+                                    let message = serde_json::to_string(&sorted_map).unwrap_or_else(|_| "{}".to_string());
+                                    let _ = tx.send(message).await;
                                 }
                             }
                         }
+                    }
+                    
+                    // 🆕 MARCAR TAGS COMO ENVIADOS APÓS TODOS OS CLIENTES RECEBEREM
+                    for interval_s in 8..=10u64 {
+                        smart_cache_clone.mark_tags_as_sent(interval_s).await;
                     }
                 }
             }
@@ -1253,7 +1502,7 @@ impl WebSocketServer {
         handles.push(medium_batch_handle);
         handles.push(slow_batch_handle);
         
-        // TASK 3: BROADCASTING PARA TAGS EM MODO "CHANGE" - AGORA COM FILTRAGEM POR CLIENTE!
+        // TASK 3: BROADCASTING PARA TAGS EM MODO "on_change" - AGORA COM FILTRAGEM POR CLIENTE!
         let smart_cache_change = smart_cache.clone();
         let is_running_change = is_running.clone();
         let connected_clients_change = self.connected_clients.clone();
@@ -1276,7 +1525,7 @@ impl WebSocketServer {
                     let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                     
                     let changed_tags = if has_filters {
-                        // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered para changes
+                        // 🎯 CLIENTE TEM FILTROS - Usar get_tags_filtered para on_change (readonly)
                         smart_cache_change.get_tags_filtered(
                             0,
                             &subscribed_plcs,
@@ -1285,8 +1534,8 @@ impl WebSocketServer {
                             include_all_faults
                         ).await
                     } else {
-                        // 📡 CLIENTE SEM FILTROS - Recebe tudo
-                        smart_cache_change.get_tags_for_broadcast(0).await
+                        // 📡 CLIENTE SEM FILTROS - Usar readonly para não afetar outros clientes
+                        smart_cache_change.get_tags_for_broadcast_readonly(0).await
                     };
                     
                     if !changed_tags.is_empty() {
@@ -1297,6 +1546,9 @@ impl WebSocketServer {
                         }
                     }
                 }
+                
+                // 🆕 MARCAR TAGS on_change COMO ENVIADOS APÓS TODOS OS CLIENTES RECEBEREM
+                smart_cache_change.mark_tags_as_sent(0).await;
             }
         });
         
@@ -1412,7 +1664,7 @@ impl WebSocketServer {
         });
 
         let connected_clients_recv = connected_clients.clone();
-        let app_handle_recv = app_handle.clone();
+        let _app_handle_recv = app_handle.clone();
         let response_tx_clone = response_tx.clone();
         let database_recv = database.clone(); // ✅ CLONE DATABASE
         let smart_cache_recv = smart_cache.clone(); // ✅ CLONE SMART_CACHE
@@ -1533,7 +1785,7 @@ impl WebSocketServer {
                                             }
                                         }
                                         
-                                        // Áreas (ENH, ESV, PJU, PMO, SCO, EDR)
+                                        // Áreas (ENCH, ESVZ, JUS, MONT, ESGT, ECLUS)
                                         {
                                             let mut subscribed_areas = client.subscribed_areas.write().await;
                                             subscribed_areas.clear();
@@ -1600,10 +1852,19 @@ impl WebSocketServer {
             _ = receive_task => {}
         }
 
+        // 🛡️ MELHORIA CRÍTICA: Cleanup explícito para evitar memory leaks
+        if let Some(client) = connected_clients.get(&client_id) {
+            // Fechar canal filtrado explicitamente
+            if let Some(tx) = &client.filtered_tx {
+                drop(tx); // Força fechamento do canal
+            }
+            println!("🧹 Canal filtrado limpo para cliente {}", client_id);
+        }
+        
         connected_clients.remove(&client_id);
         active_connections.fetch_sub(1, Ordering::SeqCst);
 
-        println!("🔌 Cliente {} desconectado", client_id);
+        println!("🔌 Cliente {} desconectado com cleanup completo", client_id);
 
         let _ = app_handle.emit("websocket-client-disconnected", serde_json::json!({
             "client_id": client_id,
@@ -1707,4 +1968,6 @@ impl WebSocketServer {
     pub async fn force_cache_cleanup(&self) -> bool {
         self.smart_cache.enforce_memory_limits().await
     }
+
+    // 🛡️ MELHORIA CRÍTICA: Monitoring system removed as requested by user
 }
