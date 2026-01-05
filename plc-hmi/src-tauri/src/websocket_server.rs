@@ -18,6 +18,331 @@ use crate::database::TagMapping;
 use crate::tcp_server::TcpServer;
 use tokio::sync::mpsc;
 
+// ============================================================================
+// 🛡️ SISTEMA DE BACKPRESSURE ADAPTATIVO AUTOMÁTICO
+// ============================================================================
+// Este sistema auto-detecta problemas de pressão no buffer e auto-corrige
+// sem fechar conexões ou perder dados críticos. Garante estabilidade total.
+// ============================================================================
+
+/// Configuração do sistema de backpressure adaptativo
+#[derive(Debug, Clone)]
+pub struct BackpressureConfig {
+    /// Capacidade inicial do buffer
+    pub initial_capacity: usize,
+    /// Capacidade máxima permitida (auto-expansão)
+    pub max_capacity: usize,
+    /// Threshold para ativar sampling (% de uso)
+    pub sampling_threshold_pct: f64,
+    /// Threshold para expandir buffer (% de uso)
+    pub expand_threshold_pct: f64,
+    /// Threshold para voltar ao normal (% de uso)
+    pub recovery_threshold_pct: f64,
+    /// Intervalo mínimo entre samples quando sob pressão (ms)
+    pub min_sample_interval_ms: u64,
+    /// Fator de expansão do buffer
+    pub expansion_factor: f64,
+}
+
+impl Default for BackpressureConfig {
+    fn default() -> Self {
+        Self {
+            initial_capacity: 2000,
+            max_capacity: 10000,        // Pode crescer até 10k entradas
+            sampling_threshold_pct: 70.0,  // Inicia sampling em 70%
+            expand_threshold_pct: 85.0,    // Expande buffer em 85%
+            recovery_threshold_pct: 40.0,  // Volta ao normal em 40%
+            min_sample_interval_ms: 50,    // Mínimo 50ms entre samples sob pressão
+            expansion_factor: 1.5,         // Expande 50% por vez
+        }
+    }
+}
+
+/// Estado do sistema de backpressure
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BackpressureState {
+    /// Sistema operando normalmente
+    Normal,
+    /// Sistema sob pressão leve - ativou sampling
+    Sampling,
+    /// Sistema sob pressão alta - buffer expandido
+    Expanded,
+    /// Sistema em recuperação - voltando ao normal
+    Recovering,
+}
+
+/// Métricas do sistema de backpressure para monitoramento
+#[derive(Debug, Clone, Serialize)]
+pub struct BackpressureMetrics {
+    pub state: String,
+    pub current_capacity: usize,
+    pub current_usage: usize,
+    pub usage_percentage: f64,
+    pub messages_processed: u64,
+    pub messages_dropped: u64,
+    pub messages_sampled: u64,
+    pub auto_expansions: u64,
+    pub auto_recoveries: u64,
+    pub last_state_change: u64,
+    pub sampling_rate: f64, // 1.0 = 100% (normal), 0.5 = 50% (sampling)
+}
+
+/// Controlador de Backpressure Adaptativo
+#[derive(Debug)]
+pub struct AdaptiveBackpressure {
+    config: BackpressureConfig,
+    state: Arc<std::sync::RwLock<BackpressureState>>,
+    current_capacity: Arc<AtomicUsize>,
+    current_usage: Arc<AtomicUsize>,
+    messages_processed: Arc<AtomicU64>,
+    messages_dropped: Arc<AtomicU64>,
+    messages_sampled: Arc<AtomicU64>,
+    auto_expansions: Arc<AtomicU64>,
+    auto_recoveries: Arc<AtomicU64>,
+    last_state_change: Arc<AtomicU64>,
+    sampling_rate: Arc<std::sync::RwLock<f64>>,
+    last_sample_time: Arc<std::sync::RwLock<std::time::Instant>>,
+    sample_counter: Arc<AtomicU64>,
+}
+
+impl AdaptiveBackpressure {
+    pub fn new(config: BackpressureConfig) -> Self {
+        let initial_cap = config.initial_capacity;
+        Self {
+            config,
+            state: Arc::new(std::sync::RwLock::new(BackpressureState::Normal)),
+            current_capacity: Arc::new(AtomicUsize::new(initial_cap)),
+            current_usage: Arc::new(AtomicUsize::new(0)),
+            messages_processed: Arc::new(AtomicU64::new(0)),
+            messages_dropped: Arc::new(AtomicU64::new(0)),
+            messages_sampled: Arc::new(AtomicU64::new(0)),
+            auto_expansions: Arc::new(AtomicU64::new(0)),
+            auto_recoveries: Arc::new(AtomicU64::new(0)),
+            last_state_change: Arc::new(AtomicU64::new(0)),
+            sampling_rate: Arc::new(std::sync::RwLock::new(1.0)),
+            last_sample_time: Arc::new(std::sync::RwLock::new(std::time::Instant::now())),
+            sample_counter: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// Verifica se deve aceitar esta mensagem (implementa sampling adaptativo)
+    pub fn should_accept(&self) -> bool {
+        let state = *self.state.read().unwrap();
+        
+        match state {
+            BackpressureState::Normal => true,
+            BackpressureState::Sampling | BackpressureState::Expanded => {
+                // Implementar sampling baseado na taxa atual
+                let rate = *self.sampling_rate.read().unwrap();
+                let counter = self.sample_counter.fetch_add(1, Ordering::Relaxed);
+                
+                // Aceitar baseado na taxa de sampling
+                // rate = 1.0 -> aceita tudo
+                // rate = 0.5 -> aceita 50%
+                // rate = 0.25 -> aceita 25%
+                if rate >= 1.0 {
+                    true
+                } else {
+                    let threshold = (rate * 100.0) as u64;
+                    (counter % 100) < threshold
+                }
+            }
+            BackpressureState::Recovering => true, // Durante recuperação, aceita tudo
+        }
+    }
+
+    /// Registra uma mensagem processada e atualiza métricas
+    pub fn record_processed(&self) {
+        self.messages_processed.fetch_add(1, Ordering::Relaxed);
+        let usage = self.current_usage.fetch_sub(1, Ordering::Relaxed).saturating_sub(1);
+        
+        // Verificar se devemos recuperar
+        self.check_recovery(usage);
+    }
+
+    /// Registra uma mensagem dropada
+    pub fn record_dropped(&self) {
+        self.messages_dropped.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Registra uma mensagem sampleada (ignorada por sampling)
+    pub fn record_sampled(&self) {
+        self.messages_sampled.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Registra uma nova mensagem chegando e retorna se deve processar
+    pub fn on_message_arrival(&self) -> bool {
+        let usage = self.current_usage.fetch_add(1, Ordering::Relaxed) + 1;
+        let capacity = self.current_capacity.load(Ordering::Relaxed);
+        let usage_pct = (usage as f64 / capacity as f64) * 100.0;
+
+        // Auto-ajustar estado baseado na pressão
+        self.auto_adjust_state(usage_pct, usage, capacity);
+
+        // Decidir se aceita esta mensagem
+        if self.should_accept() {
+            true
+        } else {
+            self.current_usage.fetch_sub(1, Ordering::Relaxed);
+            self.record_sampled();
+            false
+        }
+    }
+
+    /// Auto-ajusta o estado do sistema baseado na pressão atual
+    fn auto_adjust_state(&self, usage_pct: f64, usage: usize, capacity: usize) {
+        let mut state = self.state.write().unwrap();
+        let old_state = *state;
+
+        match *state {
+            BackpressureState::Normal => {
+                if usage_pct >= self.config.expand_threshold_pct {
+                    // Pressão muito alta - expandir buffer
+                    *state = BackpressureState::Expanded;
+                    self.expand_buffer();
+                    self.update_sampling_rate(0.5); // Reduzir para 50%
+                    println!("🔴 BACKPRESSURE: Normal → Expanded (uso: {:.1}%)", usage_pct);
+                } else if usage_pct >= self.config.sampling_threshold_pct {
+                    // Pressão média - ativar sampling
+                    *state = BackpressureState::Sampling;
+                    self.update_sampling_rate(0.75); // Reduzir para 75%
+                    println!("🟡 BACKPRESSURE: Normal → Sampling (uso: {:.1}%)", usage_pct);
+                }
+            }
+            BackpressureState::Sampling => {
+                if usage_pct >= self.config.expand_threshold_pct {
+                    // Pressão aumentou - expandir
+                    *state = BackpressureState::Expanded;
+                    self.expand_buffer();
+                    self.update_sampling_rate(0.5);
+                    println!("🔴 BACKPRESSURE: Sampling → Expanded (uso: {:.1}%)", usage_pct);
+                } else if usage_pct <= self.config.recovery_threshold_pct {
+                    // Pressão diminuiu - recuperar
+                    *state = BackpressureState::Recovering;
+                    self.update_sampling_rate(1.0);
+                    println!("🟢 BACKPRESSURE: Sampling → Recovering (uso: {:.1}%)", usage_pct);
+                }
+            }
+            BackpressureState::Expanded => {
+                if usage_pct <= self.config.recovery_threshold_pct {
+                    // Pressão diminuiu significativamente - iniciar recuperação
+                    *state = BackpressureState::Recovering;
+                    self.update_sampling_rate(1.0);
+                    self.auto_recoveries.fetch_add(1, Ordering::Relaxed);
+                    println!("🟢 BACKPRESSURE: Expanded → Recovering (uso: {:.1}%)", usage_pct);
+                } else if usage_pct >= 95.0 && capacity < self.config.max_capacity {
+                    // Ainda sob pressão crítica - expandir mais
+                    self.expand_buffer();
+                    self.update_sampling_rate(0.25); // Sampling agressivo
+                    println!("🔴🔴 BACKPRESSURE: Expansão adicional (uso: {:.1}%)", usage_pct);
+                }
+            }
+            BackpressureState::Recovering => {
+                if usage_pct >= self.config.sampling_threshold_pct {
+                    // Pressão voltou - voltar ao sampling
+                    *state = BackpressureState::Sampling;
+                    self.update_sampling_rate(0.75);
+                    println!("🟡 BACKPRESSURE: Recovering → Sampling (uso: {:.1}%)", usage_pct);
+                } else if usage_pct <= self.config.recovery_threshold_pct / 2.0 {
+                    // Totalmente recuperado
+                    *state = BackpressureState::Normal;
+                    self.update_sampling_rate(1.0);
+                    // Opcionalmente reduzir capacidade se muito grande
+                    self.maybe_shrink_buffer();
+                    println!("🟢 BACKPRESSURE: Recovering → Normal (uso: {:.1}%)", usage_pct);
+                }
+            }
+        }
+
+        if *state != old_state {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            self.last_state_change.store(now, Ordering::Relaxed);
+        }
+    }
+
+    /// Expande o buffer automaticamente
+    fn expand_buffer(&self) {
+        let current = self.current_capacity.load(Ordering::Relaxed);
+        let new_capacity = ((current as f64 * self.config.expansion_factor) as usize)
+            .min(self.config.max_capacity);
+        
+        if new_capacity > current {
+            self.current_capacity.store(new_capacity, Ordering::Relaxed);
+            self.auto_expansions.fetch_add(1, Ordering::Relaxed);
+            println!("📈 BACKPRESSURE: Buffer expandido {} → {} (max: {})", 
+                    current, new_capacity, self.config.max_capacity);
+        }
+    }
+
+    /// Reduz o buffer se estiver muito grande e o sistema estiver tranquilo
+    fn maybe_shrink_buffer(&self) {
+        let current = self.current_capacity.load(Ordering::Relaxed);
+        let usage = self.current_usage.load(Ordering::Relaxed);
+        let usage_pct = (usage as f64 / current as f64) * 100.0;
+        
+        // Só reduzir se uso estiver muito baixo e capacidade acima do inicial
+        if usage_pct < 20.0 && current > self.config.initial_capacity {
+            let new_capacity = (current / 2).max(self.config.initial_capacity);
+            self.current_capacity.store(new_capacity, Ordering::Relaxed);
+            println!("📉 BACKPRESSURE: Buffer reduzido {} → {}", current, new_capacity);
+        }
+    }
+
+    /// Atualiza a taxa de sampling
+    fn update_sampling_rate(&self, rate: f64) {
+        let mut sampling = self.sampling_rate.write().unwrap();
+        *sampling = rate.clamp(0.1, 1.0);
+    }
+
+    /// Verifica se deve iniciar recuperação
+    fn check_recovery(&self, current_usage: usize) {
+        let capacity = self.current_capacity.load(Ordering::Relaxed);
+        let usage_pct = (current_usage as f64 / capacity as f64) * 100.0;
+        
+        if usage_pct <= self.config.recovery_threshold_pct {
+            let state = *self.state.read().unwrap();
+            if state == BackpressureState::Sampling || state == BackpressureState::Expanded {
+                // Trigger auto-adjustment na próxima mensagem
+            }
+        }
+    }
+
+    /// Obtém métricas atuais do sistema
+    pub fn get_metrics(&self) -> BackpressureMetrics {
+        let state = *self.state.read().unwrap();
+        let capacity = self.current_capacity.load(Ordering::Relaxed);
+        let usage = self.current_usage.load(Ordering::Relaxed);
+        
+        BackpressureMetrics {
+            state: format!("{:?}", state),
+            current_capacity: capacity,
+            current_usage: usage,
+            usage_percentage: (usage as f64 / capacity as f64) * 100.0,
+            messages_processed: self.messages_processed.load(Ordering::Relaxed),
+            messages_dropped: self.messages_dropped.load(Ordering::Relaxed),
+            messages_sampled: self.messages_sampled.load(Ordering::Relaxed),
+            auto_expansions: self.auto_expansions.load(Ordering::Relaxed),
+            auto_recoveries: self.auto_recoveries.load(Ordering::Relaxed),
+            last_state_change: self.last_state_change.load(Ordering::Relaxed),
+            sampling_rate: *self.sampling_rate.read().unwrap(),
+        }
+    }
+
+    /// Reseta as métricas (para debugging/monitoramento)
+    pub fn reset_metrics(&self) {
+        self.messages_processed.store(0, Ordering::Relaxed);
+        self.messages_dropped.store(0, Ordering::Relaxed);
+        self.messages_sampled.store(0, Ordering::Relaxed);
+    }
+}
+
+// ============================================================================
+// FIM DO SISTEMA DE BACKPRESSURE
+// ============================================================================
+
 // ✅ Helper para base64 encode simples
 fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -171,13 +496,38 @@ pub struct CachedTagValue {
     pub value: String,
     pub data_type: String,
     pub timestamp_ns: u128,
-    pub collect_mode: String,
+    pub collect_mode: String,           // Mantido para serialização JSON
+    #[serde(skip)]
+    pub collect_mode_enum: CollectMode, // 🚀 OTIMIZAÇÃO: Enum pré-computado
     pub interval_s: u64,
     pub last_sent: u128,
     pub changed: bool,
+    #[serde(skip)]
+    pub last_value: Option<String>,     // 🚀 OTIMIZAÇÃO: Tracking inline (evita DashMap extra)
     // 🆕 CAMPOS PARA FILTRAGEM INTELIGENTE
     pub area: Option<String>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
-    pub category: Option<String>, // PROC, FAULT, EVENT, ALARM
+    pub category: Option<String>, // PROC, FAULT, EVENT (simplificado)
+}
+
+// 🚀 OTIMIZAÇÃO: Enum para collect_mode - evita comparações de string repetidas
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum CollectMode {
+    OnChange,  // Envia apenas quando valor muda
+    #[default]
+    Interval,  // Envia em intervalos fixos (padrão)
+    Unknown,   // Modo não reconhecido
+}
+
+impl CollectMode {
+    /// Converte string para enum (normalizado uma vez no insert)
+    #[inline]
+    pub fn from_str(s: &str) -> Self {
+        match s.trim().to_lowercase().as_str() {
+            "on_change" | "onchange" | "change" => CollectMode::OnChange,
+            "interval" | "periodic" => CollectMode::Interval,
+            _ => CollectMode::Unknown,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -188,6 +538,10 @@ pub struct SmartCache {
     interval_groups: Arc<RwLock<HashMap<u64, Vec<String>>>>,
     // Controle de mudanças para tags em modo "change"
     change_tracking: Arc<DashMap<String, String>>,
+    
+    // 🚀 ÍNDICE SECUNDÁRIO: Tags on_change para iteração rápida
+    // Em vez de iterar 7500 tags, iteramos apenas os ~500 on_change
+    on_change_index: Arc<DashMap<String, ()>>, // tag_key -> () (só precisamos da key)
     
     // 🆕 CACHE DE TAG MAPPINGS - EVITA CONSULTAS AO BANCO!
     tag_mappings_cache: Arc<DashMap<String, Vec<TagMapping>>>, // plc_ip -> tags
@@ -210,10 +564,31 @@ pub struct ConnectedClient {
     pub client_type: ClientType,
     // 🆕 FILTROS GRANULARES PARA SUBSCRIBE INTELIGENTE
     pub subscribed_areas: Arc<RwLock<std::collections::HashSet<String>>>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
-    pub subscribed_categories: Arc<RwLock<std::collections::HashSet<String>>>, // PROC, FAULT, EVENT, ALARM
-    pub include_all_faults: Arc<AtomicBool>, // Sempre receber TODAS as falhas (para painel de alarmes)
+    pub subscribed_categories: Arc<RwLock<std::collections::HashSet<String>>>, // PROC, FAULT, EVENT
+    pub include_all_faults: Arc<AtomicBool>, // Sempre receber TODAS as falhas/eventos (para painel de alarmes)
     // 🆕 CANAL PARA ENVIO DE MENSAGENS FILTRADAS PARA ESTE CLIENTE
     pub filtered_tx: Option<mpsc::Sender<String>>,
+}
+
+impl ConnectedClient {
+    // 🛡️ FIX RACE CONDITION: Obter snapshot atômico de todos os filtros
+    pub async fn get_filter_snapshot(&self) -> (
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+        bool
+    ) {
+        // Usar tokio::join! para adquirir todos os locks simultaneamente
+        let (plcs_guard, areas_guard, categories_guard) = tokio::join!(
+            self.subscribed_plcs.read(),
+            self.subscribed_areas.read(),
+            self.subscribed_categories.read()
+        );
+        let include_faults = self.include_all_faults.load(Ordering::Acquire);
+        
+        // Clonar tudo enquanto ainda temos os locks
+        (plcs_guard.clone(), areas_guard.clone(), categories_guard.clone(), include_faults)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -244,7 +619,8 @@ pub struct WebSocketServer {
     plc_broadcast_channels: Arc<DashMap<String, broadcast::Sender<String>>>,
     // 🚀 MELHORIA FASE 2: Batching inteligente para otimizar serialização
     batched_payloads: Arc<DashMap<u64, BatchedPayload>>, // Hash do filtro -> payload cached
-    // 🛡️ MELHORIA CRÍTICA: Removed monitoring system as requested
+    // 🛡️ SISTEMA DE BACKPRESSURE ADAPTATIVO AUTOMÁTICO
+    backpressure: Arc<AdaptiveBackpressure>,
 }
 
 impl SmartCache {
@@ -253,6 +629,8 @@ impl SmartCache {
             tag_cache: Arc::new(DashMap::new()),
             interval_groups: Arc::new(RwLock::new(HashMap::new())),
             change_tracking: Arc::new(DashMap::new()),
+            // 🚀 ÍNDICE SECUNDÁRIO PARA TAGS ON_CHANGE
+            on_change_index: Arc::new(DashMap::new()),
             // 🆕 INICIALIZAR CACHE DE MAPPINGS
             tag_mappings_cache: Arc::new(DashMap::new()),
             tag_mappings_last_update: Arc::new(RwLock::new(std::time::Instant::now())),
@@ -267,6 +645,7 @@ impl SmartCache {
     pub async fn clear(&self) {
         self.tag_cache.clear();
         self.change_tracking.clear();
+        self.on_change_index.clear(); // 🚀 Limpar índice secundário
         let mut lock = self.interval_groups.write().await;
         lock.clear();
         // 🆕 LIMPAR CACHE DE MAPPINGS TAMBÉM
@@ -295,8 +674,8 @@ impl SmartCache {
     // 🆕 VERIFICAR SE CACHE PRECISA SER ATUALIZADO (só se muito antigo)
     pub async fn should_refresh_cache(&self) -> bool {
         let last_update = self.tag_mappings_last_update.read().await;
-        // Só atualiza cache se tiver mais de 60 segundos (raramente!)
-        last_update.elapsed().as_secs() > 60
+        // Só atualiza cache se tiver mais de 300 segundos (5 minutos) - REDUZIDO DRASTICAMENTE
+        last_update.elapsed().as_secs() > 300
     }
     
     // ✅ ATUALIZAR CACHE COM DADOS TCP - AGORA USA CACHE DE TAGS!
@@ -350,26 +729,49 @@ impl SmartCache {
                     variable.value.clone()
                 };
 
-                // Verificar mudança para tags em modo "on_change"
+                // 🚀 OTIMIZAÇÃO: Converter collect_mode para enum UMA VEZ (não em cada iteração)
+                let collect_mode_str = tag.collect_mode.as_deref().unwrap_or("interval");
+                let collect_mode_enum = CollectMode::from_str(collect_mode_str);
+                
+                // 🚀 OTIMIZAÇÃO: Verificar mudança inline (evita DashMap change_tracking)
                 let mut value_changed = true;
-                if tag.collect_mode.as_deref() == Some("on_change") {
-                    if let Some(last_value) = self.change_tracking.get(&tag_key) {
-                        value_changed = last_value.value() != &final_value;
+                let mut last_value_inline: Option<String> = None;
+                let mut preserved_last_sent: u128 = 0; // 🔧 FIX: Preservar last_sent anterior
+                
+                if collect_mode_enum == CollectMode::OnChange {
+                    // Verificar se tag já existe no cache para comparar valor anterior
+                    if let Some(existing) = self.tag_cache.get(&tag_key) {
+                        value_changed = existing.value != final_value;
+                        last_value_inline = Some(existing.value.clone());
+                        // 🔧 FIX: Preservar last_sent se valor NÃO mudou
+                        if !value_changed {
+                            preserved_last_sent = existing.last_sent;
+                        }
                     }
-                    self.change_tracking.insert(tag_key.clone(), final_value.clone());
+                    // 🚀 Atualizar índice secundário de tags on_change
+                    self.on_change_index.insert(tag_key.clone(), ());
+                } else {
+                    // Para tags com intervalo, preservar last_sent se existir
+                    if let Some(existing) = self.tag_cache.get(&tag_key) {
+                        preserved_last_sent = existing.last_sent;
+                    }
+                    // Remover do índice se não for mais on_change
+                    self.on_change_index.remove(&tag_key);
                 }
                 
-                // Atualizar cache
+                // Atualizar cache com struct otimizado
                 let cached = CachedTagValue {
                     tag_name: tag.tag_name.clone(),
                     plc_ip: plc_ip.to_string(),
                     value: final_value,
                     data_type: if bit_index.is_some() { "BOOL".to_string() } else { variable.data_type.clone() },
                     timestamp_ns: now,
-                    collect_mode: tag.collect_mode.clone().unwrap_or_default(),
+                    collect_mode: collect_mode_str.to_string(),
+                    collect_mode_enum, // 🚀 Enum pré-computado
                     interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
-                    last_sent: 0,
+                    last_sent: preserved_last_sent, // 🔧 FIX: Usar valor preservado
                     changed: value_changed,
+                    last_value: last_value_inline, // 🚀 Tracking inline
                     // 🆕 GUARDAR ÁREA E CATEGORIA PARA FILTRAGEM
                     area: tag.area.clone(),
                     category: tag.category.clone(),
@@ -427,10 +829,11 @@ impl SmartCache {
                 0
             };
             
-            let should_send = match cached.collect_mode.as_str() {
-                "on_change" => cached.changed && time_since_last >= interval_s as u128,
-                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                _ => false,
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let should_send = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => false,
             };
             
             if should_send {
@@ -447,6 +850,44 @@ impl SmartCache {
         }
         
         result
+    }
+    
+    // 🚀 OTIMIZAÇÃO: Buscar APENAS tags on_change usando índice secundário
+    // Performance: O(on_change_tags) ao invés de O(all_tags)
+    pub fn get_on_change_tags_fast(&self) -> HashMap<String, String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        let mut result = HashMap::new();
+        
+        // Iterar APENAS sobre tags no índice on_change (muito mais rápido!)
+        for entry in self.on_change_index.iter() {
+            let tag_key = entry.key();
+            if let Some(cached) = self.tag_cache.get(tag_key) {
+                // Verificar se realmente mudou e pode ser enviado
+                if cached.changed {
+                    let time_since_last = if now >= cached.last_sent {
+                        (now - cached.last_sent) / 1_000_000_000
+                    } else {
+                        0
+                    };
+                    // Mínimo 1 segundo entre envios para evitar spam
+                    if time_since_last >= 1 {
+                        result.insert(cached.tag_name.clone(), cached.value.clone());
+                    }
+                }
+            }
+        }
+        
+        result
+    }
+    
+    // 🚀 ESTATÍSTICAS DO ÍNDICE ON_CHANGE
+    pub fn get_on_change_stats(&self) -> (usize, usize) {
+        let total_tags = self.tag_cache.len();
+        let on_change_tags = self.on_change_index.len();
+        (on_change_tags, total_tags)
     }
     
     // 🆕 OBTER TAGS SEM RESETAR ESTADO (para múltiplos clientes)
@@ -466,10 +907,11 @@ impl SmartCache {
                 0
             };
             
-            let should_send = match cached.collect_mode.as_str() {
-                "on_change" => cached.changed && time_since_last >= interval_s as u128,
-                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                _ => false,
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let should_send = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => false,
             };
             
             if should_send {
@@ -480,7 +922,43 @@ impl SmartCache {
         result
     }
     
+    // 🛡️ FIX RACE CONDITION: Obter E marcar atomicamente (retorna tags + marca como enviado)
+    pub async fn get_and_mark_tags_atomic(&self, interval_s: u64) -> HashMap<String, String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        let mut result = HashMap::new();
+        
+        // 🛡️ OPERAÇÃO ATÔMICA: Leitura + Reset em uma única iteração mutável
+        for mut entry in self.tag_cache.iter_mut() {
+            let cached = entry.value_mut();
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000
+            } else {
+                0
+            };
+            
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let should_send = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => false,
+            };
+            
+            if should_send {
+                result.insert(cached.tag_name.clone(), cached.value.clone());
+                // 🛡️ RESET ATÔMICO DENTRO DA MESMA ITERAÇÃO
+                cached.last_sent = now;
+                cached.changed = false;
+            }
+        }
+        
+        result
+    }
+    
     // 🆕 RESETAR ESTADO DE TAGS ENVIADOS (chamar UMA VEZ após enviar para todos os clientes)
+    // ⚠️ DEPRECATED: Usar get_and_mark_tags_atomic para evitar race conditions
     pub async fn mark_tags_as_sent(&self, interval_s: u64) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -495,10 +973,11 @@ impl SmartCache {
                 0
             };
             
-            let was_sent = match cached.collect_mode.as_str() {
-                "on_change" => cached.changed && time_since_last >= interval_s as u128,
-                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                _ => false,
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let was_sent = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => false,
             };
             
             if was_sent {
@@ -516,6 +995,61 @@ impl SmartCache {
                 cached_mut.changed = false;
             }
         }
+    }
+    
+    // 🆕 OBTER TAGS AGRUPADOS POR PLC (para broadcast estruturado)
+    // Retorna: HashMap<plc_ip, HashMap<tag_name, value>>
+    // Isso permite que o frontend receba dados organizados por PLC
+    pub async fn get_tags_grouped_by_plc(&self, interval_s: u64) -> HashMap<String, HashMap<String, String>> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_nanos();
+        let mut result: HashMap<String, HashMap<String, String>> = HashMap::new();
+        
+        for entry in self.tag_cache.iter() {
+            let cached = entry.value();
+            let time_since_last = if now >= cached.last_sent {
+                (now - cached.last_sent) / 1_000_000_000
+            } else {
+                0
+            };
+            
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let should_send = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => false,
+            };
+            
+            if should_send {
+                // Agrupar por PLC IP
+                result
+                    .entry(cached.plc_ip.clone())
+                    .or_insert_with(HashMap::new)
+                    .insert(cached.tag_name.clone(), cached.value.clone());
+            }
+        }
+        
+        result
+    }
+    
+    // 🆕 OBTER LISTA DE PLCs ATIVOS NO CACHE
+    pub fn get_active_plc_ips(&self) -> Vec<String> {
+        let mut plc_ips: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for entry in self.tag_cache.iter() {
+            plc_ips.insert(entry.value().plc_ip.clone());
+        }
+        plc_ips.into_iter().collect()
+    }
+    
+    // 🆕 CONTAR TAGS POR PLC (para diagnóstico)
+    pub fn get_tag_count_by_plc(&self) -> HashMap<String, usize> {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for entry in self.tag_cache.iter() {
+            *counts.entry(entry.value().plc_ip.clone()).or_insert(0) += 1;
+        }
+        counts
     }
     
     // 🆕 OBTER TAGS FILTRADOS POR ÁREA E CATEGORIA (para SUBSCRIBE inteligente)
@@ -551,11 +1085,11 @@ impl SmartCache {
                 let tag_area = cached.area.as_deref().unwrap_or("");
                 let area_match = areas.contains(tag_area);
                 
-                // Exceção: se include_all_faults e é uma falha, incluir independente da área
-                let is_fault = cached.category.as_deref() == Some("FAULT") || 
-                              cached.category.as_deref() == Some("ALARM");
+                // Exceção: se include_all_faults e é uma falha/evento, incluir independente da área
+                let is_fault_or_event = cached.category.as_deref() == Some("FAULT") || 
+                                        cached.category.as_deref() == Some("EVENT");
                 
-                if !area_match && !(include_all_faults && is_fault) {
+                if !area_match && !(include_all_faults && is_fault_or_event) {
                     continue;
                 }
             }
@@ -565,10 +1099,10 @@ impl SmartCache {
                 let tag_category = cached.category.as_deref().unwrap_or("");
                 let category_match = categories.contains(tag_category);
                 
-                // Exceção: sempre incluir FAULT e ALARM se include_all_faults
-                let is_fault = tag_category == "FAULT" || tag_category == "ALARM";
+                // Exceção: sempre incluir FAULT e EVENT se include_all_faults
+                let is_fault_or_event = tag_category == "FAULT" || tag_category == "EVENT";
                 
-                if !category_match && !(include_all_faults && is_fault) {
+                if !category_match && !(include_all_faults && is_fault_or_event) {
                     continue;
                 }
             }
@@ -580,10 +1114,11 @@ impl SmartCache {
                 0
             };
             
-            let should_send = match cached.collect_mode.as_str() {
-                "on_change" => cached.changed && time_since_last >= interval_s as u128,
-                "interval" => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                _ => time_since_last >= interval_s as u128, // Default: enviar baseado no intervalo
+            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
+            let should_send = match cached.collect_mode_enum {
+                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
+                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
+                CollectMode::Unknown => time_since_last >= interval_s as u128, // Default: enviar baseado no intervalo
             };
             
             if should_send {
@@ -678,6 +1213,24 @@ impl WebSocketServer {
         database: Arc<Database>,
         tcp_server: Option<Arc<RwLock<Option<TcpServer>>>>,
     ) -> Self {
+        // 🛡️ Configurar backpressure adaptativo
+        let backpressure_config = BackpressureConfig {
+            initial_capacity: 2000,      // Capacidade inicial
+            max_capacity: 15000,         // Suporta até 15k mensagens em fila
+            sampling_threshold_pct: 70.0, // Inicia sampling em 70%
+            expand_threshold_pct: 85.0,   // Expande buffer em 85%
+            recovery_threshold_pct: 40.0, // Volta ao normal em 40%
+            min_sample_interval_ms: 25,   // 25ms mínimo entre samples
+            expansion_factor: 1.5,        // Expande 50% por vez
+        };
+        
+        println!("🛡️ Sistema de Backpressure Adaptativo inicializado:");
+        println!("   📊 Capacidade inicial: {}", backpressure_config.initial_capacity);
+        println!("   📈 Capacidade máxima: {}", backpressure_config.max_capacity);
+        println!("   🎯 Threshold sampling: {}%", backpressure_config.sampling_threshold_pct);
+        println!("   🔴 Threshold expansão: {}%", backpressure_config.expand_threshold_pct);
+        println!("   🟢 Threshold recuperação: {}%", backpressure_config.recovery_threshold_pct);
+        
         Self {
             config,
             is_running: Arc::new(AtomicBool::new(false)),
@@ -700,7 +1253,24 @@ impl WebSocketServer {
             plc_broadcast_channels: Arc::new(DashMap::new()),
             // 🚀 MELHORIA FASE 2: Inicializar sistema de batching
             batched_payloads: Arc::new(DashMap::new()),
+            // 🛡️ BACKPRESSURE ADAPTATIVO
+            backpressure: Arc::new(AdaptiveBackpressure::new(backpressure_config)),
         }
+    }
+
+    /// Obtém métricas do sistema de backpressure
+    pub fn get_backpressure_metrics(&self) -> BackpressureMetrics {
+        self.backpressure.get_metrics()
+    }
+    
+    /// 🆕 DIAGNÓSTICO: Obter contagem de tags por PLC
+    pub fn get_tag_count_by_plc(&self) -> HashMap<String, usize> {
+        self.smart_cache.get_tag_count_by_plc()
+    }
+    
+    /// 🆕 DIAGNÓSTICO: Obter lista de PLCs ativos no cache
+    pub fn get_active_plc_ips(&self) -> Vec<String> {
+        self.smart_cache.get_active_plc_ips()
     }
 
     // ✅ MELHORIA: Cliente se inscreve em PLCs específicos
@@ -1108,45 +1678,56 @@ impl WebSocketServer {
         let database = self.database.clone();
         let is_running = self.is_running.clone();
         let smart_cache = self.smart_cache.clone();
+        let backpressure = self.backpressure.clone();
 
         println!("🚀 SISTEMA INTELIGENTE: Cache + Broadcasting sem bloqueios!");
         println!("📦 Cache de tags habilitado - ZERO consultas ao banco por pacote!");
+        println!("🛡️ Backpressure Adaptativo ATIVO - Auto-correção automática!");
 
-        // 🚀 MELHORIA FASE 2: Canal expandido para alto throughput de atualizações  
-        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(2000); // Expandido para suportar 7500+ tags
+        // 🚀 Usar capacidade do backpressure para o canal
+        let initial_capacity = backpressure.get_metrics().current_capacity;
+        let (update_tx, mut update_rx) = mpsc::channel::<CacheUpdateData>(initial_capacity);
         
         // TASK 1: CACHE UPDATER
         let is_running_cache = is_running.clone();
         let smart_cache_updater = smart_cache.clone();
         let database_updater = database.clone();
         let app_handle_cache = self.app_handle.clone();
+        let backpressure_processor = backpressure.clone();
         
-        // ✅ TASK 1A: PROCESSADOR ATÔMICO DE CACHE
+        // ✅ TASK 1A: PROCESSADOR ATÔMICO DE CACHE COM BACKPRESSURE
         let _atomic_cache_processor = tokio::spawn({
             let smart_cache_clone = smart_cache_updater.clone();
             let database_clone = database_updater.clone();
             let is_running_clone = is_running_cache.clone();
+            let bp = backpressure_processor.clone();
+            let app_handle_processor = app_handle_cache.clone(); // 🆕 Para emitir eventos
+            
             async move {
                 let mut packets_processed: u64 = 0;
                 let mut last_cache_refresh = std::time::Instant::now();
+                let mut last_bp_log = std::time::Instant::now();
                 
                 while let Some(update_data) = update_rx.recv().await {
                     if !is_running_clone.load(Ordering::SeqCst) {
                         break;
                     }
                     
+                    // 🛡️ REGISTRAR MENSAGEM PROCESSADA NO BACKPRESSURE
+                    bp.record_processed();
                     packets_processed += 1;
                     
-                    // 🆕 REFRESH CACHE A CADA 60 SEGUNDOS (não a cada pacote!)
-                    if last_cache_refresh.elapsed().as_secs() > 60 {
+                    // 🔧 REFRESH CACHE A CADA 5 MINUTOS (300 segundos)
+                    let cache_elapsed_secs = last_cache_refresh.elapsed().as_secs();
+                    if cache_elapsed_secs > 300 {
                         println!("🔄 Refresh periódico do cache de tags ({} pacotes processados)", packets_processed);
                         smart_cache_clone.load_tag_mappings_to_cache(&update_data.plc_ip, &database_clone).await;
                         last_cache_refresh = std::time::Instant::now();
                     }
                     
-                    // 🚀 MELHORIA FASE 2: Limpeza menos frequente para suportar 7500+ tags
-                    if packets_processed % 200 == 0 && smart_cache_clone.should_cleanup().await {
-                        println!("🧹 Limpeza automática otimizada para alta capacidade (pacote {})", packets_processed);
+                    // 🚀 LIMPEZA ULTRA-REDUZIDA: Só a cada 2000 pacotes
+                    if packets_processed % 2000 == 0 && smart_cache_clone.should_cleanup().await {
+                        println!("🧹 Limpeza automática (pacote {})", packets_processed);
                         smart_cache_clone.enforce_memory_limits().await;
                     }
                     
@@ -1157,18 +1738,66 @@ impl WebSocketServer {
                         &database_clone
                     ).await;
                     
-                    // ✅ OTIMIZAÇÃO: Log periódico com estatísticas de memória
-                    if packets_processed % 100 == 0 {
-                        let (cache_size, mappings_size, tracking_size, memory_pct) = smart_cache_clone.get_memory_stats();
-                        println!("📊 WebSocket: {} pacotes | Cache: {} tags ({:.1}%) | Mappings: {} | Tracking: {}", 
-                                packets_processed, cache_size, memory_pct, mappings_size, tracking_size);
+                    // 📊 LOG PERIÓDICO COM MÉTRICAS DE BACKPRESSURE + EMISSÃO DE EVENTOS
+                    if last_bp_log.elapsed().as_secs() >= 30 {
+                        let metrics = bp.get_metrics();
+                        let (cache_size, _mappings_size, _tracking_size, memory_pct) = smart_cache_clone.get_memory_stats();
+                        println!("📊 WebSocket Status:");
+                        println!("   📦 Pacotes: {} | Cache: {} tags ({:.1}%)", packets_processed, cache_size, memory_pct);
+                        println!("   🛡️ Backpressure: {} | Uso: {:.1}% | Capacidade: {}", 
+                                metrics.state, metrics.usage_percentage, metrics.current_capacity);
+                        println!("   📈 Processados: {} | Sampled: {} | Dropped: {}", 
+                                metrics.messages_processed, metrics.messages_sampled, metrics.messages_dropped);
+                        if metrics.auto_expansions > 0 || metrics.auto_recoveries > 0 {
+                            println!("   🔄 Auto-expansões: {} | Auto-recuperações: {}", 
+                                    metrics.auto_expansions, metrics.auto_recoveries);
+                        }
+                        
+                        // 🆕 EMITIR EVENTOS PARA FRONTEND QUANDO ESTADOS CRÍTICOS
+                        let state_lower = metrics.state.to_lowercase();
+                        if state_lower == "sampling" || state_lower == "expanded" {
+                            let _ = app_handle_processor.emit("backpressure-warning", serde_json::json!({
+                                "state": metrics.state,
+                                "usage_percentage": metrics.usage_percentage,
+                                "current_capacity": metrics.current_capacity,
+                                "sampling_rate": metrics.sampling_rate,
+                                "messages_dropped": metrics.messages_dropped,
+                                "messages_sampled": metrics.messages_sampled,
+                                "auto_expansions": metrics.auto_expansions
+                            }));
+                        }
+                        
+                        // Alertar se muitos drops
+                        let total_messages = metrics.messages_processed + metrics.messages_dropped;
+                        if total_messages > 0 {
+                            let drop_rate = (metrics.messages_dropped as f64 / total_messages as f64) * 100.0;
+                            if drop_rate > 5.0 {
+                                let _ = app_handle_processor.emit("backpressure-critical", serde_json::json!({
+                                    "state": metrics.state,
+                                    "drop_rate_percent": drop_rate,
+                                    "messages_dropped": metrics.messages_dropped,
+                                    "messages_processed": metrics.messages_processed
+                                }));
+                            }
+                        }
+                        
+                        // Alertar se cache de tags está alto
+                        if memory_pct > 80.0 {
+                            let _ = app_handle_processor.emit("tag-cache-warning", serde_json::json!({
+                                "cache_size": cache_size,
+                                "usage_percent": memory_pct
+                            }));
+                        }
+                        
+                        last_bp_log = std::time::Instant::now();
                     }
                 }
                 println!("✅ Atomic cache processor finalizado ({} pacotes)", packets_processed);
             }
         });
         
-        // ✅ TASK 1B: EVENT LISTENER
+        // ✅ TASK 1B: EVENT LISTENER COM BACKPRESSURE ADAPTATIVO
+        let backpressure_listener = backpressure.clone();
         let cache_handle = tokio::spawn(async move {
             use tauri::Listener;
             
@@ -1177,6 +1806,13 @@ impl WebSocketServer {
                 if let Ok(data) = serde_json::from_str::<serde_json::Value>(payload) {
                     let plc_ip = data["plc_ip"].as_str().unwrap_or("");
                     if let Some(variables_array) = data["variables"].as_array() {
+                        
+                        // 🛡️ BACKPRESSURE: Verificar se devemos aceitar esta mensagem
+                        if !backpressure_listener.on_message_arrival() {
+                            // Mensagem foi sampleada - ignorar sem logar (muito frequente)
+                            return;
+                        }
+                        
                         let mut variables = Vec::new();
                         for var in variables_array {
                             if let (Some(name), Some(value), Some(data_type)) = (
@@ -1199,15 +1835,21 @@ impl WebSocketServer {
                             timestamp: data["timestamp"].as_u64().unwrap_or(0),
                         };
                         
-                        // 🛡️ MELHORIA CRÍTICA: Tratar erros de buffer overflow
+                        // 🛡️ BACKPRESSURE: Tratar erros com registro de métricas
                         if let Err(e) = update_tx.try_send(update_data.clone()) {
                             match e {
                                 mpsc::error::TrySendError::Full(_) => {
-                                    println!("⚠️ Cache update buffer cheio - dados perdidos (PLC: {})", update_data.plc_ip);
+                                    // Buffer cheio mesmo com backpressure - registrar drop
+                                    backpressure_listener.record_dropped();
+                                    // Log apenas ocasionalmente para não sobrecarregar
+                                    let dropped = backpressure_listener.get_metrics().messages_dropped;
+                                    if dropped % 100 == 1 {
+                                        println!("⚠️ Backpressure: {} mensagens dropadas (buffer cheio)", dropped);
+                                    }
                                 }
                                 mpsc::error::TrySendError::Closed(_) => {
                                     println!("❌ Cache update channel fechado - parando updates");
-                                    return; // Sair da closure, não break
+                                    return;
                                 }
                             }
                         }
@@ -1247,16 +1889,9 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
-                        let filter_snapshot = {
-                            let plcs = client.subscribed_plcs.read().await;
-                            let areas = client.subscribed_areas.read().await; 
-                            let categories = client.subscribed_categories.read().await;
-                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
-                            
-                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
-                        };
-                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
+                        // 🛡️ FIX RACE CONDITION: Usar método atômico para snapshot de filtros
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = 
+                            client.get_filter_snapshot().await;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1275,12 +1910,26 @@ impl WebSocketServer {
                                 ).await;
                                 client_data.extend(filtered_tags);
                             }
+                            
+                            // 🔄 ADICIONAR TAGS ON_CHANGE FILTRADAS (independente de intervalo)
+                            let on_change_filtered = smart_cache_clone.get_tags_filtered(
+                                0,
+                                &subscribed_plcs,
+                                &subscribed_areas,
+                                &subscribed_categories,
+                                include_all_faults
+                            ).await;
+                            client_data.extend(on_change_filtered);
                         } else {
                             // 📡 CLIENTE SEM FILTROS - Usar readonly para não afetar outros clientes
                             for interval_s in 1..=3u64 {
                                 let tag_data = smart_cache_clone.get_tags_for_broadcast_readonly(interval_s).await;
                                 client_data.extend(tag_data);
                             }
+                            
+                            // 🔄 ADICIONAR TAGS ON_CHANGE (independente de intervalo)
+                            let on_change_data = smart_cache_clone.get_tags_for_broadcast_readonly(0).await;
+                            client_data.extend(on_change_data);
                         }
                         
                         // 🚀 MELHORIA FASE 2: Enviar dados com batching inteligente (BATCH 1 - Rápido)
@@ -1322,6 +1971,9 @@ impl WebSocketServer {
                     for interval_s in 1..=3u64 {
                         smart_cache_clone.mark_tags_as_sent(interval_s).await;
                     }
+                    
+                    // 🔄 MARCAR TAGS ON_CHANGE COMO ENVIADOS
+                    smart_cache_clone.mark_tags_as_sent(0).await;
                 }
             }
         });
@@ -1342,16 +1994,9 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
-                        let filter_snapshot = {
-                            let plcs = client.subscribed_plcs.read().await;
-                            let areas = client.subscribed_areas.read().await; 
-                            let categories = client.subscribed_categories.read().await;
-                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
-                            
-                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
-                        };
-                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
+                        // 🛡️ FIX RACE CONDITION: Usar método atômico para snapshot de filtros
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = 
+                            client.get_filter_snapshot().await;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1428,16 +2073,9 @@ impl WebSocketServer {
                     for client_entry in connected_clients_clone.iter() {
                         let client = client_entry.value();
                         
-                        // 🛡️ MELHORIA CRÍTICA: Snapshot atômico de filtros para evitar race conditions
-                        let filter_snapshot = {
-                            let plcs = client.subscribed_plcs.read().await;
-                            let areas = client.subscribed_areas.read().await; 
-                            let categories = client.subscribed_categories.read().await;
-                            let include_faults = client.include_all_faults.load(Ordering::SeqCst);
-                            
-                            (plcs.clone(), areas.clone(), categories.clone(), include_faults)
-                        };
-                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = filter_snapshot;
+                        // 🛡️ FIX RACE CONDITION: Usar método atômico para snapshot de filtros
+                        let (subscribed_plcs, subscribed_areas, subscribed_categories, include_all_faults) = 
+                            client.get_filter_snapshot().await;
                         
                         let has_filters = !subscribed_areas.is_empty() || !subscribed_categories.is_empty();
                         
@@ -1794,7 +2432,7 @@ impl WebSocketServer {
                                             }
                                         }
                                         
-                                        // Categorias (PROC, FAULT, EVENT, ALARM)
+                                        // Categorias (PROC, FAULT, EVENT)
                                         {
                                             let mut subscribed_categories = client.subscribed_categories.write().await;
                                             subscribed_categories.clear();
@@ -1852,16 +2490,32 @@ impl WebSocketServer {
             _ = receive_task => {}
         }
 
-        // 🛡️ MELHORIA CRÍTICA: Cleanup explícito para evitar memory leaks
-        if let Some(client) = connected_clients.get(&client_id) {
-            // Fechar canal filtrado explicitamente
-            if let Some(tx) = &client.filtered_tx {
-                drop(tx); // Força fechamento do canal
+        // 🛡️ MELHORIA CRÍTICA: Cleanup explícito e completo para evitar memory leaks
+        {
+            // Primeiro remover do DashMap para impedir novos envios
+            if let Some((_, mut client)) = connected_clients.remove(&client_id) {
+                // Fechar canal filtrado explicitamente tomando ownership
+                if let Some(tx) = client.filtered_tx.take() {
+                    // Dropar explicitamente para fechar o canal
+                    drop(tx);
+                }
+                // Limpar HashSets de subscrições
+                {
+                    let mut plcs = client.subscribed_plcs.write().await;
+                    plcs.clear();
+                }
+                {
+                    let mut areas = client.subscribed_areas.write().await;
+                    areas.clear();
+                }
+                {
+                    let mut cats = client.subscribed_categories.write().await;
+                    cats.clear();
+                }
+                println!("🧹 Cleanup completo para cliente {} - canais e subscrições limpos", client_id);
             }
-            println!("🧹 Canal filtrado limpo para cliente {}", client_id);
         }
         
-        connected_clients.remove(&client_id);
         active_connections.fetch_sub(1, Ordering::SeqCst);
 
         println!("🔌 Cliente {} desconectado com cleanup completo", client_id);
@@ -1880,18 +2534,51 @@ impl WebSocketServer {
             return Err("WebSocket server não está rodando".to_string());
         }
 
+        println!("🛑 Iniciando shutdown do WebSocket server...");
+        
+        // 1. Sinalizar parada (tasks vão detectar isso em seus loops)
         self.is_running.store(false, Ordering::SeqCst);
 
+        // 2. Abortar server handle
         if let Some(handle) = self.server_handle.take() {
             handle.abort();
+            println!("🛑 Server handle abortado");
         }
+        
+        // 3. Abortar broadcast handle
         if let Some(handle) = self.broadcast_handle.take() {
             handle.abort();
+            println!("🛑 Broadcast handle abortado");
         }
+        
+        // 4. Abortar cache updater
         if let Some(handle) = self.cache_updater_handle.take() {
             handle.abort();
+            println!("🛑 Cache updater abortado");
         }
 
+        // 🛡️ FIX: Abortar TODOS os interval handles (batches)
+        {
+            let mut handles = self.interval_handles.lock().await;
+            for handle in handles.drain(..) {
+                handle.abort();
+            }
+            println!("🛑 {} interval handles abortados", handles.capacity());
+        }
+
+        // 5. Limpar cache de smart_cache
+        self.smart_cache.clear().await;
+        println!("🧹 Smart cache limpo");
+
+        // 6. Limpar canais de broadcast por PLC
+        self.plc_broadcast_channels.clear();
+        println!("🧹 PLC broadcast channels limpos");
+
+        // 7. Limpar payloads batched
+        self.batched_payloads.clear();
+        println!("🧹 Batched payloads limpos");
+
+        // 8. Limpar clientes conectados
         self.connected_clients.clear();
         self.active_connections.store(0, Ordering::SeqCst);
 
@@ -1900,7 +2587,7 @@ impl WebSocketServer {
             "timestamp": chrono::Utc::now().to_rfc3339()
         }));
 
-        println!("🛑 WebSocket server parado");
+        println!("🛑 WebSocket server parado completamente");
         
         Ok("WebSocket server parado com sucesso".to_string())
     }

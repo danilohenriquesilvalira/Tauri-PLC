@@ -662,7 +662,7 @@ const PlcConnectionTableComponent: React.FC = () => {
 
       {/* Modal de Dados do PLC */}
       {isModalOpen && plcData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             
             {/* Header - Compacto e limpo */}
@@ -926,7 +926,7 @@ const PlcConnectionTableComponent: React.FC = () => {
 
       {/* Modal de Métricas em Tempo Real */}
       {isMetricsModalOpen && selectedMetricsPlc && trafficHistory.get(selectedMetricsPlc) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsMetricsModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" onClick={() => setIsMetricsModalOpen(false)}>
           <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             
             {/* Header - Compacto e limpo */}

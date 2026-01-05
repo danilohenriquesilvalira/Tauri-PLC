@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, CheckCheck, Trash2, AlertCircle, Info, AlertTriangle, CheckCircle, X, Database, Server, Save, Search } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, AlertCircle, Info, AlertTriangle, CheckCircle, X, Database, Server, Save, Search, Gauge, Radio, Skull, Clock, Zap } from 'lucide-react';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import type { Notification } from '../../hooks/useNotifications';
 
@@ -28,8 +28,48 @@ export const NotificationDropdown: React.FC = () => {
       return <Save size={16} className="text-edp-marine" />;
     }
     
+    // 🆕 Ícones para Conexão Morta/Timeout (Watchdog)
+    if (title && (title.includes('Morta') || title.includes('Watchdog'))) {
+      return <Skull size={16} className="text-edp-semantic-red" />;
+    }
+    
+    // 🆕 Ícones para Timeout
+    if (title && title.toLowerCase().includes('timeout')) {
+      return <Clock size={16} className="text-edp-semantic-red" />;
+    }
+    
+    // 🆕 Ícones para Sampling/Auto-Expandido
+    if (title && (title.includes('Sampling') || title.includes('Auto-Expand'))) {
+      return <Zap size={16} className="text-edp-semantic-yellow" />;
+    }
+    
+    // 🆕 Ícones para Cache de Tags
+    if (title && title.toLowerCase().includes('cache')) {
+      return <Database size={16} className="text-edp-semantic-yellow" />;
+    }
+    
+    // Ícones para WebSocket
+    if (title && title.toLowerCase().includes('websocket')) {
+      switch (type) {
+        case 'success': return <Radio size={16} className="text-edp-marine" />;
+        case 'error': return <Radio size={16} className="text-edp-semantic-red" />;
+        case 'info': return <Radio size={16} className="text-edp-marine" />;
+        case 'warning': return <Radio size={16} className="text-edp-semantic-yellow" />;
+      }
+    }
+    
+    // Ícones para Backpressure/Buffer
+    if (title && (title.toLowerCase().includes('buffer') || title.toLowerCase().includes('pressão'))) {
+      switch (type) {
+        case 'success': return <Gauge size={16} className="text-edp-marine" />;
+        case 'error': return <Gauge size={16} className="text-edp-semantic-red" />;
+        case 'info': return <Gauge size={16} className="text-edp-marine" />;
+        case 'warning': return <Gauge size={16} className="text-edp-semantic-yellow" />;
+      }
+    }
+    
     // Ícones para servidores/conexões
-    if (title && (title.includes('Conectado') || title.includes('Servidor') || title.includes('Conexão'))) {
+    if (title && (title.includes('Conectado') || title.includes('Servidor') || title.includes('Conexão') || title.includes('TCP'))) {
       switch (type) {
         case 'success': return <Server size={16} className="text-edp-marine" />;
         case 'error': return <Server size={16} className="text-edp-semantic-red" />;

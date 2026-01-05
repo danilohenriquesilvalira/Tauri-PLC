@@ -104,27 +104,38 @@ impl BufferPool {
         buf.clear();
         
         // ✅ OTIMIZAÇÃO: Usar MAX_BUFFER_POOL_SIZE para controle uniforme
+        // 🛡️ FIX: Sempre decrementar contador quando buffer não é reutilizado
         if capacity <= 1024 {
             let mut pool = self.small_buffers.lock().await;
             if pool.len() < MAX_BUFFER_POOL_SIZE { 
                 pool.push_back(buf); 
             } else {
-                // ✅ Buffer descartado - decrementar contador se foi criado por nós
-                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                // Buffer descartado - decrementar contador
+                let prev = self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                if prev == 0 {
+                    // Underflow protection - restaurar
+                    self.total_buffers.store(0, Ordering::Relaxed);
+                }
             }
         } else if capacity <= 8192 {
             let mut pool = self.medium_buffers.lock().await;
             if pool.len() < MAX_BUFFER_POOL_SIZE { 
                 pool.push_back(buf); 
             } else {
-                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                let prev = self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                if prev == 0 {
+                    self.total_buffers.store(0, Ordering::Relaxed);
+                }
             }
         } else {
             let mut pool = self.large_buffers.lock().await;
             if pool.len() < MAX_BUFFER_POOL_SIZE { 
                 pool.push_back(buf); 
             } else {
-                self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                let prev = self.total_buffers.fetch_sub(1, Ordering::Relaxed);
+                if prev == 0 {
+                    self.total_buffers.store(0, Ordering::Relaxed);
+                }
             }
         }
     }
@@ -250,6 +261,64 @@ impl TcpServer {
             plc_configs_cache: Arc::new(DashMap::new()),
             connection_health: Arc::new(DashMap::new()),
             event_sender: None,
+        }
+    }
+
+    /// 🆕 NOVA FUNÇÃO: Recarregar configurações PLC do banco para o cache
+    pub async fn reload_plc_configs_cache(&self) -> Result<String, String> {
+        if let Some(db) = &self.database {
+            // Limpar cache atual
+            self.plc_configs_cache.clear();
+            
+            // Recarregar configurações do banco
+            match db.list_configured_plcs() {
+                Ok(plc_ips) => {
+                    let mut loaded_count = 0;
+                    for ip in plc_ips {
+                        match db.load_plc_structure(&ip) {
+                            Ok(Some(config)) => {
+                                self.plc_configs_cache.insert(ip.clone(), config);
+                                loaded_count += 1;
+                                println!("✅ Cache PLC {}: Configuração recarregada", ip);
+                            }
+                            Ok(None) => {
+                                println!("⚠️ Cache PLC {}: Sem configuração no banco", ip);
+                            }
+                            Err(e) => {
+                                println!("❌ Cache PLC {}: Erro ao carregar - {}", ip, e);
+                            }
+                        }
+                    }
+                    Ok(format!("✅ Cache recarregado: {} configurações PLC", loaded_count))
+                }
+                Err(e) => Err(format!("❌ Erro ao listar PLCs: {}", e))
+            }
+        } else {
+            Err("❌ Banco de dados não disponível".to_string())
+        }
+    }
+
+    /// 🆕 NOVA FUNÇÃO: Invalidar cache de um PLC específico
+    pub async fn invalidate_plc_cache(&self, plc_ip: &str) -> Result<String, String> {
+        if let Some(db) = &self.database {
+            // Remover do cache
+            self.plc_configs_cache.remove(plc_ip);
+            
+            // Recarregar do banco
+            match db.load_plc_structure(plc_ip) {
+                Ok(Some(config)) => {
+                    self.plc_configs_cache.insert(plc_ip.to_string(), config);
+                    Ok(format!("✅ Cache PLC {} invalidado e recarregado", plc_ip))
+                }
+                Ok(None) => {
+                    Ok(format!("⚠️ Cache PLC {} invalidado (sem config no banco)", plc_ip))
+                }
+                Err(e) => {
+                    Err(format!("❌ Erro ao recarregar cache PLC {}: {}", plc_ip, e))
+                }
+            }
+        } else {
+            Err("❌ Banco de dados não disponível".to_string())
         }
     }
 
@@ -550,11 +619,30 @@ impl TcpServer {
                     
                     if should_remove {
                         println!("💀 WATCHDOG: Matando conexão: {}", ip);
-                        if let Some(handle) = connection_handles.write().await.remove(&ip) {
-                            handle.abort();
+                        // 🛡️ FIX: Usar timeout para evitar deadlock
+                        match tokio::time::timeout(
+                            tokio::time::Duration::from_millis(500),
+                            connection_handles.write()
+                        ).await {
+                            Ok(mut handles) => {
+                                if let Some(handle) = handles.remove(&ip) {
+                                    handle.abort();
+                                }
+                            }
+                            Err(_) => {
+                                println!("⚠️ WATCHDOG: Timeout ao adquirir lock para {}", ip);
+                                continue; // Tentar novamente na próxima iteração
+                            }
                         }
                         connection_health.remove(&ip);
-                        connected_clients.write().await.retain(|x| x != &ip);
+                        
+                        // 🛡️ FIX: Timeout também para connected_clients
+                        if let Ok(mut clients) = tokio::time::timeout(
+                            tokio::time::Duration::from_millis(200),
+                            connected_clients.write()
+                        ).await {
+                            clients.retain(|x| x != &ip);
+                        }
                         active_connections.fetch_sub(1, Ordering::SeqCst);
                     }
                 }

@@ -100,6 +100,15 @@ pub fn run() {
       commands::get_available_plcs,
       commands::write_file,
       commands::read_file,
+      // 🆕 NOVOS COMANDOS DE CACHE PLC
+      commands::reload_plc_configs_cache,
+      commands::invalidate_plc_cache,
+      // 🛡️ BACKPRESSURE ADAPTATIVO
+      commands::get_backpressure_metrics,
+      // 🆕 DIAGNÓSTICO MULTI-PLC
+      commands::get_multi_plc_diagnostics,
+      // DEBUG
+      commands::debug_clear_all_tags,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

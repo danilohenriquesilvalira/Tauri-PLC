@@ -32,7 +32,7 @@ pub struct TagMapping {
     pub collect_interval_s: Option<i64>, // Intervalo em segundos, se aplicável
     // 🆕 CAMPOS PARA SUBSCRIBE INTELIGENTE
     pub area: Option<String>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS (equipamento)
-    pub category: Option<String>, // PROC, FAULT, EVENT, ALARM, CMD (tipo de tag)
+    pub category: Option<String>, // PROC, FAULT, EVENT (tipo de tag - simplificado)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -650,6 +650,23 @@ impl Database {
         tx.commit()?;
         println!("🗑️ Bulk Delete: {} tags removidos com sucesso.", ids.len());
         Ok(())
+    }
+    
+    /// DEBUG: Remove TODOS os tags de um PLC específico
+    pub fn debug_clear_all_plc_tags(&self, plc_ip: &str) -> Result<usize> {
+        let conn = self.write_conn.lock()
+            .map_err(|_| rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), 
+                Some("Write connection lock poisoned".to_string())
+            ))?;
+        
+        let count = conn.execute(
+            "DELETE FROM tag_mappings WHERE plc_ip = ?1",
+            [plc_ip]
+        )?;
+        
+        println!("🧹 DEBUG: Removidos {} tags do PLC {}", count, plc_ip);
+        Ok(count)
     }
     
     /// Lista todos os tags ativos (enabled=true) de um PLC para o WebSocket

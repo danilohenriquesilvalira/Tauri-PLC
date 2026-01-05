@@ -278,6 +278,36 @@ export const useNotifications = () => {
         const notification = NotificationMessages.INFO.serverStopped();
         addNotification(notification);
       }));
+      
+      // 🆕 EVENTOS CRÍTICOS DO TCP (Watchdog, Timeout, Erros)
+      unsubscribes.push(await listen('tcp-connection-dead', (event: any) => {
+        const { ip, seconds_since_data } = event.payload || {};
+        const notification = NotificationMessages.CRITICAL.connectionDead(ip, seconds_since_data);
+        addNotification({ ...notification, plcIp: ip });
+      }));
+      
+      unsubscribes.push(await listen('tcp-connection-slow', (event: any) => {
+        const { ip, seconds_since_data } = event.payload || {};
+        const notification = NotificationMessages.WARNING.connectionSlow(ip, seconds_since_data);
+        addNotification({ ...notification, plcIp: ip });
+      }));
+      
+      unsubscribes.push(await listen('tcp-connection-timeout', (event: any) => {
+        const { ip, reason } = event.payload || {};
+        const notification = NotificationMessages.CRITICAL.connectionTimeout(ip, reason || 'Tempo esgotado');
+        addNotification({ ...notification, plcIp: ip });
+      }));
+      
+      unsubscribes.push(await listen('tcp-connection-error', (event: any) => {
+        const { ip, error } = event.payload || {};
+        const notification = NotificationMessages.CRITICAL.connectionError(ip, error || 'Erro desconhecido');
+        addNotification({ ...notification, plcIp: ip });
+      }));
+      
+      // 🆕 HEARTBEAT - Apenas para debugging (opcional)
+      // unsubscribes.push(await listen('tcp-connection-heartbeat', (event: any) => {
+      //   console.log('💓 Heartbeat:', event.payload);
+      // }));
       // 📡 WEBSOCKET EVENTOS REAIS
       // 📦 SQLITE ERROS CRÍTICOS
       unsubscribes.push(await listen('sqlite-error', (event: any) => {
@@ -335,6 +365,38 @@ export const useNotifications = () => {
           message: `Cliente ${address} desconectou (${totalClients} ativo${totalClients !== 1 ? 's' : ''})`,
         });
       }));
+      
+      // 🆕 EVENTOS CRÍTICOS DE BACKPRESSURE DO BACKEND
+      unsubscribes.push(await listen('backpressure-warning', (event: any) => {
+        const { usage_percentage, sampling_rate, auto_expansions } = event.payload || {};
+        const notification = NotificationMessages.WARNING.backpressureSampling(sampling_rate || 0.75);
+        addNotification(notification);
+        
+        // Se houve expansão automática, notificar também
+        if (auto_expansions > 0) {
+          addNotification({
+            type: 'warning',
+            title: 'Buffer Auto-Expandido',
+            message: `Sistema expandiu buffer ${auto_expansions}x para lidar com carga (${usage_percentage?.toFixed(0)}% uso)`
+          });
+        }
+      }));
+      
+      unsubscribes.push(await listen('backpressure-critical', (event: any) => {
+        const { drop_rate_percent } = event.payload || {};
+        const notification = NotificationMessages.CRITICAL.bufferOverflow(drop_rate_percent || 0);
+        addNotification(notification);
+      }));
+      
+      unsubscribes.push(await listen('tag-cache-warning', (event: any) => {
+        const { cache_size, usage_percent } = event.payload || {};
+        addNotification({
+          type: 'warning',
+          title: 'Cache de Tags Alto',
+          message: `${cache_size} tags em cache (${usage_percent?.toFixed(0)}% da capacidade)`
+        });
+      }));
+      
       // 📊 MONITORAMENTO DE PERFORMANCE (filtrado)
       unsubscribes.push(await listen('plc-data-received', (event: any) => {
         const latencyMs = Math.round(event.payload.processing_time_us / 1000);

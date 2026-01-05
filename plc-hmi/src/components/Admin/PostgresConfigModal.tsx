@@ -9,7 +9,7 @@ interface Props {
 export const PostgresConfigModal: React.FC<Props> = ({ isVisible, onClose }) => {
   if (!isVisible) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <PostgresConfigPanel onClose={onClose} />
     </div>
   );

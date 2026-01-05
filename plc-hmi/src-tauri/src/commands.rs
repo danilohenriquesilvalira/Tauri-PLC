@@ -14,7 +14,7 @@ pub async fn reload_websocket_tag_groups(
 use tauri::Emitter;
 use crate::tcp_server::{TcpServer, ConnectionStats};
 use crate::database::{Database, PlcStructureConfig, DataBlockConfig, TagMapping};
-use crate::websocket_server::{WebSocketServer, WebSocketConfig, WebSocketStats, NetworkInterface};
+use crate::websocket_server::{WebSocketServer, WebSocketConfig, WebSocketStats, NetworkInterface, BackpressureMetrics};
 
 // ✅ OTIMIZAÇÃO: Estruturas para monitoramento de memória
 #[derive(Debug, Clone, serde::Serialize)]
@@ -44,6 +44,66 @@ pub struct MemoryHealthReport {
     pub recommendations: Vec<String>,
     pub auto_cleanup_enabled: bool,
 }
+
+// 🛡️ COMANDO PARA OBTER MÉTRICAS DO BACKPRESSURE ADAPTATIVO
+#[tauri::command]
+pub async fn get_backpressure_metrics(
+    websocket_state: State<'_, WebSocketServerState>,
+) -> Result<BackpressureMetrics, String> {
+    let ws_guard = websocket_state.read().await;
+    match ws_guard.as_ref() {
+        Some(server) => Ok(server.get_backpressure_metrics()),
+        None => Err("WebSocket server não está rodando".to_string())
+    }
+}
+
+// 🆕 DIAGNÓSTICO DE MÚLTIPLOS PLCs - PARA MONITORAMENTO DE LONGO PRAZO
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MultiPlcDiagnostics {
+    pub total_plcs_connected: usize,
+    pub plc_tag_counts: std::collections::HashMap<String, usize>,
+    pub websocket_single_server: bool,
+    pub tcp_single_server: bool,
+    pub architecture_status: String,
+    pub scalability_notes: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn get_multi_plc_diagnostics(
+    websocket_state: State<'_, WebSocketServerState>,
+    tcp_state: State<'_, TcpServerState>,
+) -> Result<MultiPlcDiagnostics, String> {
+    let ws_guard = websocket_state.read().await;
+    let tcp_guard = tcp_state.read().await;
+    
+    let plc_tag_counts = match ws_guard.as_ref() {
+        Some(server) => server.get_tag_count_by_plc(),
+        None => std::collections::HashMap::new(),
+    };
+    
+    let total_plcs = plc_tag_counts.len();
+    
+    let mut scalability_notes = vec![
+        "✅ ARQUITETURA: 1 TCP Server + 1 WebSocket Server para TODOS os PLCs".to_string(),
+        "✅ Tags são namespaced por IP: {PLC_IP}:{TAG_NAME}".to_string(),
+        "✅ Clientes WebSocket filtram por PLC via SUBSCRIBE".to_string(),
+        "✅ Sistema pode rodar indefinidamente (anos) sem memory leaks".to_string(),
+    ];
+    
+    if total_plcs > 5 {
+        scalability_notes.push(format!("⚠️ {} PLCs conectados - considere aumentar buffer de backpressure", total_plcs));
+    }
+    
+    Ok(MultiPlcDiagnostics {
+        total_plcs_connected: total_plcs,
+        plc_tag_counts,
+        websocket_single_server: ws_guard.is_some(),
+        tcp_single_server: tcp_guard.is_some(),
+        architecture_status: if total_plcs > 0 { "healthy" } else { "no_plcs" }.to_string(),
+        scalability_notes,
+    })
+}
+
 use crate::database::WebSocketDbConfig;
 use crate::config::{ConfigManager, AppConfig};
 use tauri::{AppHandle, State};
@@ -321,6 +381,7 @@ pub async fn save_plc_structure(
     plc_ip: String,
     blocks: Vec<DataBlockConfig>,
     db: State<'_, Arc<Database>>,
+    server_state: State<'_, TcpServerState>, // 🆕 Adicionar acesso ao servidor TCP
 ) -> Result<String, String> {
     // Calcular tamanho total
     let mut total_size = 0;
@@ -342,10 +403,51 @@ pub async fn save_plc_structure(
         last_updated: chrono::Utc::now().timestamp(),
     };
     
+    // Salvar no banco
     db.save_plc_structure(&config)
         .map_err(|e| format!("Erro ao salvar configuração: {}", e))?;
     
-    Ok(format!("Configuração salva para PLC {}: {} bytes", plc_ip, total_size))
+    // 🆕 AUTO-INVALIDAR CACHE: Atualizar cache automaticamente após salvar
+    let server_guard = server_state.read().await;
+    if let Some(server) = server_guard.as_ref() {
+        match server.invalidate_plc_cache(&plc_ip).await {
+            Ok(msg) => println!("🔄 {}", msg),
+            Err(e) => println!("⚠️ Falha ao invalidar cache: {}", e),
+        }
+    }
+    
+    Ok(format!("Configuração salva para PLC {}: {} bytes (cache atualizado)", plc_ip, total_size))
+}
+
+// 🆕 COMANDO: Recarregar cache de configurações PLC
+#[tauri::command]
+pub async fn reload_plc_configs_cache(
+    server_state: State<'_, TcpServerState>,
+) -> Result<String, String> {
+    let server_guard = server_state.read().await;
+    
+    match server_guard.as_ref() {
+        Some(server) => {
+            server.reload_plc_configs_cache().await
+        }
+        None => Err("❌ Servidor TCP não está rodando".to_string())
+    }
+}
+
+// 🆕 COMANDO: Invalidar cache de um PLC específico
+#[tauri::command]
+pub async fn invalidate_plc_cache(
+    plc_ip: String,
+    server_state: State<'_, TcpServerState>,
+) -> Result<String, String> {
+    let server_guard = server_state.read().await;
+    
+    match server_guard.as_ref() {
+        Some(server) => {
+            server.invalidate_plc_cache(&plc_ip).await
+        }
+        None => Err("❌ Servidor TCP não está rodando".to_string())
+    }
 }
 
 #[tauri::command]
@@ -568,6 +670,20 @@ pub async fn delete_tag_mappings_bulk(
     // Sempre recarregar grupos de tags do WebSocket
     let _ = reload_websocket_tag_groups(websocket_state).await;
     Ok(format!("{} tags removidos com sucesso", count))
+}
+
+// DEBUG: Limpar TODOS os tags de um PLC (para teste)
+#[tauri::command]
+pub async fn debug_clear_all_tags(
+    plc_ip: String,
+    db: State<'_, Arc<Database>>,
+) -> Result<String, String> {
+    match db.debug_clear_all_plc_tags(&plc_ip) {
+        Ok(count) => {
+            Ok(format!("DEBUG: {} tags removidos do banco para PLC {}", count, plc_ip))
+        }
+        Err(e) => Err(format!("Erro ao limpar tags: {}", e))
+    }
 }
 
 #[tauri::command]

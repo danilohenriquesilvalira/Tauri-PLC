@@ -210,7 +210,7 @@ export const PlcStructureModal: React.FC<PlcStructureModalProps> = ({ plcIp, onC
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
         <div className="bg-white rounded-lg p-8 shadow-xl">
           <div className="flex items-center gap-3">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#212E3E]"></div>
@@ -222,7 +222,7 @@ export const PlcStructureModal: React.FC<PlcStructureModalProps> = ({ plcIp, onC
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header - Compacto e limpo */}
         <div className="bg-[#212E3E] px-6 py-4 flex items-center justify-between border-b border-gray-200">

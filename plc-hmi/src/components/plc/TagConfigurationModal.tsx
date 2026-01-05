@@ -21,15 +21,14 @@ const AREAS: { key: AreaType; label: string; description: string }[] = [
 ];
 
 // 🆕 CATEGORIAS DOS TAGS (para SUBSCRIBE inteligente)
-type CategoryType = 'PROC' | 'FAULT' | 'EVENT' | 'ALARM' | 'CMD' | '';
+// Simplificado: PROC (processo), FAULT (falhas e alarmes), EVENT (eventos)
+type CategoryType = 'PROC' | 'FAULT' | 'EVENT' | '';
 
 const CATEGORIES: { key: CategoryType; label: string; description: string; color: string }[] = [
   { key: '', label: 'Selecione...', description: '', color: '' },
-  { key: 'PROC', label: 'PROC - Processo', description: 'Variáveis de processo (níveis, temperaturas, posições)', color: 'bg-blue-100 text-blue-800' },
-  { key: 'FAULT', label: 'FAULT - Falha', description: 'Bits de falha de equipamentos', color: 'bg-red-100 text-red-800' },
-  { key: 'EVENT', label: 'EVENT - Evento', description: 'Eventos do sistema (porta abriu, ciclo iniciou)', color: 'bg-yellow-100 text-yellow-800' },
-  { key: 'ALARM', label: 'ALARM - Alarme', description: 'Alarmes críticos do sistema', color: 'bg-orange-100 text-orange-800' },
-  { key: 'CMD', label: 'CMD - Comando', description: 'Comandos enviados ao PLC', color: 'bg-purple-100 text-purple-800' },
+  { key: 'PROC', label: 'PROC - Processo', description: 'Variáveis de processo (níveis, temperaturas, posições, estados)', color: 'bg-blue-100 text-blue-800' },
+  { key: 'FAULT', label: 'FAULT - Falha/Alarme', description: 'Falhas e alarmes de equipamentos (críticos e não-críticos)', color: 'bg-red-100 text-red-800' },
+  { key: 'EVENT', label: 'EVENT - Evento', description: 'Eventos informativos do sistema (porta abriu, ciclo iniciou)', color: 'bg-yellow-100 text-yellow-800' },
 ];
 
 interface TagMapping {
@@ -44,8 +43,8 @@ interface TagMapping {
   collect_mode?: 'on_change' | 'interval';
   collect_interval_s?: number;
   // 🆕 CAMPOS PARA SUBSCRIBE INTELIGENTE
-  area?: AreaType;      // ENH, ESV, PJU, PMO, SCO, EDR, GER
-  category?: CategoryType; // PROC, FAULT, EVENT, ALARM, CMD
+  area?: AreaType;      // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
+  category?: CategoryType; // PROC, FAULT, EVENT
 }
 
 interface ImportedTag {
@@ -167,7 +166,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
     if (parts.length >= 2 && area) {
       // Verificar se segunda parte é uma categoria válida
       const possibleCategory = parts[1] as CategoryType;
-      if (['PROC', 'FAULT', 'EVENT', 'ALARM', 'CMD'].includes(possibleCategory)) {
+      if (['PROC', 'FAULT', 'EVENT'].includes(possibleCategory)) {
         category = possibleCategory;
       }
     }
@@ -474,14 +473,27 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       const dataLines = lines.slice(1);
       const imported: ImportedTag[] = [];
       
-      dataLines.forEach((line: string) => {
+      // 🚀 OTIMIZAÇÃO: Buscar dados atuais UMA VEZ só (não para cada linha)
+      let currentTags: TagMapping[] = [];
+      try {
+        currentTags = await invoke<TagMapping[]>('load_tag_mappings', { plcIp });
+        console.log(`🔄 Validação CSV: Carregados ${currentTags.length} tags existentes para validação`);
+      } catch (error) {
+        console.warn('Erro ao carregar tags, usando cache local:', error);
+        currentTags = tags; // Fallback para cache local
+      }
+      
+      // 🔧 PROCESSAMENTO: Usar for loop para permitir async/await
+      for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
         const separator = line.includes('\t') ? '\t' : (line.includes(';') ? ';' : ',');
         const parts = line.split(separator).map((p: string) => p.trim().replace(/^"|"$/g, ''));
         
         // 🆕 Agora lê também area e category do CSV
         const [variable_path, tag_name, description, unit, collect_mode, collect_interval_s, enabled, area, category] = parts;
         
-        if (!variable_path) return;
+        
+        if (!variable_path) continue;
 
         let isValid = true;
         let errorMsg = '';
@@ -489,15 +501,18 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
         if (!tag_name) {
           isValid = false;
           errorMsg = 'Nome obrigatório';
-        } else if (tags.some(t => t.tag_name === tag_name)) {
+        } else if (currentTags.some(t => t.tag_name === tag_name)) {
           isValid = false;
-          errorMsg = 'Nome já existe';
-        } else if (tags.some(t => t.variable_path === variable_path)) {
+          errorMsg = `Nome já existe (${currentTags.filter(t => t.tag_name === tag_name).length} encontrados)`;
+        } else if (currentTags.some(t => t.variable_path === variable_path)) {
           isValid = false;
           errorMsg = 'Variável já mapeada';
         } else if (imported.some(t => t.tag_name === tag_name)) {
           isValid = false;
           errorMsg = 'Nome duplicado no CSV';
+        } else if (imported.some(t => t.variable_path === variable_path)) {
+          isValid = false;
+          errorMsg = 'Variável duplicada no CSV';
         }
 
         imported.push({
@@ -505,7 +520,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
           tag_name: tag_name || '',
           description: description || '',
           unit: unit || '',
-          collect_mode: (collect_mode === 'interval' ? 'interval' : 'on_change') as 'on_change' | 'interval',
+          collect_mode: (collect_mode?.toLowerCase().trim() === 'interval' ? 'interval' : 'on_change') as 'on_change' | 'interval',
           collect_interval_s: parseInt(collect_interval_s) || 1,
           enabled: enabled?.toLowerCase() !== 'false',
           isValid,
@@ -514,7 +529,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
           area: (area as AreaType) || '',
           category: (category as CategoryType) || '',
         });
-      });
+      }
 
       setImportedTags(imported);
       setCurrentTab('import');
@@ -643,7 +658,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
         error = 'Nome obrigatório';
       } else if (tags.some(t => t.tag_name === tag.tag_name)) {
         isValid = false;
-        error = 'Nome já existe';
+        error = 'Nome já existe (será validado ao salvar)';
       }
 
       updated[index].isValid = isValid;
@@ -666,14 +681,26 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
       return;
     }
 
-    if (tags.some(t => t.tag_name === newTag.tag_name)) {
-      setError('Nome do tag já existe');
-      return;
-    }
+    // 🆕 RECARREGAR TAGS ANTES DA VALIDAÇÃO (evitar cache desatualizado)
+    try {
+      const currentTags = await invoke<TagMapping[]>('load_tag_mappings', { plcIp });
+      
+      if (currentTags.some(t => t.tag_name === newTag.tag_name)) {
+        setError(`Nome do tag já existe (encontrado nos dados atuais)`);
+        return;
+      }
 
-    if (tags.some(t => t.variable_path === newTag.variable_path)) {
-      setError('Variável já mapeada');
-      return;
+      if (currentTags.some(t => t.variable_path === newTag.variable_path)) {
+        setError('Variável já mapeada');
+        return;
+      }
+    } catch (error) {
+      console.error('Erro ao verificar duplicação:', error);
+      // Fallback para cache local se der erro
+      if (tags.some(t => t.tag_name === newTag.tag_name)) {
+        setError('Nome do tag já existe');
+        return;
+      }
     }
 
     try {
@@ -843,7 +870,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
         <div className="bg-[#212E3E] rounded-lg p-5 shadow-xl flex flex-col items-center animate-pulse">
           <Tag size={32} className="text-[#28FF52] mb-3" />
           <span className="text-white font-mono">Carregando tags...</span>
@@ -857,7 +884,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
   // ============================================================================
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" onClick={onClose}>
       <div 
         className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
@@ -928,7 +955,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
               )}
             </div>
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               {[
                 { id: 'tags', label: 'Tags Ativos', icon: Tag },
                 { id: 'csv', label: 'Import/Export CSV', icon: FileSpreadsheet },
@@ -947,6 +974,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   {tab.label}
                 </button>
               ))}
+              
               
               {importedTags.length > 0 && (
                 <button
@@ -1061,35 +1089,59 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                   
                   {/* Lado Direito: Ações */}
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Botão Refresh - Só ícone */}
+                    <button
+                      onClick={async () => {
+                        console.log('Recarregando dados...');
+                        await loadData();
+                        console.log('Dados recarregados');
+                      }}
+                      className="p-1.5 bg-[#212E3E] text-white rounded hover:bg-[#1a252f]"
+                      title="Recarregar dados"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+
                     <button
                       onClick={handleExportActiveTags}
                       disabled={tags.length === 0}
-                      className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 flex items-center gap-1 whitespace-nowrap"
-                      title="Exportar todos os tags ativos para CSV"
+                      className="px-3 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 flex items-center gap-1.5"
+                      title="Exportar todos os tags ativos"
                     >
                       <Download size={12} />
                       Export Ativos
                     </button>
-                    <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={filteredTags.length > 0 && selectedTags.size === filteredTags.length}
-                        onChange={handleSelectAll}
-                        className="w-3 h-3 rounded border-gray-300 text-[#212E3E] focus:ring-[#212E3E]"
-                      />
-                      Selecionar todos
-                    </label>
-                    {selectedTags.size > 0 && (
-                      <button
-                        onClick={handleBulkDelete}
-                        className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <Trash2 size={12} />
-                        Excluir ({selectedTags.size})
-                      </button>
+
+                    {/* Seleção - Só aparece quando há tags */}
+                    {filteredTags.length > 0 && (
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedTags.size === filteredTags.length}
+                          onChange={handleSelectAll}
+                          className="w-3 h-3 rounded border-gray-300 text-[#212E3E] focus:ring-[#212E3E]"
+                        />
+                        Selecionar todos
+                      </label>
                     )}
                   </div>
                 </div>
+                
+                {/* Botão de Exclusão - Linha separada para não quebrar layout */}
+                {selectedTags.size > 0 && (
+                  <div className="px-3 py-2 bg-red-50 border-t border-red-200">
+                    <button
+                      onClick={handleBulkDelete}
+                      className="w-full px-3 py-2 text-sm font-medium bg-red-100 text-red-700 rounded hover:bg-red-200 flex items-center justify-center gap-2"
+                      title={`Excluir ${selectedTags.size} tags selecionados`}
+                    >
+                      <Trash2 size={14} />
+                      Excluir {selectedTags.size} selecionados
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Lista de Tags */}
@@ -1196,10 +1248,8 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                             ) : (
                               <span className={`inline-flex px-1 py-0.5 text-xs font-semibold rounded ${
                                 tag.category === 'FAULT' ? 'bg-red-100 text-red-700' :
-                                tag.category === 'ALARM' ? 'bg-orange-100 text-orange-700' :
                                 tag.category === 'EVENT' ? 'bg-yellow-100 text-yellow-700' :
                                 tag.category === 'PROC' ? 'bg-blue-100 text-blue-700' :
-                                tag.category === 'CMD' ? 'bg-purple-100 text-purple-700' :
                                 'text-gray-400'
                               }`}>
                                 {tag.category || '-'}
@@ -1517,13 +1567,61 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
               {/* Formulário Manual */}
               <div className="bg-white rounded-lg border border-[#BECACC] overflow-hidden">
                 <div className="bg-[#F1F4F4] px-4 py-3 border-b border-[#BECACC]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-[#212E3E] rounded-lg flex items-center justify-center">
-                      <Plus size={16} className="text-[#28FF52]" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-[#212E3E] rounded-lg flex items-center justify-center">
+                        <Plus size={16} className="text-[#28FF52]" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#212E3E]">Adicionar Tag Individual</h3>
+                        <p className="text-xs text-[#7C9599]">Crie um tag manualmente selecionando a variável PLC</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-[#212E3E]">Adicionar Tag Individual</h3>
-                      <p className="text-xs text-[#7C9599]">Crie um tag manualmente selecionando a variável PLC</p>
+                    
+                    {/* Ferramentas Admin - Espaço Lateral */}
+                    <div className="flex items-center gap-2">
+                      {/* Debug Compacto */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            const allTags = await invoke<any[]>('load_tag_mappings', { plcIp });
+                            const collectModes = allTags.map(t => ({ mode: t.collect_mode }));
+                            const onChangeCount = collectModes.filter(c => c.mode === 'on_change').length;
+                            const intervalCount = collectModes.filter(c => c.mode === 'interval').length;
+                            console.log('Debug:', { total: allTags.length, on_change: onChangeCount, interval: intervalCount });
+                            alert(`Total: ${allTags.length} | on_change: ${onChangeCount} | interval: ${intervalCount}`);
+                          } catch (err) {
+                            alert('Erro: ' + err);
+                          }
+                        }}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 border"
+                        title="Debug rápido"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </button>
+                      
+                      {/* Limpar Admin */}
+                      <button
+                        onClick={async () => {
+                          if (confirm(`ATENÇÃO: Apagar TODOS os tags do PLC ${plcIp}?`)) {
+                            try {
+                              const result = await invoke<string>('debug_clear_all_tags', { plcIp });
+                              alert(result);
+                              await loadData();
+                            } catch (err) {
+                              alert('Erro: ' + err);
+                            }
+                          }
+                        }}
+                        className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 border border-red-200"
+                        title="Limpar todos os tags"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1736,7 +1834,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
               </div>
 
               {/* Lista de Tags Importados */}
-              <div className="bg-white rounded-lg border border-[#BECACC] overflow-hidden">
+              <div className="bg-white rounded-lg border border-[#BECACC] overflow-hidden max-h-96 overflow-y-auto">
                 <table className="w-full">
                   <thead className="bg-[#F1F4F4]">
                     <tr>
@@ -1749,7 +1847,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                     </tr>
                   </thead>
                   <tbody>
-                    {importedTags.slice(0, 50).map((tag, index) => (
+                    {importedTags.map((tag, index) => (
                       <tr key={index} className={`border-t border-gray-100 ${tag.isValid ? 'bg-white' : 'bg-red-50'}`}>
                         <td className="px-2 py-1.5">
                           <div className={`w-2 h-2 rounded-full ${tag.isValid ? 'bg-green-500' : 'bg-red-500'}`}/>
@@ -1797,9 +1895,9 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                     ))}
                   </tbody>
                 </table>
-                {importedTags.length > 50 && (
-                  <div className="p-2 bg-gray-50 text-center text-xs text-gray-500">
-                    Mostrando 50 de {importedTags.length} tags. Os demais serão importados normalmente.
+                {importedTags.length > 100 && (
+                  <div className="p-2 bg-blue-50 text-center text-xs text-blue-600">
+                    📋 Mostrando todos os {importedTags.length} tags importados. Use scroll para navegar.
                   </div>
                 )}
               </div>
@@ -1810,7 +1908,7 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
 
         {/* Preview Modal */}
         {previewData && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setPreviewData(null)}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]" onClick={() => setPreviewData(null)}>
             <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-[#212E3E]">Preview do Tag</h3>

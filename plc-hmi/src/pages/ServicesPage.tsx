@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
     Server,
@@ -12,10 +12,14 @@ import {
     CheckCircle,
     Network,
     Router,
+    Gauge,
 } from 'lucide-react';
 
 import { WebSocketNetworkConfig } from '../components/websocket/WebSocketNetworkConfig';
 import { PostgresConfigModal } from '../components/Admin';
+import { SystemDiagnosticsModal } from '../components/diagnostics';
+import { useNotificationContext } from '../contexts/NotificationContext';
+import { NotificationMessages, NotificationFilters } from '../utils/notificationMessages';
 
 interface TcpServerStats {
     active_connections: number;
@@ -35,6 +39,21 @@ interface WebSocketStats {
     broadcast_rate_hz: number;
 }
 
+// Interface para métricas de backpressure (sincronizada com backend Rust)
+interface BackpressureMetrics {
+    state: string;                  // Nome do estado (Normal, Sampling, Expanded, Recovering)
+    current_capacity: number;       // Capacidade atual do buffer
+    current_usage: number;          // Uso atual do buffer
+    usage_percentage: number;       // Porcentagem de uso (0-100)
+    messages_processed: number;     // Total de mensagens processadas
+    messages_dropped: number;       // Total de mensagens descartadas
+    messages_sampled: number;       // Total de mensagens amostradas
+    auto_expansions: number;        // Quantidade de expansões automáticas
+    auto_recoveries: number;        // Quantidade de recuperações automáticas
+    last_state_change: number;      // Timestamp da última mudança de estado
+    sampling_rate: number;          // Taxa de sampling atual (0.0-1.0)
+}
+
 export const ServicesPage: React.FC = () => {
     const [tcpStats, setTcpStats] = useState<TcpServerStats | null>(null);
     const [wsStats, setWsStats] = useState<WebSocketStats | null>(null);
@@ -43,6 +62,15 @@ export const ServicesPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [showNetworkConfig, setShowNetworkConfig] = useState(false);
     const [showPostgresConfig, setShowPostgresConfig] = useState(false);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+    
+    // 🆕 Hook de notificações
+    const { addNotification } = useNotificationContext();
+    
+    // 🆕 Refs para evitar notificações duplicadas
+    const lastBackpressureState = useRef<string>('none');
+    const lastTcpState = useRef<boolean>(false);
+    const lastWsState = useRef<boolean>(false);
 
     const loadInitialStats = useCallback(async () => {
         try {
@@ -81,13 +109,61 @@ export const ServicesPage: React.FC = () => {
         const interval = setInterval(loadInitialStats, 2000);
         return () => clearInterval(interval);
     }, [loadInitialStats]);
+    
+    // 🆕 MONITORAMENTO INTELIGENTE DE BACKPRESSURE (a cada 10s para não impactar performance)
+    useEffect(() => {
+        if (!wsRunning) return;
+        
+        const checkBackpressure = async () => {
+            try {
+                const metrics = await invoke<BackpressureMetrics>('get_backpressure_metrics');
+                
+                // Calcular drop rate para notificação
+                const totalMessages = metrics.messages_processed + metrics.messages_dropped;
+                const dropRate = totalMessages > 0 ? (metrics.messages_dropped / totalMessages) * 100 : 0;
+                
+                const notifyLevel = NotificationFilters.shouldNotifyBackpressure(
+                    metrics.state,
+                    metrics.usage_percentage,
+                    metrics.messages_dropped,
+                    metrics.messages_processed
+                );
+                
+                // Só notifica se mudou de estado (evita spam)
+                if (notifyLevel !== lastBackpressureState.current) {
+                    if (notifyLevel === 'error') {
+                        addNotification(NotificationMessages.CRITICAL.bufferOverflow(dropRate));
+                    } else if (notifyLevel === 'warning') {
+                        addNotification(NotificationMessages.WARNING.bufferPressure(metrics.usage_percentage));
+                    } else if (notifyLevel === 'success' && lastBackpressureState.current !== 'none') {
+                        addNotification(NotificationMessages.INFO.bufferRecovered());
+                    }
+                    lastBackpressureState.current = notifyLevel;
+                }
+            } catch {
+                // Silencioso se WebSocket não está rodando
+            }
+        };
+        
+        // Verificar a cada 10 segundos (não impacta performance)
+        const interval = setInterval(checkBackpressure, 10000);
+        checkBackpressure(); // Verificar imediatamente
+        
+        return () => clearInterval(interval);
+    }, [wsRunning, addNotification]);
 
     const handleStartTcp = async () => {
         try {
             await invoke('start_tcp_server', { port: 8502 });
             setTcpRunning(true);
+            // 🆕 Notificar início do TCP
+            if (!lastTcpState.current) {
+                addNotification(NotificationMessages.INFO.serverStarted(8502));
+                lastTcpState.current = true;
+            }
         } catch (error) {
             console.error('Erro ao iniciar TCP:', error);
+            addNotification(NotificationMessages.CRITICAL.systemError('TCP Server', String(error)));
         }
     };
 
@@ -96,6 +172,9 @@ export const ServicesPage: React.FC = () => {
             await invoke('stop_tcp_server');
             setTcpRunning(false);
             setTcpStats(null);
+            // 🆕 Notificar parada do TCP
+            addNotification(NotificationMessages.INFO.serverStopped());
+            lastTcpState.current = false;
         } catch (error) {
             console.error('Erro ao parar TCP:', error);
         }
@@ -123,8 +202,14 @@ export const ServicesPage: React.FC = () => {
             console.log('✅ WebSocket iniciado:', result);
 
             setWsRunning(true);
+            // 🆕 Notificar início do WebSocket
+            if (!lastWsState.current) {
+                addNotification(NotificationMessages.INFO.websocketStarted(8765));
+                lastWsState.current = true;
+            }
         } catch (error) {
             console.error('❌ Botão Iniciar: Erro:', error);
+            addNotification(NotificationMessages.CRITICAL.systemError('WebSocket', String(error)));
             alert(`Erro ao iniciar WebSocket: ${error}`);
         }
     };
@@ -134,6 +219,10 @@ export const ServicesPage: React.FC = () => {
             await invoke('stop_websocket_server');
             setWsRunning(false);
             setWsStats(null);
+            // 🆕 Notificar parada do WebSocket
+            addNotification(NotificationMessages.INFO.websocketStopped());
+            lastWsState.current = false;
+            lastBackpressureState.current = 'none'; // Reset estado do backpressure
         } catch (error) {
             console.error('Erro ao parar WebSocket:', error);
         }
@@ -280,9 +369,12 @@ export const ServicesPage: React.FC = () => {
                 </div>
 
                 {/* Card 4 - Status */}
-                <div className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200">
+                <div 
+                    className="bg-white rounded-xl border border-edp-marine/15 p-6 hover:border-edp-marine/25 transition-all duration-200 cursor-pointer group"
+                    onClick={() => setShowDiagnostics(true)}
+                >
                     <div className="flex items-center justify-between">
-                        <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center">
+                        <div className="w-12 h-12 bg-edp-marine rounded-xl flex items-center justify-center group-hover:bg-edp-marine/90 transition-colors">
                             <Activity className="w-6 h-6 text-white" />
                         </div>
                         <div className="text-right">
@@ -293,8 +385,11 @@ export const ServicesPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4 pt-3 border-t border-edp-marine/10">
-                        <h3 className="font-medium text-edp-marine text-sm">Sistema</h3>
-                        <p className="text-xs text-edp-slate mt-1">Operacional</p>
+                        <h3 className="font-medium text-edp-marine text-sm flex items-center gap-2">
+                            Sistema
+                            <Gauge className="w-3.5 h-3.5 text-edp-slate group-hover:text-edp-marine transition-colors" />
+                        </h3>
+                        <p className="text-xs text-edp-slate mt-1">Clique para diagnóstico</p>
                     </div>
                 </div>
             </div>
@@ -473,6 +568,12 @@ export const ServicesPage: React.FC = () => {
             <PostgresConfigModal
                 isVisible={showPostgresConfig}
                 onClose={() => setShowPostgresConfig(false)}
+            />
+
+            {/* Modal de Diagnóstico do Sistema */}
+            <SystemDiagnosticsModal
+                isVisible={showDiagnostics}
+                onClose={() => setShowDiagnostics(false)}
             />
         </div>
     );
