@@ -669,20 +669,44 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const alturaTotal = baseEnchimentoHeight;
   
   // 📡 USAR O SISTEMA PLC EXISTENTE
-  const { data: plcData, sendCommand } = usePLC();
+  const { data: plcData, sendCommand, connectionStatus } = usePLC();
   
-  // 🔧 ESTADOS PARA TESTE DAS VÁLVULAS - IDENTIFICAÇÃO
-  const [testMode, setTestMode] = useState(false);
-  const [valvulasTest, setValvulasTest] = useState<{[key: string]: boolean}>({
-    'ESQ_1': false, 'ESQ_2': false, 'ESQ_3': false, 
-    'DIR_1': false, 'DIR_2': false, 'DIR_3': false
+  // 🔧 ESTADOS PARA SIMULAÇÃO DE PIPES (lado direito já mapeado)
+  const [simulationMode, setSimulationMode] = useState(false);
+  const [tubulacaoSimulation, setTubulacaoSimulation] = useState<{[key: string]: boolean}>({
+    PIPE_1: false, PIPE_2: false, PIPE_3: false, PIPE_4: false, PIPE_5: false,
+    PIPE_6: false, PIPE_7: false, PIPE_8: false, PIPE_9: false
   });
-
-  // 🔧 FUNÇÃO PARA TESTAR VÁLVULAS
-  const handleTestValvula = (valvulaId: string, value: boolean) => {
-    if (!testMode) return;
-    
-    setValvulasTest(prev => ({ ...prev, [valvulaId]: value }));
+  
+  // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA ENCH usando sendCommand
+  React.useEffect(() => {
+    if (connectionStatus.connected) {
+      // Enviar subscribe específico para ENCH via sendCommand
+      const subscribeCmd = {
+        type: 'SUBSCRIBE',
+        plc_ips: [],
+        areas: ['ENCH'],
+        categories: ['PROC', 'FAULT', 'EVENT'],
+        include_all_faults: true
+      };
+      
+      // Usar sendCommand para enviar subscribe
+      sendCommand({
+        plc_ip: '',
+        tag_name: 'SUBSCRIBE',
+        variable: JSON.stringify(subscribeCmd),
+        value: 'SUBSCRIBE',
+        data_type: 'STRING'
+      });
+      
+      console.log('📡 [Enchimento] Subscribe ENCH enviado:', subscribeCmd);
+    }
+  }, [connectionStatus.connected, sendCommand]);
+  
+  // 🔧 FUNÇÃO PARA SIMULAÇÃO DE TUBULAÇÕES
+  const handleTubulacaoSimulation = (tubuId: string, value: boolean) => {
+    if (!simulationMode) return;
+    setTubulacaoSimulation(prev => ({ ...prev, [tubuId]: value }));
   };
   
   // Extrair dados dos pistões do PLC - SISTEMA ENCHIMENTO
@@ -728,48 +752,57 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const cilindroDireito = plcData?.bit_data?.status_bits?.[1]?.[13] || 0;  // Cilindro direito (bit 29)
   const cilindroEsquerdo = plcData?.bit_data?.status_bits?.[1]?.[14] || 0; // Cilindro esquerdo (bit 30)
 
-  // ✓ Válvulas Verticais Laterais IDENTIFICADAS
-  const bit9 = Number(plcData?.bit_data?.status_bits?.[0]?.[9] || 0);   // VVL1 = Bit 9 (Válvula Vertical Esquerda)
-  const bit11 = Number(plcData?.bit_data?.status_bits?.[0]?.[11] || 0); // VVL2 = Bit 11 (Válvula Vertical Direita)
+  // 🎯 TUBULAÇÕES LADO DIREITO COM TAGS REAIS ENCH (Pipes 1-9)
   
-  // Tubulações
-  const bit12 = Number(plcData?.bit_data?.status_bits?.[0]?.[12] || 0);
-  const bit13 = Number(plcData?.bit_data?.status_bits?.[0]?.[13] || 0);
-  const bit16 = Number(plcData?.bit_data?.status_bits?.[1]?.[0] || 0);
-  const bit17 = Number(plcData?.bit_data?.status_bits?.[1]?.[1] || 0);
-  const bit18 = Number(plcData?.bit_data?.status_bits?.[1]?.[2] || 0);
-  const bit19 = Number(plcData?.bit_data?.status_bits?.[1]?.[3] || 0);
-  const bit20 = Number(plcData?.bit_data?.status_bits?.[1]?.[4] || 0);
-  const bit21 = Number(plcData?.bit_data?.status_bits?.[1]?.[5] || 0);
-  const bit23 = Number(plcData?.bit_data?.status_bits?.[1]?.[7] || 0);
-  const bit24 = Number(plcData?.bit_data?.status_bits?.[1]?.[8] || 0);
-  const bit25 = Number(plcData?.bit_data?.status_bits?.[1]?.[9] || 0);
-  const bit26 = Number(plcData?.bit_data?.status_bits?.[1]?.[10] || 0);
-  const bit30 = Number(plcData?.bit_data?.status_bits?.[1]?.[14] || 0);
-  const bit31 = Number(plcData?.bit_data?.status_bits?.[1]?.[15] || 0);
-  const bit33 = Number(plcData?.bit_data?.status_bits?.[2]?.[1] || 0);
-  const bit34 = Number(plcData?.bit_data?.status_bits?.[2]?.[2] || 0);
-  const bit36 = Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0);
+  // Tags reais do WebSocket ENCH para lado DIREITO  
+  const pipe1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;            // Pipe 1 DIREITA
+  const pipe2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;         // Pipe 2 DIREITA  
+  const pipe3Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;     // Pipe 3 DIREITA
+  const pipe4Real = plcData?.tags?.['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0;            // Pipe 4 DIREITA
+  const pipe5Real = plcData?.tags?.['ENCH_HMI_B_LIG_VD2_0_DIR'] === 'TRUE' ? 1 : 0;     // Pipe 5 DIREITA
+  const pipe6Real = plcData?.tags?.['ENCH_RM_BOMB_DIR'] === 'TRUE' ? 1 : 0;             // Pipe 6 DIREITA
+  const pipe7Real = plcData?.tags?.['ENCH_HMI_VD1_VD2_LIG_DIR'] === 'TRUE' ? 1 : 0;     // Pipe 7 DIREITA
+  const pipe8Real = plcData?.tags?.['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0;              // Pipe 8 DIREITA
+  const pipe9Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;         // Pipe 9 DIREITA
+  
+  // Mapeamento conforme os bits usados no PipeSystem.tsx - CORRIGIDO ✅
+  const bit12 = simulationMode ? (tubulacaoSimulation.PIPE_1 ? 1 : 0) : pipe1Real;     // Pipe 1 - ENCH_SIN_AG_SUBID
+  const bit19 = simulationMode ? (tubulacaoSimulation.PIPE_4 ? 1 : 0) : pipe4Real;     // Pipe 4 - ENCH_EM_SUB_LENTA
+  const bit20 = simulationMode ? (tubulacaoSimulation.PIPE_5 ? 1 : 0) : pipe5Real;     // Pipe 5 - ENCH_HMI_B_LIG_VD2_0_DIR
+  const bit21 = simulationMode ? (tubulacaoSimulation.PIPE_6 ? 1 : 0) : pipe6Real;     // Pipe 6 - ENCH_RM_BOMB_DIR  
+  const bit23 = simulationMode ? (tubulacaoSimulation.PIPE_7 ? 1 : 0) : pipe7Real;     // Pipe 7 - ENCH_HMI_VD1_VD2_LIG_DIR
+  const bit25 = simulationMode ? (tubulacaoSimulation.PIPE_8 ? 1 : 0) : pipe8Real;     // Pipe 8 - ENCH_EM_SUB_RAP
+  const bit24 = simulationMode ? (tubulacaoSimulation.PIPE_9 ? 1 : 0) : pipe9Real;     // Pipe 9 - ENCH_OM_VD2_COMP_DIR
+  
+  // ✓ Válvulas Verticais Laterais + Pipes 2 e 3 SOBREPOSTOS no SVG
+  const bit9 = simulationMode ? (tubulacaoSimulation.PIPE_2 ? 1 : 0) : pipe2Real;      // bit9: VVL1 OU Pipe 2
+  const bit11 = simulationMode ? (tubulacaoSimulation.PIPE_3 ? 1 : 0) : pipe3Real;     // bit11: VVL2 OU Pipe 3
+  
+  // Bits do lado esquerdo (ainda não mapeados com tags reais - aguardando definição)
+  const bit13 = Number(plcData?.bit_data?.status_bits?.[1]?.[13] || 0);  // TODO: Pipe esquerdo
+  const bit16 = Number(plcData?.bit_data?.status_bits?.[1]?.[0] || 0);   // TODO: Pipe esquerdo
+  const bit17 = Number(plcData?.bit_data?.status_bits?.[1]?.[1] || 0);   // TODO: Pipe esquerdo
+  const bit18 = Number(plcData?.bit_data?.status_bits?.[1]?.[2] || 0);   // TODO: Pipe esquerdo
+  const bit26 = Number(plcData?.bit_data?.status_bits?.[1]?.[10] || 0);  // TODO: Pipe esquerdo
+  const bit30 = Number(plcData?.bit_data?.status_bits?.[1]?.[14] || 0);  // TODO: Pipe esquerdo
+  const bit31 = Number(plcData?.bit_data?.status_bits?.[1]?.[15] || 0);  // TODO: Pipe esquerdo
+  const bit33 = Number(plcData?.bit_data?.status_bits?.[2]?.[1] || 0);   // TODO: Pipe esquerdo
+  const bit34 = Number(plcData?.bit_data?.status_bits?.[2]?.[2] || 0);   // TODO: Pipe esquerdo
+  const bit36 = Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0);   // TODO: Pipe esquerdo
 
   // Extrair bits para válvulas - CORRIGIDO ✓
   // V1 = Bit 18, V2 = Bit 19, V3 = Bit 12
-  // V4 = Bit 13, V5 = Bit 24, V6 = Bit 23
+  // 🎯 VÁLVULAS VRC - USANDO TAGS REAIS DO WEBSOCKET ENCH
   
-  // 🔧 VÁLVULAS COM OVERRIDE DE TESTE - VALORES REAIS
-  const valvulaEsquerda1Real = Number(plcData?.bit_data?.status_bits?.[1]?.[2] || 0);  // V1 - Bit 18 (Word 1, Bit 2)
-  const valvulaEsquerda2Real = Number(plcData?.bit_data?.status_bits?.[1]?.[3] || 0);  // V2 - Bit 19 (Word 1, Bit 3)
-  const valvulaEsquerda3Real = Number(plcData?.bit_data?.status_bits?.[0]?.[12] || 0); // V3 - Bit 12 (Word 0, Bit 12)
-  const valvulaDireita1Real = Number(plcData?.bit_data?.status_bits?.[0]?.[13] || 0);  // V4 - Bit 13 (Word 0, Bit 13)
-  const valvulaDireita2Real = Number(plcData?.bit_data?.status_bits?.[1]?.[8] || 0);   // V5 - Bit 24 (Word 1, Bit 8)
-  const valvulaDireita3Real = Number(plcData?.bit_data?.status_bits?.[1]?.[7] || 0);   // V6 - Bit 23 (Word 1, Bit 7)
+  // LADO ESQUERDO na animação 
+  const valvulaEsquerda1 = plcData?.tags?.['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0;     // VRC1 ESQUERDO
+  const valvulaEsquerda2 = plcData?.tags?.['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0;       // VRC2 ESQUERDO  
+  const valvulaEsquerda3 = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VRC3 ESQUERDO
   
-  // 🎯 VALORES FINAIS - TESTE SOBRESCREVE OS DADOS REAIS (TROCADO - CORRIGIDO)
-  const valvulaEsquerda1 = testMode ? (valvulasTest.DIR_1 ? 1 : 0) : valvulaEsquerda1Real;  // DIR_1 → lado esquerdo na tela
-  const valvulaEsquerda2 = testMode ? (valvulasTest.DIR_2 ? 1 : 0) : valvulaEsquerda2Real;  // DIR_2 → lado esquerdo na tela
-  const valvulaEsquerda3 = testMode ? (valvulasTest.DIR_3 ? 1 : 0) : valvulaEsquerda3Real;  // DIR_3 → lado esquerdo na tela
-  const valvulaDireita1 = testMode ? (valvulasTest.ESQ_1 ? 1 : 0) : valvulaDireita1Real;    // ESQ_1 → lado direito na tela
-  const valvulaDireita2 = testMode ? (valvulasTest.ESQ_2 ? 1 : 0) : valvulaDireita2Real;    // ESQ_2 → lado direito na tela
-  const valvulaDireita3 = testMode ? (valvulasTest.ESQ_3 ? 1 : 0) : valvulaDireita3Real;    // ESQ_3 → lado direito na tela
+  // LADO DIREITO na animação 
+  const valvulaDireita1 = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;          // VRC1 DIREITO
+  const valvulaDireita2 = plcData?.tags?.['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0;            // VRC2 DIREITO
+  const valvulaDireita3 = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;           // VRC3 DIREITO
 
   // Extrair bits para válvulas flange - CORRIGIDO ✓
   const valvulaFlangeEsquerda1 = valvulaEsquerda1; // V1 - Bit 18
@@ -781,21 +814,45 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaFlangeDireita2 = valvulaDireita2; // Bit 24
   const valvulaFlangeDireita3 = valvulaDireita3; // Bit 23
 
-  // Extrair bits para válvulas gaveta - IDENTIFICADOS ✓
-  const valvulaGavetaEsquerda1 = Number(plcData?.bit_data?.status_bits?.[1]?.[5] || 0);  // VG1 = Bit 21 (Word 1, Bit 5)
-  const valvulaGavetaEsquerda2 = Number(plcData?.bit_data?.status_bits?.[1]?.[4] || 0);  // VG2 = Bit 20 (Word 1, Bit 4)
-  const valvulaGavetaEsquerda3 = Number(plcData?.bit_data?.status_bits?.[1]?.[5] || 0);  // VG3 = Bit 21 (Word 1, Bit 5)
-  const valvulaGavetaDireita1 = Number(plcData?.bit_data?.status_bits?.[1]?.[10] || 0); // VG4 = Bit 26 (Word 1, Bit 10)
-  const valvulaGavetaDireita2 = Number(plcData?.bit_data?.status_bits?.[1]?.[9] || 0);  // VG5 = Bit 25 (Word 1, Bit 9)
-  const valvulaGavetaDireita3 = Number(plcData?.bit_data?.status_bits?.[1]?.[10] || 0); // VG6 = Bit 26 (Word 1, Bit 10)
+  // 🎯 VÁLVULAS GAVETA - TAGS REAIS DO WEBSOCKET ENCH
+  
+  // LADO DIREITO na tela (VG1, VG2, VG3) - CORRIGIDO ✅
+  const valvulaGavetaDireita1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;           // VG1 DIREITO - mesmo tag do PIPE 1
+  const valvulaGavetaDireita2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;        // VG2 DIREITO - tag diferente
+  const valvulaGavetaDireita3Real = plcData?.tags?.['EENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;          // VG3 DIREITO - mesmo tag do PIPE 1
+  
+  // LADO ESQUERDO na tela (VG4, VG5, VG6) - CORRIGIDO ✅
+  const valvulaGavetaEsquerda1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;              // VG4 ESQUERDO - tag esquerdo
+  const valvulaGavetaEsquerda2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;           // VG5 ESQUERDO - tag esquerdo
+  const valvulaGavetaEsquerda3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;              // VG6 ESQUERDO - tag esquerdo
+  
+  // Valores finais das válvulas gaveta (sem simulação)
+  const valvulaGavetaEsquerda1 = valvulaGavetaEsquerda1Real; // VG4 ESQUERDO - CORRIGIDO ✅
+  const valvulaGavetaEsquerda2 = valvulaGavetaEsquerda2Real; // VG5 ESQUERDO - CORRIGIDO ✅
+  const valvulaGavetaEsquerda3 = valvulaGavetaEsquerda3Real; // VG6 ESQUERDO - CORRIGIDO ✅
+  const valvulaGavetaDireita1 = valvulaGavetaDireita1Real;   // VG1 DIREITO - CORRIGIDO ✅
+  const valvulaGavetaDireita2 = valvulaGavetaDireita2Real;   // VG2 DIREITO - CORRIGIDO ✅
+  const valvulaGavetaDireita3 = valvulaGavetaDireita3Real;   // VG3 DIREITO - CORRIGIDO ✅
 
-  // ✓ Válvulas Direcionais IDENTIFICADAS
-  const valvulaDirecionalEsquerda1 = Number(plcData?.bit_data?.status_bits?.[0]?.[9] || 0);  // VD1 = Bit 9 (Word 0, Bit 9)
-  const valvulaDirecionalEsquerda2 = Number(plcData?.bit_data?.status_bits?.[0]?.[8] || 0);  // VD2 = Bit 8 (Word 0, Bit 8)
-  const valvulaDirecionalEsquerda3 = Number(plcData?.bit_data?.status_bits?.[0]?.[12] || 0); // VD3 = Bit 12 (Word 0, Bit 12)
-  const valvulaDirecionalDireita1 = Number(plcData?.bit_data?.status_bits?.[0]?.[11] || 0);  // VD4 = Bit 11 (Word 0, Bit 11)
-  const valvulaDirecionalDireita2 = Number(plcData?.bit_data?.status_bits?.[0]?.[10] || 0);  // VD5 = Bit 10 (Word 0, Bit 10)
-  const valvulaDirecionalDireita3 = Number(plcData?.bit_data?.status_bits?.[0]?.[13] || 0);  // VD6 = Bit 13 (Word 0, Bit 13)
+  // 🎯 VÁLVULAS DIRECIONAIS - TAGS REAIS DO WEBSOCKET ENCH
+  
+  // LADO DIREITO na tela: VCD, VD1, VD2 (botões VD1, VD2, VD3)
+  const valvulaDirecionalDireita1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;   // VCD DIREITO
+  const valvulaDirecionalDireita2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_B'] === 'TRUE' ? 1 : 0;   // VD1 DIREITO
+  const valvulaDirecionalDireita3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;       // VD2 DIREITO
+  
+  // LADO ESQUERDO na tela: VCD, VD1, VD2 (botões VD4, VD5, VD6)
+  const valvulaDirecionalEsquerda1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;  // VCD ESQUERDO
+  const valvulaDirecionalEsquerda2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_A'] === 'TRUE' ? 1 : 0;  // VD1 ESQUERDO
+  const valvulaDirecionalEsquerda3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VD2 ESQUERDO
+  
+  // Valores finais das válvulas direcionais (sem simulação)
+  const valvulaDirecionalEsquerda1 = valvulaDirecionalEsquerda1Real; // VCD ESQUERDO
+  const valvulaDirecionalEsquerda2 = valvulaDirecionalEsquerda2Real; // VD1 ESQUERDO  
+  const valvulaDirecionalEsquerda3 = valvulaDirecionalEsquerda3Real; // VD2 ESQUERDO
+  const valvulaDirecionalDireita1 = valvulaDirecionalDireita1Real;   // VCD DIREITO
+  const valvulaDirecionalDireita2 = valvulaDirecionalDireita2Real;   // VD1 DIREITO
+  const valvulaDirecionalDireita3 = valvulaDirecionalDireita3Real;   // VD2 DIREITO
   
   // Configuração responsiva BASE
   const baseConfigAtual = isMobile ? BASE_PISTAO_CONFIG.mobile : BASE_PISTAO_CONFIG.desktop;
@@ -928,133 +985,93 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         </div>
       )}
 
-      {/* 🔧 PAINEL DE TESTE DE VÁLVULAS V1-V6 */}
+      {/* 🔧 PAINEL DE SIMULAÇÃO DE TUBULAÇÕES */}
       {isInitialized && containerDimensions.width > 100 && (
         <div 
           className="absolute z-50"
           style={{
             top: '20px',
-            right: '20px',
-            width: '320px',
+            left: '20px',
+            width: '400px',
           }}
         >
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg shadow-lg border border-yellow-300 p-4">
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-lg border border-orange-300 p-4">
             <h3 className="text-sm font-bold text-[#212E3E] uppercase tracking-wide mb-3 flex items-center gap-2">
-              🔧 IDENTIFICAR VÁLVULAS VRC
+              🔧 IDENTIFICAR TUBULAÇÕES
             </h3>
             
-            {/* Toggle Modo Teste */}
+            {/* Toggle Modo Simulação */}
             <div className="mb-4">
               <label className="flex items-center gap-2 text-sm font-medium text-[#212E3E]">
                 <input
                   type="checkbox"
-                  checked={testMode}
-                  onChange={(e) => setTestMode(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  checked={simulationMode}
+                  onChange={(e) => setSimulationMode(e.target.checked)}
+                  className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
                 />
-                Modo Teste Ativo
+                Modo Simulação Ativo
               </label>
               <p className="text-xs text-gray-600 mt-1">
-                {testMode ? '✅ Testes habilitados' : '⚠️ Testes desabilitados'}
+                {simulationMode ? '✅ Simulação habilitada' : '⚠️ Simulação desabilitada'}
               </p>
             </div>
 
-            {/* Grid de Válvulas - SEPARADO POR LADO */}
-            <div className="space-y-3">
-              {/* LADO ESQUERDO */}
-              <div>
-                <h4 className="text-xs font-bold text-blue-700 mb-2">🔵 LADO ESQUERDO</h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {['ESQ_1', 'ESQ_2', 'ESQ_3'].map(valvulaId => {
-                    const isActive = valvulasTest[valvulaId];
-                    const displayName = valvulaId.replace('ESQ_', 'VRC');
-                    return (
-                      <div key={valvulaId} className="space-y-1">
-                        <label className="text-xs font-medium text-[#212E3E] uppercase flex justify-between">
-                          <span>{displayName}</span>
-                          <span className="text-gray-500">({valvulaId})</span>
-                        </label>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleTestValvula(valvulaId, true)}
-                            disabled={!testMode}
-                            className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                              !testMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                              isActive ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-green-500 hover:text-white'
-                            }`}
-                          >
-                            ABRIR
-                          </button>
-                          <button
-                            onClick={() => handleTestValvula(valvulaId, false)}
-                            disabled={!testMode}
-                            className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                              !testMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                              !isActive ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-red-500 hover:text-white'
-                            }`}
-                          >
-                            FECHAR
-                          </button>
-                        </div>
-                        <div className={`w-full h-1 rounded ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* LADO DIREITO */}
-              <div>
-                <h4 className="text-xs font-bold text-orange-700 mb-2">🟠 LADO DIREITO</h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {['DIR_1', 'DIR_2', 'DIR_3'].map(valvulaId => {
-                    const isActive = valvulasTest[valvulaId];
-                    const displayName = valvulaId.replace('DIR_', 'VRC');
-                    return (
-                      <div key={valvulaId} className="space-y-1">
-                        <label className="text-xs font-medium text-[#212E3E] uppercase flex justify-between">
-                          <span>{displayName}</span>
-                          <span className="text-gray-500">({valvulaId})</span>
-                        </label>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleTestValvula(valvulaId, true)}
-                            disabled={!testMode}
-                            className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                              !testMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                              isActive ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-green-500 hover:text-white'
-                            }`}
-                          >
-                            ABRIR
-                          </button>
-                          <button
-                            onClick={() => handleTestValvula(valvulaId, false)}
-                            disabled={!testMode}
-                            className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                              !testMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                              !isActive ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-red-500 hover:text-white'
-                            }`}
-                          >
-                            FECHAR
-                          </button>
-                        </div>
-                        <div className={`w-full h-1 rounded ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* GRID DE PIPES LADO DIREITO */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { id: 'PIPE_1', tag: 'ENCH_SIN_AG_SUBID' },
+                { id: 'PIPE_2', tag: 'ENCH_SIN_CIRC_SUBIDA' },  
+                { id: 'PIPE_3', tag: 'ENCH_OM_VALV_DESC_COMP_A' },
+                { id: 'PIPE_4', tag: 'ENCH_EM_SUB_LENTA' },
+                { id: 'PIPE_5', tag: 'ENCH_HMI_B_LIG_VD2_0_DIR' },
+                { id: 'PIPE_6', tag: 'ENCH_RM_BOMB_DIR' },
+                { id: 'PIPE_7', tag: 'ENCH_HMI_VD1_VD2_LIG_DIR' },
+                { id: 'PIPE_8', tag: 'ENCH_EM_SUB_RAP' },
+                { id: 'PIPE_9', tag: 'ENCH_OM_VD2_COMP_DIR' }
+              ].map(({id, tag}) => {
+                const isActive = tubulacaoSimulation[id];
+                return (
+                  <div key={id} className="mb-2">
+                    <label className="text-xs font-medium text-[#212E3E] uppercase block mb-1">
+                      {id} DIR
+                    </label>
+                    <p className="text-xs text-gray-500 mb-1 truncate">{tag}</p>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleTubulacaoSimulation(id, true)}
+                        disabled={!simulationMode}
+                        className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
+                          !simulationMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
+                          isActive ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-green-500 hover:text-white'
+                        }`}
+                      >
+                        ON
+                      </button>
+                      <button
+                        onClick={() => handleTubulacaoSimulation(id, false)}
+                        disabled={!simulationMode}
+                        className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
+                          !simulationMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
+                          !isActive ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-red-500 hover:text-white'
+                        }`}
+                      >
+                        OFF
+                      </button>
+                    </div>
+                    <div className={`w-full h-1 rounded mt-1 ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Instruções */}
-            <div className="mt-4 p-2 bg-blue-50 rounded border border-blue-200">
+            <div className="p-2 bg-blue-50 rounded border border-blue-200">
               <p className="text-xs text-blue-800">
-                <strong>Identificação VRC:</strong><br/>
-                1. Ative o "Modo Teste"<br/>
-                2. Teste cada VRC1/VRC2/VRC3 por lado<br/>
-                3. Observe qual válvula física responde<br/>
-                4. Anote as siglas exatas (VRC1, VRC2, VRC3)<br/>
-                5. Mapeie com os tags do novo WebSocket
+                <strong>Pipes Lado DIREITO Mapeados:</strong><br/>
+                ✅ Pipes 1-9 já conectados aos tags ENCH reais<br/>
+                🔧 Use simulação para testar se os mapeamentos estão corretos<br/>
+                📝 Aguardando mapeamento do lado ESQUERDO<br/>
+                🎯 Subscribe ENCH ativo - dados em tempo real
               </p>
             </div>
           </div>
