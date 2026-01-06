@@ -198,23 +198,83 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const alturaTotal = basePortaHeight;
   
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
-  const { data: plcData } = usePLC();
+  const { data: plcData, sendCommand, connectionStatus } = usePLC();
   
-  // Extrair dados dos contrapesos, régua e motores do PLC
-  const contrapesoDirectoRaw = plcData?.ints?.[41] || 0;   // Contrapeso direito (índice 40) - Valores: 376-675
-  const contrapesoEsquerdoRaw = plcData?.ints?.[40] || 0;  // Contrapeso esquerdo (índice 41) - Valores: 376-675
-  const reguaPortaJusanteRaw = plcData?.ints?.[39] || 0;   // Régua porta jusante (índice 39) - Valores: 431-14
-  const motorDireito = plcData?.ints?.[28] || 0;           // Motor direito (índice 28)
-  const motorEsquerdo = plcData?.ints?.[29] || 0;          // Motor esquerdo (índice 29)
+  // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA JUS usando sendCommand
+  React.useEffect(() => {
+    if (connectionStatus.connected) {
+      // Enviar subscribe específico para JUS via sendCommand
+      const subscribeCmd = {
+        type: 'SUBSCRIBE',
+        plc_ips: [],
+        areas: ['JUS'],
+        categories: ['PROC', 'FAULT', 'EVENT'],
+        include_all_faults: true
+      };
+      
+      // Usar sendCommand para enviar subscribe
+      sendCommand({
+        plc_ip: '',
+        tag_name: 'SUBSCRIBE',
+        variable: JSON.stringify(subscribeCmd),
+        value: 'SUBSCRIBE',
+        data_type: 'STRING'
+      });
+      
+      console.log('📡 [PortaJusante] Subscribe JUS enviado:', subscribeCmd);
+    }
+  }, [connectionStatus.connected, sendCommand]);
   
-  // 🔄 NORMALIZAR PARA 0-100%
-  // Contrapesos: 376 (em cima/0%) -> 675 (embaixo/100%)
-  const contrapesoDirecto = ((contrapesoDirectoRaw - 376) / (675 - 376)) * 100;
-  const contrapesoEsquerdo = ((contrapesoEsquerdoRaw - 376) / (675 - 376)) * 100;
+  // 🎯 DADOS DOS CONTRAPESOS, RÉGUA E MOTORES - JUS WEBSOCKET (TAGS REAIS)
+  // 📍 USANDO TAGS REAIS DO WEBSOCKET JUS - DATA TYPE INTEGER
+  const reguaPortaJusanteRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'] ? 
+    parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'], 10) : 0;    // Tag real JUS porta jusante (régua)
+  const contrapesoDirectoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'] ? 
+    parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'], 10) : 0;   // Tag real JUS contrapeso direito
+  const contrapesoEsquerdoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'] ? 
+    parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'], 10) : 0;  // Tag real JUS contrapeso esquerdo
+  const motorDireito = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'] ? 
+    parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'], 10) : 0;       // Tag real JUS motor direito (animação)  
+  const motorEsquerdo = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'] ? 
+    parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'], 10) : 0;      // Tag real JUS motor esquerdo (animação)
   
-  // Régua Porta: 431 (em cima/0%) -> 14 (embaixo/100%) - INVERTIDO!
-  const reguaPortaJusante = ((431 - reguaPortaJusanteRaw) / (431 - 14)) * 100;
+  // 🔄 NORMALIZAÇÃO DIRETA DOS VALORES JUS (igual página Enchimento)
+  // WebSocket JUS provavelmente já envia valores normalizados ou precisam normalização direta
+  const contrapesoDirecto = React.useMemo(() => {
+    return Math.max(0, Math.min(100, contrapesoDirectoRaw));
+  }, [contrapesoDirectoRaw]);
   
+  const contrapesoEsquerdo = React.useMemo(() => {
+    return Math.max(0, Math.min(100, contrapesoEsquerdoRaw));
+  }, [contrapesoEsquerdoRaw]);
+  
+  const reguaPortaJusante = React.useMemo(() => {
+    return Math.max(0, Math.min(100, reguaPortaJusanteRaw));
+  }, [reguaPortaJusanteRaw]);
+  
+  // 🐛 DEBUG: Log dos valores JUS WebSocket para verificar se estão funcionando
+  React.useEffect(() => {
+    console.log('🎯 [PortaJusante] Debug Tags JUS WebSocket:', {
+      reguaPortaJusanteRaw: reguaPortaJusanteRaw,
+      contrapesoDirectoRaw: contrapesoDirectoRaw,
+      contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
+      motorDireito: motorDireito,
+      motorEsquerdo: motorEsquerdo,
+      reguaPortaJusante: reguaPortaJusante,
+      contrapesoDirecto: contrapesoDirecto,
+      contrapesoEsquerdo: contrapesoEsquerdo,
+      tagsDisponiveis: {
+        JUS_PORTA: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'],
+        JUS_CONTRA_DIR: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'],
+        JUS_CONTRA_ESQ: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'],
+        JUS_MOTOR_DIR: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'],
+        JUS_MOTOR_ESQ: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ']
+      },
+      connected: connectionStatus.connected
+    });
+  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo, 
+      reguaPortaJusanteRaw, reguaPortaJusante, motorDireito, motorEsquerdo, connectionStatus.connected]);
+
   // Configuração responsiva SIMPLES - igual outros componentes
   const configAtual = isMobile ? CONTRAPESO_CONFIG.mobile : CONTRAPESO_CONFIG.desktop;
   const contrapesoDireitoConfig = configAtual.direito;

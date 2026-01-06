@@ -123,6 +123,37 @@ html, body {
   transform: scale(1.02);
 }
 
+/* OTIMIZAÇÕES SIDEBAR - PERFORMANCE MÁXIMA */
+.sidebar-optimized {
+  /* GPU Acceleration para transições suaves */
+  will-change: width;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.sidebar-nav-item {
+  /* GPU Acceleration para botões de navegação */
+  will-change: background-color, color, padding, gap;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+.sidebar-text-transition {
+  /* GPU Acceleration para textos que aparecem/desaparecem */
+  will-change: width, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+/* Transição customizada cubic-bezier otimizada */
+.sidebar-smooth-transition {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
 /* FORÇAR FUNDO TRANSPARENTE NOS INPUTS - EDP */
 input[type="email"],
 input[type="password"],
