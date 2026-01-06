@@ -671,12 +671,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   // 📡 USAR O SISTEMA PLC EXISTENTE
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
   
-  // 🔧 ESTADOS PARA SIMULAÇÃO DE PIPES (lado direito já mapeado)
-  const [simulationMode, setSimulationMode] = useState(false);
-  const [tubulacaoSimulation, setTubulacaoSimulation] = useState<{[key: string]: boolean}>({
-    PIPE_1: false, PIPE_2: false, PIPE_3: false, PIPE_4: false, PIPE_5: false,
-    PIPE_6: false, PIPE_7: false, PIPE_8: false, PIPE_9: false
-  });
+  // 🔥 SEM SIMULAÇÃO - USANDO TAGS REAIS DO WEBSOCKET ENCH
   
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA ENCH usando sendCommand
   React.useEffect(() => {
@@ -699,58 +694,51 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         data_type: 'STRING'
       });
       
-      console.log('📡 [Enchimento] Subscribe ENCH enviado:', subscribeCmd);
     }
   }, [connectionStatus.connected, sendCommand]);
   
-  // 🔧 FUNÇÃO PARA SIMULAÇÃO DE TUBULAÇÕES
-  const handleTubulacaoSimulation = (tubuId: string, value: boolean) => {
-    if (!simulationMode) return;
-    setTubulacaoSimulation(prev => ({ ...prev, [tubuId]: value }));
-  };
+  // 🔥 SISTEMA REAL - SEM SIMULAÇÃO
   
-  // Extrair dados dos pistões do PLC - SISTEMA ENCHIMENTO
-  const pistaoDireitoRaw = plcData?.ints?.[0] || 310;   // Pistão direito (índice 0) - range 87 a 310
-  const pistaoEsquerdoRaw = plcData?.ints?.[1] || 310;  // Pistão esquerdo (índice 1) - range 87 a 310
+  // 🎯 PISTÕES - TAGS REAIS DO WEBSOCKET ENCH (MOVIMENTO REAL 0-100%)
+  const pistaoDireitoRaw = parseInt(plcData?.tags?.['ENCH_MED_AB_CILIND.POS_DIR_INT'] || '0', 10);   // Pistão direito - valor real WebSocket
+  const pistaoEsquerdoRaw = parseInt(plcData?.tags?.['ENCH_MED_AB_CILIND.POS_ESQ_INT'] || '0', 10);  // Pistão esquerdo - valor real WebSocket
+
+  // 🎯 DADOS COMPLEMENTARES - PISTÃO DIREITO
+  const tempoAberturaDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_A'] || '0', 10);        // Tempo abertura (int)
+  const velocidadeDireito = parseFloat(plcData?.tags?.['ENCH_POSICAO_COMP.VELOC_C_A'] || '0');                   // Velocidade m/s (real)
+  const tempoAberturaLentaDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_A'] || '0', 10); // Tempo abertura lenta (int)
+  const tempoFechoDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_A'] || '0', 10);         // Tempo fecho (int)
+  const posicaoMetrosDireito = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.MED_CILIND_DIR'] || '0');           // Posição em metros (real)
+  const posicaoPorcentagemDireito = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.PORC_CILIND_DIR'] || '0');     // Posição em % (real)
+
+  // 🎯 DADOS COMPLEMENTARES - PISTÃO ESQUERDO (assumindo tags similares)
+  const tempoAberturaEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_B'] || '0', 10);        // Tempo abertura (int)
+  const velocidadeEsquerdo = parseFloat(plcData?.tags?.['ENCH_POSICAO_COMP.VELOC_C_B'] || '0');                   // Velocidade m/s (real)
+  const tempoAberturaLentaEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_B'] || '0', 10); // Tempo abertura lenta (int)
+  const tempoFechoEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_B'] || '0', 10);         // Tempo fecho (int)
+  const posicaoMetrosEsquerdo = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.MED_CILIND_ESQ'] || '0');           // Posição em metros (real)
+  const posicaoPorcentagemEsquerdo = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.PORC_CILIND_ESQ'] || '0');     // Posição em % (real)
   
-  // 🎯 NORMALIZAÇÃO DOS PISTÕES
-  // PLC envia: 87 = pistão NO TOPO (100%), 310 = pistão NA BASE (0%)
-  // Fórmula invertida: quanto MENOR o valor, MAIS ALTO está o pistão
+  // 🎯 NORMALIZAÇÃO DIRETA DOS PISTÕES (0-100% do WebSocket)
+  // WebSocket já envia valores normalizados para controle direto do eixo Y
   const pistaoDireito = React.useMemo(() => {
-    const MIN_POS = 87;   // Posição superior (topo)
-    const MAX_POS = 310;  // Posição inferior (base)
-    // Inverter: 87 → 100%, 310 → 0%
-    const normalized = ((MAX_POS - pistaoDireitoRaw) / (MAX_POS - MIN_POS)) * 100;
-    return Math.max(0, Math.min(100, normalized));
+    // Garantir que o valor está entre 0-100%
+    return Math.max(0, Math.min(100, pistaoDireitoRaw));
   }, [pistaoDireitoRaw]);
   
   const pistaoEsquerdo = React.useMemo(() => {
-    const MIN_POS = 87;   // Posição superior (topo)
-    const MAX_POS = 310;  // Posição inferior (base)
-    // Inverter: 87 → 100%, 310 → 0%
-    const normalized = ((MAX_POS - pistaoEsquerdoRaw) / (MAX_POS - MIN_POS)) * 100;
-    return Math.max(0, Math.min(100, normalized));
+    // Garantir que o valor está entre 0-100%
+    return Math.max(0, Math.min(100, pistaoEsquerdoRaw));
   }, [pistaoEsquerdoRaw]);
   
-  // Debug dos valores dos pistões
-  React.useEffect(() => {
-    console.log('🔧 PISTÕES:', {
-      'Dir Raw': pistaoDireitoRaw,
-      'Dir %': pistaoDireito.toFixed(1),
-      'Esq Raw': pistaoEsquerdoRaw,
-      'Esq %': pistaoEsquerdo.toFixed(1)
-    });
-  }, [pistaoDireitoRaw, pistaoDireito, pistaoEsquerdoRaw, pistaoEsquerdo]);
+  // 🎯 BOMBAS/MOTORES - TAGS REAIS DO WEBSOCKET ENCH (0,1,2,3 - ANIMAÇÃO)
+  const bombaMotorDireito = parseInt(plcData?.tags?.['ENCH_ANIM_WINCC_ANIM_BOMBA_A_ENCH'] || '0', 10);  // Bomba direita (0=parada, 1,2=verde, 3=vermelha)
+  const bombaMotorEsquerdo = parseInt(plcData?.tags?.['ENCH_ANIM_WINCC_ANIM_BOMBA_B_ENCH'] || '0', 10); // Bomba esquerda (0=parada, 1,2=verde, 3=vermelha)
 
-  // Extrair dados dos motores do PLC - SISTEMA ENCHIMENTO
-  const motorEsquerdo = plcData?.ints?.[8] || 0;   // Motor esquerdo (índice 8)
-  const motorDireito = plcData?.ints?.[9] || 0;    // Motor direito (índice 9)
   
-  // Extrair bits dos cilindros do PLC - STATUS BITS 
-  // Bit 29: Word 1, Bit 13 (29 = 1*16 + 13)
-  // Bit 30: Word 1, Bit 14 (30 = 1*16 + 14)
-  const cilindroDireito = plcData?.bit_data?.status_bits?.[1]?.[13] || 0;  // Cilindro direito (bit 29)
-  const cilindroEsquerdo = plcData?.bit_data?.status_bits?.[1]?.[14] || 0; // Cilindro esquerdo (bit 30)
+  // 🎯 CILINDROS - TAGS REAIS DO WEBSOCKET ENCH  
+  const cilindroDireito = plcData?.tags?.['ENCH_DEF_AG_CILIND_A_DIR'] === 'TRUE' ? 1 : 0;  // Cilindro direito
+  const cilindroEsquerdo = plcData?.tags?.['ENCH_DEF_AG_CILIND_B_ESQ'] === 'TRUE' ? 1 : 0; // Cilindro esquerdo
 
   // 🎯 TUBULAÇÕES LADO DIREITO COM TAGS REAIS ENCH (Pipes 1-9)
   
@@ -764,31 +752,49 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const pipe7Real = plcData?.tags?.['ENCH_HMI_VD1_VD2_LIG_DIR'] === 'TRUE' ? 1 : 0;     // Pipe 7 DIREITA
   const pipe8Real = plcData?.tags?.['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0;              // Pipe 8 DIREITA
   const pipe9Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;         // Pipe 9 DIREITA
+
+  // Tags reais do WebSocket ENCH para lado ESQUERDO
+  const pipe1EsqReal = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 1 ESQUERDA
+  const pipe2EsqReal = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;          // Pipe 2 ESQUERDA
+  const pipe3EsqReal = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;       // Pipe 3 ESQUERDA
+  const pipe4EsqReal = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;          // Pipe 4 ESQUERDA
+  const pipe5EsqReal = plcData?.tags?.['ENCH_HMI_B_LIG_VD2_0_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 5 ESQUERDA
+  const pipe6EsqReal = plcData?.tags?.['ENCH_RM_BOMB_ESQ'] === 'TRUE' ? 1 : 0;               // Pipe 6 ESQUERDA
+  const pipe7EsqReal = plcData?.tags?.['ENCH_HMI_VD1_VD2_LIG_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 7 ESQUERDA
+  const pipe8EsqReal = plcData?.tags?.['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0;            // Pipe 8 ESQUERDA
+  const pipe9EsqReal = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;           // Pipe 9 ESQUERDA
   
-  // Mapeamento conforme os bits usados no PipeSystem.tsx - CORRIGIDO ✅
-  const bit12 = simulationMode ? (tubulacaoSimulation.PIPE_1 ? 1 : 0) : pipe1Real;     // Pipe 1 - ENCH_SIN_AG_SUBID
-  const bit19 = simulationMode ? (tubulacaoSimulation.PIPE_4 ? 1 : 0) : pipe4Real;     // Pipe 4 - ENCH_EM_SUB_LENTA
-  const bit20 = simulationMode ? (tubulacaoSimulation.PIPE_5 ? 1 : 0) : pipe5Real;     // Pipe 5 - ENCH_HMI_B_LIG_VD2_0_DIR
-  const bit21 = simulationMode ? (tubulacaoSimulation.PIPE_6 ? 1 : 0) : pipe6Real;     // Pipe 6 - ENCH_RM_BOMB_DIR  
-  const bit23 = simulationMode ? (tubulacaoSimulation.PIPE_7 ? 1 : 0) : pipe7Real;     // Pipe 7 - ENCH_HMI_VD1_VD2_LIG_DIR
-  const bit25 = simulationMode ? (tubulacaoSimulation.PIPE_8 ? 1 : 0) : pipe8Real;     // Pipe 8 - ENCH_EM_SUB_RAP
-  const bit24 = simulationMode ? (tubulacaoSimulation.PIPE_9 ? 1 : 0) : pipe9Real;     // Pipe 9 - ENCH_OM_VD2_COMP_DIR
+  // 🎯 MAPEAMENTO PIPES LADO DIREITO → BITS SVG
+  const bit12 = pipe1Real;     // Pipe 1 DIREITA - ENCH_SIN_AG_SUBID
+  const bit9 = pipe2Real;      // Pipe 2 DIREITA - ENCH_SIN_CIRC_SUBIDA  
+  const bit11 = pipe3Real;     // Pipe 3 DIREITA - ENCH_OM_VALV_DESC_COMP_A
+  const bit19 = pipe4Real;     // Pipe 4 DIREITA - ENCH_EM_SUB_LENTA
+  const bit20 = pipe5Real;     // Pipe 5 DIREITA - ENCH_HMI_B_LIG_VD2_0_DIR
+  const bit21 = pipe6Real;     // Pipe 6 DIREITA - ENCH_RM_BOMB_DIR  
+  const bit23 = pipe7Real;     // Pipe 7 DIREITA - ENCH_HMI_VD1_VD2_LIG_DIR
+  const bit25 = pipe8Real;     // Pipe 8 DIREITA - ENCH_EM_SUB_RAP
+  const bit24 = pipe9Real;     // Pipe 9 DIREITA - ENCH_OM_VD2_COMP_DIR
+
+  // 🎯 MAPEAMENTO PIPES LADO ESQUERDO → BITS SVG (CORRIGIDO)
+  const bit26 = pipe1EsqReal;  // Pipe 1 ESQUERDA - ENCH_SIN_AG_SUBID_ESQ 
+  const bit31 = pipe2EsqReal;  // Pipe 2 ESQUERDA - ENCH_SIN_CIRC_SUBIDA_ESQ
+  const bit30 = pipe3EsqReal;  // Pipe 3 ESQUERDA - ENCH_OM_VALV_DESC_COMP_B
+  const bit16 = pipe4EsqReal;  // Pipe 4 ESQUERDA - ENCH_EM_SUB_LENTA_ESQ
+  const bit17 = pipe5EsqReal;  // Pipe 5 ESQUERDA - ENCH_HMI_B_LIG_VD2_0_ESQ
+  const bit18 = pipe6EsqReal;  // Pipe 6 ESQUERDA - ENCH_RM_BOMB_ESQ
+  const bit22 = pipe7EsqReal;  // Pipe 7 ESQUERDA - ENCH_HMI_VD1_VD2_LIG_ESQ (BIT ÚNICO)
+  const bit27 = pipe8EsqReal;  // Pipe 8 ESQUERDA - ENCH_EM_SUB_RAP_ESQ (BIT ÚNICO)
+  const bit28 = pipe9EsqReal;  // Pipe 9 ESQUERDA - ENCH_OM_VD2_COMP_ESQ (BIT ÚNICO)
   
-  // ✓ Válvulas Verticais Laterais + Pipes 2 e 3 SOBREPOSTOS no SVG
-  const bit9 = simulationMode ? (tubulacaoSimulation.PIPE_2 ? 1 : 0) : pipe2Real;      // bit9: VVL1 OU Pipe 2
-  const bit11 = simulationMode ? (tubulacaoSimulation.PIPE_3 ? 1 : 0) : pipe3Real;     // bit11: VVL2 OU Pipe 3
+  // 🎯 VÁLVULAS VERTICAIS - BITS ÚNICOS COM TAGS ESPECÍFICOS
+  const valvulaVerticalDireita = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;  // VÁLVULA VERTICAL DIREITA
+  const valvulaVerticalEsquerda = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0; // VÁLVULA VERTICAL ESQUERDA
   
-  // Bits do lado esquerdo (ainda não mapeados com tags reais - aguardando definição)
-  const bit13 = Number(plcData?.bit_data?.status_bits?.[1]?.[13] || 0);  // TODO: Pipe esquerdo
-  const bit16 = Number(plcData?.bit_data?.status_bits?.[1]?.[0] || 0);   // TODO: Pipe esquerdo
-  const bit17 = Number(plcData?.bit_data?.status_bits?.[1]?.[1] || 0);   // TODO: Pipe esquerdo
-  const bit18 = Number(plcData?.bit_data?.status_bits?.[1]?.[2] || 0);   // TODO: Pipe esquerdo
-  const bit26 = Number(plcData?.bit_data?.status_bits?.[1]?.[10] || 0);  // TODO: Pipe esquerdo
-  const bit30 = Number(plcData?.bit_data?.status_bits?.[1]?.[14] || 0);  // TODO: Pipe esquerdo
-  const bit31 = Number(plcData?.bit_data?.status_bits?.[1]?.[15] || 0);  // TODO: Pipe esquerdo
-  const bit33 = Number(plcData?.bit_data?.status_bits?.[2]?.[1] || 0);   // TODO: Pipe esquerdo
-  const bit34 = Number(plcData?.bit_data?.status_bits?.[2]?.[2] || 0);   // TODO: Pipe esquerdo
-  const bit36 = Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0);   // TODO: Pipe esquerdo
+  // Bits extras do SVG (elementos adicionais dos pipes principais)
+  const bit13 = Number(plcData?.bit_data?.status_bits?.[1]?.[13] || 0);  // Disponível
+  const bit33 = pipe2EsqReal;  // Pipe 2 ESQUERDA - elemento extra (CORRIGIDO)
+  const bit34 = pipe3EsqReal;  // Pipe 3 ESQUERDA - elemento extra (mesmo tag)
+  const bit36 = Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0);   // Disponível
 
   // Extrair bits para válvulas - CORRIGIDO ✓
   // V1 = Bit 18, V2 = Bit 19, V3 = Bit 12
@@ -800,9 +806,9 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaEsquerda3 = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VRC3 ESQUERDO
   
   // LADO DIREITO na animação 
-  const valvulaDireita1 = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;          // VRC1 DIREITO
+  const valvulaDireita1 = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;          // VRC1 DIREITO
   const valvulaDireita2 = plcData?.tags?.['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0;            // VRC2 DIREITO
-  const valvulaDireita3 = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;           // VRC3 DIREITO
+  const valvulaDireita3 = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;           // VRC3 DIREITO
 
   // Extrair bits para válvulas flange - CORRIGIDO ✓
   const valvulaFlangeEsquerda1 = valvulaEsquerda1; // V1 - Bit 18
@@ -814,37 +820,37 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaFlangeDireita2 = valvulaDireita2; // Bit 24
   const valvulaFlangeDireita3 = valvulaDireita3; // Bit 23
 
-  // 🎯 VÁLVULAS GAVETA - TAGS REAIS DO WEBSOCKET ENCH
+
   
-  // LADO DIREITO na tela (VG1, VG2, VG3) - CORRIGIDO ✅
-  const valvulaGavetaDireita1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;           // VG1 DIREITO - mesmo tag do PIPE 1
-  const valvulaGavetaDireita2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;        // VG2 DIREITO - tag diferente
-  const valvulaGavetaDireita3Real = plcData?.tags?.['EENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;          // VG3 DIREITO - mesmo tag do PIPE 1
+  // LADO DIREITO VISUAL (VG1, VG2, VG3) - variáveis "Esquerda" 
+  const valvulaGavetaEsquerda1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;         // VG1 DIREITA VISUAL
+  const valvulaGavetaEsquerda2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;      // VG2 DIREITA VISUAL  
+  const valvulaGavetaEsquerda3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;  // VG3 DIREITA VISUAL
   
-  // LADO ESQUERDO na tela (VG4, VG5, VG6) - CORRIGIDO ✅
-  const valvulaGavetaEsquerda1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;              // VG4 ESQUERDO - tag esquerdo
-  const valvulaGavetaEsquerda2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;           // VG5 ESQUERDO - tag esquerdo
-  const valvulaGavetaEsquerda3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;              // VG6 ESQUERDO - tag esquerdo
+  // LADO ESQUERDO VISUAL (VG4, VG5, VG6) - variáveis "Direita"
+  const valvulaGavetaDireita1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;      // VG4 ESQUERDA VISUAL  
+  const valvulaGavetaDireita2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;      // VG5 ESQUERDA VISUAL
+  const valvulaGavetaDireita3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;      // VG6 ESQUERDA VISUAL (mesmo que VG4)
   
-  // Valores finais das válvulas gaveta (sem simulação)
-  const valvulaGavetaEsquerda1 = valvulaGavetaEsquerda1Real; // VG4 ESQUERDO - CORRIGIDO ✅
-  const valvulaGavetaEsquerda2 = valvulaGavetaEsquerda2Real; // VG5 ESQUERDO - CORRIGIDO ✅
-  const valvulaGavetaEsquerda3 = valvulaGavetaEsquerda3Real; // VG6 ESQUERDO - CORRIGIDO ✅
-  const valvulaGavetaDireita1 = valvulaGavetaDireita1Real;   // VG1 DIREITO - CORRIGIDO ✅
-  const valvulaGavetaDireita2 = valvulaGavetaDireita2Real;   // VG2 DIREITO - CORRIGIDO ✅
-  const valvulaGavetaDireita3 = valvulaGavetaDireita3Real;   // VG3 DIREITO - CORRIGIDO ✅
+  // Valores finais das válvulas gaveta (NOMES TROCADOS MAS FUNCIONAL)
+  const valvulaGavetaEsquerda1 = valvulaGavetaEsquerda1Real; // VG1 DIREITA VISUAL ✅
+  const valvulaGavetaEsquerda2 = valvulaGavetaEsquerda2Real; // VG2 DIREITA VISUAL ✅
+  const valvulaGavetaEsquerda3 = valvulaGavetaEsquerda3Real; // VG3 DIREITA VISUAL ✅
+  const valvulaGavetaDireita1 = valvulaGavetaDireita1Real;   // VG4 ESQUERDA VISUAL ✅
+  const valvulaGavetaDireita2 = valvulaGavetaDireita2Real;   // VG5 ESQUERDA VISUAL ✅
+  const valvulaGavetaDireita3 = valvulaGavetaDireita3Real;   // VG6 ESQUERDA VISUAL ✅
 
   // 🎯 VÁLVULAS DIRECIONAIS - TAGS REAIS DO WEBSOCKET ENCH
   
   // LADO DIREITO na tela: VCD, VD1, VD2 (botões VD1, VD2, VD3)
-  const valvulaDirecionalDireita1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;   // VCD DIREITO
-  const valvulaDirecionalDireita2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_B'] === 'TRUE' ? 1 : 0;   // VD1 DIREITO
-  const valvulaDirecionalDireita3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;       // VD2 DIREITO
+  const valvulaDirecionalDireita1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;   // VCD ESQUERDO
+  const valvulaDirecionalDireita2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_B'] === 'TRUE' ? 1 : 0;   // VD1 ESQUERDO
+  const valvulaDirecionalDireita3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;       // VD2 ESQUERDO
   
   // LADO ESQUERDO na tela: VCD, VD1, VD2 (botões VD4, VD5, VD6)
-  const valvulaDirecionalEsquerda1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;  // VCD ESQUERDO
-  const valvulaDirecionalEsquerda2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_A'] === 'TRUE' ? 1 : 0;  // VD1 ESQUERDO
-  const valvulaDirecionalEsquerda3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VD2 ESQUERDO
+  const valvulaDirecionalEsquerda1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;  // VCD DIREITO
+  const valvulaDirecionalEsquerda2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_A'] === 'TRUE' ? 1 : 0;  // VD1 DIREITO
+  const valvulaDirecionalEsquerda3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VD2 DIREITO
   
   // Valores finais das válvulas direcionais (sem simulação)
   const valvulaDirecionalEsquerda1 = valvulaDirecionalEsquerda1Real; // VCD ESQUERDO
@@ -931,153 +937,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
   return (
     <div className="w-full h-auto flex flex-col items-center relative">
-      
-      {/* PAINEL INFORMATIVO - POSIÇÕES DOS PISTÕES */}
-      {isInitialized && containerDimensions.width > 100 && (
-        <div 
-          className="absolute z-50"
-          style={{
-            top: `${alturaTotal * 0.99}px`,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: `${Math.min(maxWidth * 0.4, 600)}px`,
-          }}
-        >
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg border border-gray-300 p-4">
-            <h3 className="text-sm font-bold text-[#212E3E] uppercase tracking-wide mb-3 flex items-center gap-2">
-              <BoltIcon className="w-4 h-4" />
-              POSIÇÕES DOS PISTÕES
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Pistão Esquerdo */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Pistão Esquerdo:</span>
-                  <span className="text-sm font-mono font-bold px-2 py-1 rounded bg-white border border-gray-200 text-[#212E3E]">
-                    {pistaoEsquerdoRaw}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Percentual:</span>
-                  <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    {pistaoEsquerdo.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              
-              {/* Pistão Direito */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Pistão Direito:</span>
-                  <span className="text-sm font-mono font-bold px-2 py-1 rounded bg-white border border-gray-200 text-[#212E3E]">
-                    {pistaoDireitoRaw}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Percentual:</span>
-                  <span className="text-sm font-mono font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
-                    {pistaoDireito.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* 🔧 PAINEL DE SIMULAÇÃO DE TUBULAÇÕES */}
-      {isInitialized && containerDimensions.width > 100 && (
-        <div 
-          className="absolute z-50"
-          style={{
-            top: '20px',
-            left: '20px',
-            width: '400px',
-          }}
-        >
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-lg border border-orange-300 p-4">
-            <h3 className="text-sm font-bold text-[#212E3E] uppercase tracking-wide mb-3 flex items-center gap-2">
-              🔧 IDENTIFICAR TUBULAÇÕES
-            </h3>
-            
-            {/* Toggle Modo Simulação */}
-            <div className="mb-4">
-              <label className="flex items-center gap-2 text-sm font-medium text-[#212E3E]">
-                <input
-                  type="checkbox"
-                  checked={simulationMode}
-                  onChange={(e) => setSimulationMode(e.target.checked)}
-                  className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
-                />
-                Modo Simulação Ativo
-              </label>
-              <p className="text-xs text-gray-600 mt-1">
-                {simulationMode ? '✅ Simulação habilitada' : '⚠️ Simulação desabilitada'}
-              </p>
-            </div>
-
-            {/* GRID DE PIPES LADO DIREITO */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {[
-                { id: 'PIPE_1', tag: 'ENCH_SIN_AG_SUBID' },
-                { id: 'PIPE_2', tag: 'ENCH_SIN_CIRC_SUBIDA' },  
-                { id: 'PIPE_3', tag: 'ENCH_OM_VALV_DESC_COMP_A' },
-                { id: 'PIPE_4', tag: 'ENCH_EM_SUB_LENTA' },
-                { id: 'PIPE_5', tag: 'ENCH_HMI_B_LIG_VD2_0_DIR' },
-                { id: 'PIPE_6', tag: 'ENCH_RM_BOMB_DIR' },
-                { id: 'PIPE_7', tag: 'ENCH_HMI_VD1_VD2_LIG_DIR' },
-                { id: 'PIPE_8', tag: 'ENCH_EM_SUB_RAP' },
-                { id: 'PIPE_9', tag: 'ENCH_OM_VD2_COMP_DIR' }
-              ].map(({id, tag}) => {
-                const isActive = tubulacaoSimulation[id];
-                return (
-                  <div key={id} className="mb-2">
-                    <label className="text-xs font-medium text-[#212E3E] uppercase block mb-1">
-                      {id} DIR
-                    </label>
-                    <p className="text-xs text-gray-500 mb-1 truncate">{tag}</p>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleTubulacaoSimulation(id, true)}
-                        disabled={!simulationMode}
-                        className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                          !simulationMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                          isActive ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-green-500 hover:text-white'
-                        }`}
-                      >
-                        ON
-                      </button>
-                      <button
-                        onClick={() => handleTubulacaoSimulation(id, false)}
-                        disabled={!simulationMode}
-                        className={`flex-1 px-2 py-1 text-xs font-bold rounded transition-colors ${
-                          !simulationMode ? 'bg-gray-200 text-gray-400 cursor-not-allowed' :
-                          !isActive ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-600 hover:bg-red-500 hover:text-white'
-                        }`}
-                      >
-                        OFF
-                      </button>
-                    </div>
-                    <div className={`w-full h-1 rounded mt-1 ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Instruções */}
-            <div className="p-2 bg-blue-50 rounded border border-blue-200">
-              <p className="text-xs text-blue-800">
-                <strong>Pipes Lado DIREITO Mapeados:</strong><br/>
-                ✅ Pipes 1-9 já conectados aos tags ENCH reais<br/>
-                🔧 Use simulação para testar se os mapeamentos estão corretos<br/>
-                📝 Aguardando mapeamento do lado ESQUERDO<br/>
-                🎯 Subscribe ENCH ativo - dados em tempo real
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Container do Sistema de Enchimento */}
       <div 
         ref={containerRef}
@@ -1129,6 +989,9 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                 bit33={bit33}
                 bit34={bit34}
                 bit36={bit36}
+                bit22={bit22}
+                bit27={bit27}
+                bit28={bit28}
                 editMode={false}
               />
             </div>
@@ -1574,7 +1437,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             }}
           >
             <MotorEnchimento 
-              websocketValue={motorEsquerdo}
+              websocketValue={bombaMotorEsquerdo}
               side="esquerdo"
               editMode={false}
             />
@@ -1593,7 +1456,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             }}
           >
             <MotorEnchimento 
-              websocketValue={motorDireito}
+              websocketValue={bombaMotorDireito}
               side="direito"
               editMode={false}
             />
@@ -1821,7 +1684,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             }}
           >
             <ValvulaVertical 
-              websocketBit={bit9}
+              websocketBit={valvulaVerticalEsquerda}
               editMode={false}
             />
           </div>
@@ -1839,9 +1702,275 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             }}
           >
             <ValvulaVertical 
-              websocketBit={bit11}
+              websocketBit={valvulaVerticalDireita}
               editMode={false}
             />
+          </div>
+
+          {/* 🎯 CARD PISTÃO DIREITO - ESTILO PADRÃO INFOCARD */}
+          <div 
+            className="absolute z-50"
+            style={{
+              top: `${alturaTotal * 0.91}px`,
+              left: `${maxWidth * 0.21}px`,
+              width: `${maxWidth * 0.23}px`,
+            }}
+          >
+            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+              {/* Header Padrão InfoCard */}
+              <div 
+                className="bg-edp-marine text-white"
+                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+              >
+                <h3 
+                  className="font-bold uppercase tracking-wide"
+                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
+                >
+                  PISTÃO DIREITO
+                </h3>
+              </div>
+              
+              {/* Conteúdo Padrão InfoCard */}
+              <div style={{ padding: `${Math.max(10, maxWidth * 0.01)}px` }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, maxWidth * 0.006)}px` }}>
+                  
+                  {/* Posição Metros */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Posição:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {posicaoMetrosDireito.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m</span>
+                    </span>
+                  </div>
+                  
+                  {/* Abertura % */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Abertura:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {posicaoPorcentagemDireito.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>%</span>
+                    </span>
+                  </div>
+                  
+                  {/* Separador */}
+                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                  
+                  {/* Tempo Abertura */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Abertura:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoAberturaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Tempo Ab. Lenta */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Ab. Lenta:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoAberturaLentaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Tempo Fecho */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Fecho:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoFechoDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Separador */}
+                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                  
+                  {/* Velocidade */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Velocidade:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {velocidadeDireito.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m/s</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 🎯 CARD PISTÃO ESQUERDO - ESTILO PADRÃO INFOCARD */}
+          <div 
+            className="absolute z-50"
+            style={{
+              top: `${alturaTotal * 0.91}px`,
+              left: `${maxWidth * 0.50}px`,
+              width: `${maxWidth * 0.23}px`,
+            }}
+          >
+            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+              {/* Header Padrão InfoCard */}
+              <div 
+                className="bg-edp-marine text-white"
+                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+              >
+                <h3 
+                  className="font-bold uppercase tracking-wide"
+                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
+                >
+                  PISTÃO ESQUERDO
+                </h3>
+              </div>
+              
+              {/* Conteúdo Padrão InfoCard */}
+              <div style={{ padding: `${Math.max(10, maxWidth * 0.01)}px` }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, maxWidth * 0.006)}px` }}>
+                  
+                  {/* Posição Metros */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Posição:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {posicaoMetrosEsquerdo.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m</span>
+                    </span>
+                  </div>
+                  
+                  {/* Abertura % */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Abertura:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {posicaoPorcentagemEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>%</span>
+                    </span>
+                  </div>
+                  
+                  {/* Separador */}
+                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                  
+                  {/* Tempo Abertura */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Abertura:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoAberturaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Tempo Ab. Lenta */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Ab. Lenta:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoAberturaLentaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Tempo Fecho */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      T. Fecho:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {tempoFechoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
+                    </span>
+                  </div>
+                  
+                  {/* Separador */}
+                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                  
+                  {/* Velocidade */}
+                  <div className="flex justify-between items-center">
+                    <span 
+                      className="font-medium text-[#212E3E] uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    >
+                      Velocidade:
+                    </span>
+                    <span 
+                      className="font-mono font-bold text-[#212E3E]"
+                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    >
+                      {velocidadeEsquerdo.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m/s</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         ) : (
@@ -1866,6 +1995,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           </div>
         )}
       </div>
+
 
       {/* BOTÃO MOBILE - Mesmo estilo do desktop, porém menor (abaixo de 1024px) */}
       <button

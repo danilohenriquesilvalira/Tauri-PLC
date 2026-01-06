@@ -15,10 +15,13 @@ interface PipeSystemProps {
   bit19?: number | boolean;
   bit20?: number | boolean;
   bit21?: number | boolean;
+  bit22?: number | boolean;  // PIPE 7 ESQUERDO
   bit23?: number | boolean;
   bit24?: number | boolean;
   bit25?: number | boolean;
   bit26?: number | boolean;
+  bit27?: number | boolean;  // PIPE 8 ESQUERDO
+  bit28?: number | boolean;  // PIPE 9 ESQUERDO
   bit30?: number | boolean;
   bit31?: number | boolean;
   bit33?: number | boolean;
@@ -38,10 +41,13 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
   bit19 = 0,
   bit20 = 0,
   bit21 = 0,
+  bit22 = 0,  // PIPE 7 ESQUERDO
   bit23 = 0,
   bit24 = 0,
   bit25 = 0,
   bit26 = 0,
+  bit27 = 0,  // PIPE 8 ESQUERDO
+  bit28 = 0,  // PIPE 9 ESQUERDO
   bit30 = 0,
   bit31 = 0,
   bit33 = 0,
@@ -186,7 +192,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 14 - Bit 26 */}
+        {/* Pipe 2 - ESQUERDA - M23.7 - ENCH_SIN_CIRC_SUBIDA_ESQ */}
         <path 
           d="M931.5 285.5L931.5 422.501" 
           stroke={getColor(bit26)} 
@@ -194,7 +200,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 15 - Bit 30 */}
+        {/* Pipe 3 - ESQUERDA - DB1.DBX1.7 - ENCH_OM_VALV_DESC_COMP_B */}
         <path 
           d="M953.504 200H906.004L905.504 280.501H953.003" 
           stroke={getColor(bit30)} 
@@ -202,7 +208,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 16 - Bit 31 */}
+        {/* Pipe 1 - ESQUERDA - M24.0 - ENCH_SIN_AG_SUBID_ESQ */}
         <path 
           d="M1146 319.003H1131.5M905.502 15H1060.5V319.003H1099.5M905.502 15V180.502H953.501M905.502 15H859.002C859.002 21.8342 859.002 26.1659 859.002 33.0002M859.002 49.5003C859.002 51.8435 859.002 53.6572 859.002 56.0004V62.0004" 
           stroke={getColor(bit31)} 
@@ -210,7 +216,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 17 - Bit 33 */}
+        {/*Pipe 1 - ESQUERDA - M24.0 - ENCH_SIN_AG_SUBID_ESQ  */}
         <path 
           d="M1145.5 30.5002H1109V5H1343V368.503H995.002V280.503H979.291" 
           stroke={getColor(bit33)} 
@@ -218,7 +224,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 18 - Bit 34 */}
+        {/* Pipe 3 - ESQUERDA - DB1.DBX1.7 - ENCH_OM_VALV_DESC_COMP_B */}
         <path 
           d="M1252 31.5L1298 31.5004V286.502M1278 319.003H1252.5" 
           stroke={getColor(bit34)} 
@@ -226,7 +232,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipe 19 - Bit 36 */}
+        {/*  */}
         <path 
           d="M1316.5 319.5H1325.5V348" 
           stroke={getColor(bit36)} 
@@ -234,14 +240,15 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
-        {/* Pipes extras - lado esquerdo - usando bit separado */}
+        {/* Pipe 2 - ESQUERDA - M23.7 - ENCH_SIN_CIRC_SUBIDA_ESQ */}
         <path 
           d="M1316.5 319.001H1325.5V349.503H1088.5M1057 349.503H1028V180.5H990.502" 
           stroke={getColor(bit26)} 
           strokeWidth="10"
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
-        
+
+        {/* Pipe 4 - ESQUERDA - M23.5 - ENCH_EM_SUB_LENTA_ESQ */}
         <path 
           d="M858.504 85V126" 
           stroke={getColor(bit16)} 
@@ -249,6 +256,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
+        {/* Pipe 5 - ESQUERDA - M28.2 - ENCH_HMI_B_LIG_VD2_0_ESQ */}
         <path 
           d="M858.504 162.5V199.501" 
           stroke={getColor(bit17)} 
@@ -256,6 +264,7 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
+        {/* Pipe 6 - ESQUERDA - I4.5 - ENCH_RM_BOMB_ESQ */}
         <path 
           d="M858.504 236.5V399.002" 
           stroke={getColor(bit18)} 
@@ -263,23 +272,27 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
+        {/* Pipe 7 - ESQUERDA - M28.3 - ENCH_HMI_VD1_VD2_LIG_ESQ */}
         <path 
           d="M860.004 15H809.004V33.5002M809.004 49.5003C809.004 53.9914 809.004 57.5094 809.004 62.0004" 
-          stroke={getColor(bit16)} 
+          stroke={getColor(bit22)} 
           strokeWidth="10"
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
-        
+
+        {/* Pipe 9 - ESQUERDA - DB1.DBX2.7 - ENCH_OM_VD2_COMP_ESQ */}
         <path 
           d="M810.504 15H759.004V33.0002M839.004 199.502V178.002H759.004V85.0007M759.004 62.0004C759.004 57.3141 759.004 54.1867 759.004 49.5003" 
-          stroke={getColor(bit17)} 
+          stroke={getColor(bit28)} 
           strokeWidth="10"
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
         
+
+        {/* Pipe 8 - ESQUERDA - M23.6 - ENCH_EM_SUB_RAP_ESQ */}
         <path 
           d="M809.004 85C809.004 95.1537 809.004 101.847 809.004 112H839.004V126" 
-          stroke={getColor(bit18)} 
+          stroke={getColor(bit27)} 
           strokeWidth="10"
           style={{ transition: 'stroke 0.3s ease-in-out' }}
         />
