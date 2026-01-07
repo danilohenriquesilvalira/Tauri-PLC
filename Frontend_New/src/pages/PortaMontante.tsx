@@ -182,22 +182,109 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const alturaTotal = basePortaHeight;
   
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
-  const { data: plcData } = usePLC();
+  const { data: plcData, sendCommand, connectionStatus } = usePLC();
   
-  // Extrair dados dos contrapesos, régua e motores do PLC - PORTA MONTANTE
-  const contrapesoDirectoRaw = plcData?.ints?.[56] || 0;   // Contrapeso direito (índice 56) - Valores: 598->252 (0->6500 entrada)
-  const contrapesoEsquerdoRaw = plcData?.ints?.[55] || 0;  // Contrapeso esquerdo (índice 55) - Valores: 598->252 (0->6500 entrada)
-  const reguaPortaMontanteRaw = plcData?.ints?.[54] || 0;   // Régua porta montante (índice 54) - Valores: 253->517 (0->6500 entrada)
-  const motorDireito = plcData?.ints?.[48] || 0;           // Motor direito (índice 50)
-  const motorEsquerdo = plcData?.ints?.[49] || 0;          // Motor esquerdo (índice 51)
+  // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA MONT usando sendCommand
+  React.useEffect(() => {
+    if (connectionStatus.connected) {
+      // Enviar subscribe específico para MONT via sendCommand
+      const subscribeCmd = {
+        type: 'SUBSCRIBE',
+        plc_ips: [],
+        areas: ['MONT'],
+        categories: ['PROC', 'FAULT', 'EVENT'],
+        include_all_faults: true
+      };
+      
+      // Usar sendCommand para enviar subscribe
+      sendCommand({
+        plc_ip: '',
+        tag_name: 'SUBSCRIBE',
+        variable: JSON.stringify(subscribeCmd),
+        value: 'SUBSCRIBE',
+        data_type: 'STRING'
+      });
+      
+      console.log('📡 [PortaMontante] Subscribe MONT enviado:', subscribeCmd);
+    }
+  }, [connectionStatus.connected, sendCommand]);
   
-  // 🔄 NORMALIZAR PARA 0-100% - PORTA MONTANTE
-  // Contrapesos: 252 (em cima/0%) -> 598 (embaixo/100%) - NORMAL (não inverter!)
-  const contrapesoDirecto = ((contrapesoDirectoRaw - 252) / (598 - 252)) * 100;
-  const contrapesoEsquerdo = ((contrapesoEsquerdoRaw - 252) / (598 - 252)) * 100;
+  // 🎯 DADOS DOS CONTRAPESOS, RÉGUA E MOTORES - MONT WEBSOCKET (TAGS REAIS)
+  // 📍 USANDO TAGS REAIS DO WEBSOCKET MONT - DATA TYPE INTEGER
+  const reguaPortaMontanteRaw = plcData?.tags?.['MONT_MOVIMENTAR_PORTA_MONTANTE'] ? 
+    parseInt(plcData.tags['MONT_MOVIMENTAR_PORTA_MONTANTE'], 10) : 0;    // Tag real MONT porta montante (régua)
+  const contrapesoDirectoRaw = plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'] ? 
+    parseInt(plcData.tags['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'], 10) : 0;   // Tag real MONT contrapeso direito
+  const contrapesoEsquerdoRaw = plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'] ? 
+    parseInt(plcData.tags['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'], 10) : 0;  // Tag real MONT contrapeso esquerdo
   
-  // Régua Porta: 253 (em cima/0%) -> 517 (embaixo/100%)
-  const reguaPortaMontante = ((reguaPortaMontanteRaw - 253) / (517 - 253)) * 100;
+  // MOTORES - Velocidade
+  const motorDireitoVeloc = plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR'] ? 
+    parseFloat(plcData.tags['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR']) : 0;       // Tag MONT motor direito velocidade
+  const motorEsquerdoVeloc = plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ'] ? 
+    parseFloat(plcData.tags['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ']) : 0;      // Tag MONT motor esquerdo velocidade
+  
+  // VELOCIDADES OPERACIONAIS
+  const velocidadeSubida = plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_SUB'] ? 
+    parseFloat(plcData.tags['MONT_VELOC_VAR.VELOC_1_SUB']) : 0;           // Velocidade subida
+  const velocidadeDescida = plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_DESC'] ? 
+    parseFloat(plcData.tags['MONT_VELOC_VAR.VELOC_1_DESC']) : 0;          // Velocidade descida
+  
+  // ANIMAÇÃO DOS MOTORES (para indicar se está em movimento)
+  const animMotorDireito = plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_DIR'] ? 
+    parseInt(plcData.tags['MONT_WINCC_ANIM_MONT_MOT_DIR'], 10) : 0;       // Animação motor direito
+  const animMotorEsquerdo = plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_ESQ'] ? 
+    parseInt(plcData.tags['MONT_WINCC_ANIM_MONT_MOT_ESQ'], 10) : 0;       // Animação motor esquerdo
+  
+  // 🔄 NORMALIZAÇÃO DIRETA DOS VALORES MONT (igual página PortaJusante)
+  // WebSocket MONT provavelmente já envia valores normalizados ou precisam normalização direta
+  const contrapesoDirecto = React.useMemo(() => {
+    return Math.max(0, Math.min(100, contrapesoDirectoRaw));
+  }, [contrapesoDirectoRaw]);
+  
+  const contrapesoEsquerdo = React.useMemo(() => {
+    return Math.max(0, Math.min(100, contrapesoEsquerdoRaw));
+  }, [contrapesoEsquerdoRaw]);
+  
+  const reguaPortaMontante = React.useMemo(() => {
+    return Math.max(0, Math.min(100, reguaPortaMontanteRaw));
+  }, [reguaPortaMontanteRaw]);
+  
+  // Motor status para animação (1 = ligado, 0 = desligado)
+  const motorDireito = animMotorDireito;
+  const motorEsquerdo = animMotorEsquerdo;
+  
+  // 🐛 DEBUG: Log dos valores MONT WebSocket para verificar se estão funcionando
+  React.useEffect(() => {
+    console.log('🎯 [PortaMontante] Debug Tags MONT WebSocket:', {
+      reguaPortaMontanteRaw: reguaPortaMontanteRaw,
+      contrapesoDirectoRaw: contrapesoDirectoRaw,
+      contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
+      motorDireitoVeloc: motorDireitoVeloc,
+      motorEsquerdoVeloc: motorEsquerdoVeloc,
+      velocidadeSubida: velocidadeSubida,
+      velocidadeDescida: velocidadeDescida,
+      animMotorDireito: animMotorDireito,
+      animMotorEsquerdo: animMotorEsquerdo,
+      reguaPortaMontante: reguaPortaMontante,
+      contrapesoDirecto: contrapesoDirecto,
+      contrapesoEsquerdo: contrapesoEsquerdo,
+      tagsDisponiveis: {
+        MONT_PORTA: !!plcData?.tags?.['MONT_MOVIMENTAR_PORTA_MONTANTE'],
+        MONT_CONTRA_DIR: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'],
+        MONT_CONTRA_ESQ: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'],
+        MONT_MOTOR_DIR: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR'],
+        MONT_MOTOR_ESQ: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ'],
+        MONT_VELOC_SUB: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_SUB'],
+        MONT_VELOC_DESC: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_DESC'],
+        MONT_ANIM_DIR: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_DIR'],
+        MONT_ANIM_ESQ: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_ESQ']
+      },
+      connected: connectionStatus.connected
+    });
+  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo, 
+      reguaPortaMontanteRaw, reguaPortaMontante, motorDireitoVeloc, motorEsquerdoVeloc,
+      velocidadeSubida, velocidadeDescida, animMotorDireito, animMotorEsquerdo, connectionStatus.connected]);
   
   // Configuração responsiva SIMPLES - igual outros componentes
   const configAtual = isMobile ? CONTRAPESO_CONFIG.mobile : CONTRAPESO_CONFIG.desktop;
@@ -279,12 +366,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               <div className="border-t border-gray-600 my-3"></div>
               
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Velocidade:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{(Math.random() * 0.5 + 0.1).toFixed(2)} <span className="text-xs text-gray-500">m/s</span></span>
+                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vel. Subida:</span>
+                <span className="text-lg font-mono font-bold text-[#212E3E]">{velocidadeSubida.toFixed(3)} <span className="text-xs text-gray-500">m/s</span></span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Velocidade Nominal:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">0.25 <span className="text-xs text-gray-500">m/s</span></span>
+                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vel. Descida:</span>
+                <span className="text-lg font-mono font-bold text-[#212E3E]">{velocidadeDescida.toFixed(3)} <span className="text-xs text-gray-500">m/s</span></span>
               </div>
             </div>
           </InfoCard>
@@ -325,14 +412,14 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
                 <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR DIREITO</div>
-                <div className={`w-3 h-3 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-500'}`}></div>
+                <div className={`w-3 h-3 rounded-full ${animMotorDireito > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
               </div>
               <div className="flex justify-between items-center">
                 <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {Math.round(1450 + Math.random() * 100)} <span className="text-xs text-gray-500">RPM</span>
+                  {motorDireitoVeloc.toFixed(1)} <span className="text-xs text-gray-500">RPM</span>
                 </div>
                 <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-xs text-gray-500">A</span>
+                  {animMotorDireito > 0 ? 'LIGADO' : 'PARADO'}
                 </div>
               </div>
             </div>
@@ -343,14 +430,14 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div>
               <div className="flex justify-between items-center mb-2">
                 <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR ESQUERDO</div>
-                <div className={`w-3 h-3 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-500'}`}></div>
+                <div className={`w-3 h-3 rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
               </div>
               <div className="flex justify-between items-center">
                 <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {Math.round(1450 + Math.random() * 100)} <span className="text-xs text-gray-500">RPM</span>
+                  {motorEsquerdoVeloc.toFixed(1)} <span className="text-xs text-gray-500">RPM</span>
                 </div>
                 <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-xs text-gray-500">A</span>
+                  {animMotorEsquerdo > 0 ? 'LIGADO' : 'PARADO'}
                 </div>
               </div>
             </div>

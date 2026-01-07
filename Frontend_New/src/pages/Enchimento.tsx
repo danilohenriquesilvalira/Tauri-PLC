@@ -349,7 +349,7 @@ const VALVULA_FLANGE_CONFIG = {
 const TANQUE_OLEO_CONFIG = {
   desktop: {
     verticalPercent: 41.7,       // % da altura total (posição Y) - ajustável
-    horizontalPercent: 19.9,     // % da largura total (posição X) - ajustável
+    horizontalPercent: 15.2,     // % da largura total (posição X) - ajustável
     widthPercent: 54,          // % da largura total (tamanho) - ajustável
     heightPercent: 54,         // % da altura total (tamanho) - ajustável
   },
@@ -1417,8 +1417,8 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             >
               <image
                 href="/Enchimento/Tanque_Oleo.svg"
-                width="200"
-                height="150"
+                width="260"
+                height="165"
                 preserveAspectRatio="xMidYMid meet"
               />
             </svg>
