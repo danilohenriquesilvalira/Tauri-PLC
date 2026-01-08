@@ -22,10 +22,14 @@ export default function NivelCaldeira({
   const [isManualControl] = useState(false);
 
   useEffect(() => {
-    console.log('🏭 CALDEIRA - websocketValue recebido:', websocketValue, 'isManualControl:', isManualControl);
+    if (import.meta.env.DEV) {
+      console.log('🏭 CALDEIRA - websocketValue recebido:', websocketValue, 'isManualControl:', isManualControl);
+    }
     if (websocketValue !== null && !isManualControl) {
       setNivelAtual(websocketValue);
-      console.log('🏭 CALDEIRA - nivelAtual atualizado para:', websocketValue);
+      if (import.meta.env.DEV) {
+        console.log('🏭 CALDEIRA - nivelAtual atualizado para:', websocketValue);
+      }
     }
   }, [websocketValue, isManualControl]);
 

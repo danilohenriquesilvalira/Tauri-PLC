@@ -149,7 +149,9 @@ function processWebSocketData(rawData: string): TagData {
     const parsed = JSON.parse(rawData);
     // Se tem campo 'type', é mensagem de sistema, não dados de tags
     if (parsed.type) {
+      if (import.meta.env.DEV) {
       console.log('📩 Mensagem de sistema:', parsed.type);
+    }
       return {};
     }
     return parsed;
@@ -265,7 +267,9 @@ async function discoverWebSocketServer(port: number = 8765): Promise<string | nu
     const url = `ws://${host}:${port}`;
     const result = await testWebSocketConnection(url, 2000);
     if (result) {
-      console.log(`✅ Servidor WebSocket encontrado em: ${url}`);
+      if (import.meta.env.DEV) {
+        console.log(`✅ Servidor WebSocket encontrado em: ${url}`);
+      }
       return url;
     }
   }
@@ -310,7 +314,9 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
   // Incrementar contador na montagem, decrementar na desmontagem
   useEffect(() => {
     activeInstanceCount++;
-    console.log(`🔢 Instâncias WebSocket ativas: ${activeInstanceCount}`);
+    if (import.meta.env.DEV) {
+      console.log(`🔢 Instâncias WebSocket ativas: ${activeInstanceCount}`);
+    }
     
     if (activeInstanceCount > 1) {
       console.error(`❌ MÚLTIPLAS CONEXÕES DETECTADAS! ${activeInstanceCount} instâncias ativas`);
@@ -319,11 +325,35 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
     
     return () => {
       activeInstanceCount--;
-      console.log(`🔢 Instâncias WebSocket ativas: ${activeInstanceCount}`);
+      if (import.meta.env.DEV) {
+        console.log(`🔢 Instâncias WebSocket ativas: ${activeInstanceCount}`);
+      }
     };
   }, []);
   
-  const [data, setData] = useState<PLCData | null>(null);
+  // 🚀 CACHE: Carregar valores persistidos do localStorage para evitar flashes
+  const loadCachedData = (): PLCData | null => {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const cached = localStorage.getItem('plc-websocket-cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Verificar se cache não é muito antigo (max 5 minutos)
+        if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+          if (import.meta.env.DEV) {
+            console.log('🔄 Cache WebSocket restaurado:', Object.keys(parsed.data?.tags || {}).length, 'tags');
+          }
+          return parsed.data;
+        }
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar cache WebSocket:', error);
+    }
+    return null;
+  };
+
+  const [data, setData] = useState<PLCData | null>(loadCachedData());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     connected: false,
     lastUpdate: null,
@@ -350,17 +380,23 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
   const connect = useCallback(async () => {
     // Evitar conexões simultâneas
     if (isConnectingRef.current) {
-      console.log('⏳ Conexão já em andamento...');
+      if (import.meta.env.DEV) {
+        console.log('⏳ Conexão já em andamento...');
+      }
       return;
     }
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('✅ WebSocket já conectado');
+      if (import.meta.env.DEV) {
+        console.log('✅ WebSocket já conectado');
+      }
       return;
     }
 
     if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      console.log('⏳ WebSocket já tentando conectar...');
+      if (import.meta.env.DEV) {
+        console.log('⏳ WebSocket já tentando conectar...');
+      }
       return;
     }
 
@@ -395,8 +431,10 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
         }
       }
 
-      console.log('🔌 NOVA CONEXÃO WebSocket:', url);
-      console.log('⚠️ Se você ver esta mensagem DUAS VEZES = BUG DE MÚLTIPLAS CONEXÕES');
+      if (import.meta.env.DEV) {
+        console.log('🔌 NOVA CONEXÃO WebSocket:', url);
+        console.log('⚠️ Se você ver esta mensagem DUAS VEZES = BUG DE MÚLTIPLAS CONEXÕES');
+      }
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
@@ -430,7 +468,9 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
 
       ws.onmessage = (event) => {
         try {
-          console.log('📥 RAW WebSocket Message:', event.data);
+          if (import.meta.env.DEV) {
+            console.log('📥 RAW WebSocket Message:', event.data);
+          }
           
           const tagData = processWebSocketData(event.data);
           
@@ -438,6 +478,22 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
           if (Object.keys(tagData).length > 0) {
             const newData = convertToPLCData(tagData, dataRef.current);
             setData(newData);
+            
+            // 🚀 CACHE: Persistir dados no localStorage para evitar flashes
+            if (typeof window !== 'undefined' && newData?.tags && Object.keys(newData.tags).length > 0) {
+              try {
+                localStorage.setItem('plc-websocket-cache', JSON.stringify({
+                  data: newData,
+                  timestamp: Date.now()
+                }));
+              } catch (error) {
+                // Ignorar erro de localStorage (pode estar cheio)
+                if (import.meta.env.DEV) {
+                  console.warn('Erro ao salvar cache WebSocket:', error);
+                }
+              }
+            }
+            
             setConnectionStatus(prev => ({
               ...prev,
               lastUpdate: new Date(),
@@ -456,6 +512,9 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
       ws.onclose = (event) => {
         console.log('🔌 WebSocket desconectado:', event.code, event.reason);
         isConnectingRef.current = false;
+        
+        // 🚀 CACHE: Preservar dados durante desconexão temporária
+        // Não limpar data atual, mantendo últimos valores válidos na tela
         
         setConnectionStatus(prev => ({
           ...prev,
@@ -528,7 +587,9 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
       if (command.tag_name === 'SUBSCRIBE' && command.variable) {
         try {
           const subscribeCmd = JSON.parse(command.variable);
-          console.log('📡 ENVIANDO SUBSCRIBE:', subscribeCmd);
+          if (import.meta.env.DEV) {
+            console.log('📡 ENVIANDO SUBSCRIBE:', subscribeCmd);
+          }
           wsRef.current.send(JSON.stringify(subscribeCmd));
           return;
         } catch (error) {
@@ -546,7 +607,9 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
       };
       
       wsRef.current.send(JSON.stringify(rustCommand));
-      console.log('📤 Comando enviado:', rustCommand);
+      if (import.meta.env.DEV) {
+        console.log('📤 Comando enviado:', rustCommand);
+      }
     } else {
       console.error('❌ WebSocket não conectado, comando não enviado:', command);
     }

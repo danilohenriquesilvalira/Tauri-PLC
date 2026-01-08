@@ -6,7 +6,7 @@ import MotorJusante from '../components/Porta_Jusante/Motor_Jusante';
 import { Card } from '../components/ui/Card';
 import { InfoCard } from '../components/ui/InfoCard';
 import { StatusCard } from '../components/ui/StatusCard';
-import { 
+import {
   CogIcon,
   ChevronUpIcon,
   ChevronDownIcon,
@@ -112,20 +112,20 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const [windowDimensions, setWindowDimensions] = React.useState({ width: 1200, height: 800 }); // Valores iniciais estáveis
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
-  
+
   // ✅ DETECÇÃO MOBILE ESTÁVEL - baseada no viewport, não na window
   const [isMobile, setIsMobile] = React.useState(false);
-  
+
   React.useEffect(() => {
     const checkMobile = () => {
       const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
       setIsMobile(vw < 1024);
     };
-    
+
     checkMobile();
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
     mediaQuery.addListener(checkMobile);
-    
+
     return () => mediaQuery.removeListener(checkMobile);
   }, []);
 
@@ -134,7 +134,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     const updateDimensions = () => {
       const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
       const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-      
+
       setWindowDimensions(prev => {
         // Só atualiza se a diferença for significativa (>50px) para evitar micro-ajustes
         if (Math.abs(prev.width - vw) > 50 || Math.abs(prev.height - vh) > 50) {
@@ -142,38 +142,38 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         }
         return prev;
       });
-      
+
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const newContainerDimensions = { width: rect.width, height: rect.height };
-        
+
         setContainerDimensions(prev => {
           // Só atualiza se a diferença for significativa
-          if (Math.abs(prev.width - newContainerDimensions.width) > 20 || 
-              Math.abs(prev.height - newContainerDimensions.height) > 20) {
+          if (Math.abs(prev.width - newContainerDimensions.width) > 20 ||
+            Math.abs(prev.height - newContainerDimensions.height) > 20) {
             return newContainerDimensions;
           }
           return prev;
         });
       }
     };
-    
+
     // ✅ Delay inicial para garantir que o DOM esteja pronto
     const timeoutId = setTimeout(() => {
       updateDimensions();
       setIsInitialized(true);
     }, 100);
-    
+
     // ✅ Debounce no resize para evitar cálculos excessivos
     let resizeTimeout: NodeJS.Timeout;
     const debouncedResize = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(updateDimensions, 150);
     };
-    
+
     window.addEventListener('resize', debouncedResize);
     window.addEventListener('orientationchange', debouncedResize);
-    
+
     return () => {
       clearTimeout(timeoutId);
       clearTimeout(resizeTimeout);
@@ -184,22 +184,22 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
   // ✅ CÁLCULOS ESTABILIZADOS COM VALORES MÍNIMOS SEGUROS
   const portaJusanteAspectRatio = 1075 / 1098; // Baseado no SVG real: width="1075" height="1098"
-  
+
   // ✅ DIMENSÕES SEGURAS - com mínimos garantidos para evitar componentes minúsculos
   const safeContainerWidth = Math.max(containerDimensions.width, isMobile ? 350 : 800);
   const maxWidth = Math.min(safeContainerWidth - 32, 1920); // 32px = margem mínima
-  
+
   // ✅ ESCALAS FIXAS E PREVISÍVEIS
   const portaScale = isMobile ? 85 : 55; // Escala fixa para evitar recálculos
   const basePortaWidth = Math.max((maxWidth * portaScale) / 100, isMobile ? 300 : 500); // Mínimos seguros
   const basePortaHeight = Math.max(basePortaWidth / portaJusanteAspectRatio, isMobile ? 250 : 400);
-  
+
   // ✅ ALTURA TOTAL COM MÍNIMO GARANTIDO
   const alturaTotal = basePortaHeight;
-  
+
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
-  
+
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA JUS usando sendCommand
   React.useEffect(() => {
     if (connectionStatus.connected) {
@@ -211,7 +211,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         categories: ['PROC', 'FAULT', 'EVENT'],
         include_all_faults: true
       };
-      
+
       // Usar sendCommand para enviar subscribe
       sendCommand({
         plc_ip: '',
@@ -220,100 +220,141 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         value: 'SUBSCRIBE',
         data_type: 'STRING'
       });
-      
-      console.log('📡 [PortaJusante] Subscribe JUS enviado:', subscribeCmd);
+
+      if (import.meta.env.DEV) {
+        console.log('📡 [PortaJusante] Subscribe JUS enviado:', subscribeCmd);
+      }
     }
   }, [connectionStatus.connected, sendCommand]);
-  
+
   // 🎯 DADOS DOS CONTRAPESOS, RÉGUA E MOTORES - JUS WEBSOCKET (TAGS REAIS)
   // 📍 USANDO TAGS REAIS DO WEBSOCKET JUS - DATA TYPE INTEGER
-  const reguaPortaJusanteRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'] ? 
+  const reguaPortaJusanteRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'] ?
     parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'], 10) : 0;    // Tag real JUS porta jusante (régua)
-  const contrapesoDirectoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'] ? 
+  const contrapesoDirectoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'] ?
     parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'], 10) : 0;   // Tag real JUS contrapeso direito
-  const contrapesoEsquerdoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'] ? 
+  const contrapesoEsquerdoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'] ?
     parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'], 10) : 0;  // Tag real JUS contrapeso esquerdo
-  const motorDireito = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'] ? 
+  const motorDireito = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'] ?
     parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'], 10) : 0;       // Tag real JUS motor direito (animação)  
-  const motorEsquerdo = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'] ? 
+  const motorEsquerdo = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'] ?
     parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'], 10) : 0;      // Tag real JUS motor esquerdo (animação)
-  
+
   // 🔄 NORMALIZAÇÃO DIRETA DOS VALORES JUS (igual página Enchimento)
   // WebSocket JUS provavelmente já envia valores normalizados ou precisam normalização direta
   const contrapesoDirecto = React.useMemo(() => {
     return Math.max(0, Math.min(100, contrapesoDirectoRaw));
   }, [contrapesoDirectoRaw]);
-  
+
   const contrapesoEsquerdo = React.useMemo(() => {
     return Math.max(0, Math.min(100, contrapesoEsquerdoRaw));
   }, [contrapesoEsquerdoRaw]);
-  
+
   const reguaPortaJusante = React.useMemo(() => {
     return Math.max(0, Math.min(100, reguaPortaJusanteRaw));
   }, [reguaPortaJusanteRaw]);
-  
-  // 🐛 DEBUG: Log dos valores JUS WebSocket para verificar se estão funcionando
+
+  // Performance optimization: Debug logging only in development
   React.useEffect(() => {
-    console.log('🎯 [PortaJusante] Debug Tags JUS WebSocket:', {
-      reguaPortaJusanteRaw: reguaPortaJusanteRaw,
-      contrapesoDirectoRaw: contrapesoDirectoRaw,
-      contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
-      motorDireito: motorDireito,
-      motorEsquerdo: motorEsquerdo,
-      reguaPortaJusante: reguaPortaJusante,
-      contrapesoDirecto: contrapesoDirecto,
-      contrapesoEsquerdo: contrapesoEsquerdo,
-      tagsDisponiveis: {
-        JUS_PORTA: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'],
-        JUS_CONTRA_DIR: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'],
-        JUS_CONTRA_ESQ: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'],
-        JUS_MOTOR_DIR: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'],
-        JUS_MOTOR_ESQ: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ']
-      },
-      connected: connectionStatus.connected
-    });
-  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo, 
-      reguaPortaJusanteRaw, reguaPortaJusante, motorDireito, motorEsquerdo, connectionStatus.connected]);
+    if (import.meta.env.DEV) {
+      console.log('🎯 [PortaJusante] Debug Tags JUS WebSocket:', {
+        reguaPortaJusanteRaw: reguaPortaJusanteRaw,
+        contrapesoDirectoRaw: contrapesoDirectoRaw,
+        contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
+        motorDireito: motorDireito,
+        motorEsquerdo: motorEsquerdo,
+        reguaPortaJusante: reguaPortaJusante,
+        contrapesoDirecto: contrapesoDirecto,
+        contrapesoEsquerdo: contrapesoEsquerdo,
+        tagsDisponiveis: {
+          JUS_PORTA: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'],
+          JUS_CONTRA_DIR: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'],
+          JUS_CONTRA_ESQ: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'],
+          JUS_MOTOR_DIR: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'],
+          JUS_MOTOR_ESQ: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ']
+        },
+        connected: connectionStatus.connected
+      });
+    }
+  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo,
+    reguaPortaJusanteRaw, reguaPortaJusante, motorDireito, motorEsquerdo, connectionStatus.connected]);
 
   // Configuração responsiva SIMPLES - igual outros componentes
   const configAtual = isMobile ? CONTRAPESO_CONFIG.mobile : CONTRAPESO_CONFIG.desktop;
   const contrapesoDireitoConfig = configAtual.direito;
   const contrapesoEsquerdoConfig = configAtual.esquerdo;
-  
+
   const reguaConfigAtual = isMobile ? REGUA_CONFIG.mobile : REGUA_CONFIG.desktop;
-  
+
   const motorConfigAtual = isMobile ? MOTOR_CONFIG.mobile : MOTOR_CONFIG.desktop;
   const motorDireitoConfig = motorConfigAtual.direito;
   const motorEsquerdoConfig = motorConfigAtual.esquerdo;
-  
-  
+
+
+  // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
+  const cardWidthValue = React.useMemo(() => {
+    // 🎯 MESMO CÁLCULO QUE OS OUTROS COMPONENTES ATÉ 1920px
+    const baseCardWidth = maxWidth * 0.18;
+    
+    // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
+    if (containerDimensions.width > 1920) {
+      // Usar a largura real do container para calcular
+      const expandedMaxWidth = Math.min(containerDimensions.width - 32, 2560); // Máximo 2560px
+      return expandedMaxWidth * 0.18;
+    }
+    
+    return baseCardWidth;
+  }, [maxWidth, containerDimensions.width]);
+
+  // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
+  const cardWidth = () => cardWidthValue;
+
+  // 🎯 SISTEMA RESPONSIVO MEMOIZADO PARA PERFORMANCE
+  const getResponsiveCardFontSize = React.useCallback((baseSize: number, type: 'header' | 'label' | 'value' = 'label') => {
+    const cardW = cardWidthValue;
+    
+    // Escala baseada na largura do card (300px = escala base 1.0)
+    let scaleFactor = cardW / 300;
+    scaleFactor = Math.max(scaleFactor, 0.7); // Mínimo 70%
+    scaleFactor = Math.min(scaleFactor, 1.4); // Máximo 140%
+    
+    // Ajustes por tipo
+    if (type === 'header') scaleFactor *= 1.1;
+    else if (type === 'value') scaleFactor *= 1.05;
+    
+    return Math.max(baseSize * scaleFactor, type === 'header' ? 10 : 8);
+  }, [cardWidthValue]);
+
+  const getResponsiveCardSpacing = React.useCallback((baseSpacing: number) => {
+    const cardW = cardWidthValue;
+    let scaleFactor = cardW / 300; // 300px = escala base 1.0
+    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80%
+    scaleFactor = Math.min(scaleFactor, 1.3); // Máximo 130%
+    return Math.max(baseSpacing * scaleFactor, 4);
+  }, [cardWidthValue]);
+
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
   const larguraTotalTela = windowDimensions.width;
   const espacoUsadoPorComponentes = maxWidth; // Usar maxWidth que mantém o tamanho original
   const espacoSobrandoTotal = Math.max(0, larguraTotalTela - espacoUsadoPorComponentes);
-  
+
   const espacoDisponivelEsquerda = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
   const espacoDisponivelDireita = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
 
-  // Debug completo do espaço disponível
-  console.log('📐 ESPAÇO DISPONÍVEL REAL:', {
-    tela_largura: windowDimensions.width,
-    container_largura: containerDimensions.width,
-    sidebar_aberto: sidebarOpen,
-    espaco_usado_componentes: espacoUsadoPorComponentes,
-    componentes_largura_maxima: maxWidth,
-    componentes_largura_real: basePortaWidth,
-    espaco_sobrando_total: espacoSobrandoTotal,
-    espaco_disponivel_esquerda: espacoDisponivelEsquerda,
-    espaco_disponivel_direita: espacoDisponivelDireita,
-    condicao_esquerda: espacoDisponivelEsquerda > 100,
-    condicao_direita: espacoDisponivelDireita > 100 && windowDimensions.width >= 1500,
-    config_usada: isMobile ? 'mobile' : 'desktop',
-    isMobile: isMobile
-  });
+  // Performance optimization: Debug logging only in development
+  if (import.meta.env.DEV) {
+    console.log('🎯 CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
+      container_width: containerDimensions.width,
+      maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
+      card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
+      card_expandido: `${cardWidthValue.toFixed(0)}px`,
+      diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
+      usando_expansao: containerDimensions.width > 1920 ? '✅ SIM' : '❌ NÃO'
+    });
+  }
 
   return (
-    <div 
+    <div
       className="w-full h-auto flex flex-col items-center relative"
       style={{
         // ✅ OVERFLOW CONTROLADO para evitar elementos vazando
@@ -323,147 +364,340 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       }}
     >
 
-      {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA */}
-      {!isMobile && espacoDisponivelEsquerda > 100 && (
-        <div 
-          className="absolute top-8 z-10 flex flex-col gap-4"
-          style={{ 
-            left: '16px',
-            width: `${Math.max(380, Math.min(espacoDisponivelEsquerda - 20, 600))}px`,
-            maxHeight: 'calc(100vh - 120px)'
+      {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - POSICIONAMENTO PROPORCIONAL */}
+      {!isMobile && isInitialized && (
+        <div
+          className="absolute z-50 flex flex-col"
+          style={{
+            top: `${alturaTotal * 0.05}px`,
+            left: `${maxWidth * 0.02}px`,
+            width: `${cardWidth()}px`,
+            gap: `${Math.max(6, maxWidth * 0.005)}px`
           }}
         >
-          {/* DADOS OPERACIONAIS - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="DADOS OPERACIONAIS" variant="industrial">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Posição Porta:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{(reguaPortaJusante * 12.5 / 100).toFixed(2)} <span className="text-xs text-gray-500">m</span></span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Abertura:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{reguaPortaJusante}<span className="text-xs text-gray-500">%</span></span>
-              </div>
-              
-              <div className="border-t border-gray-600 my-3"></div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Diferença E/D:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-xs text-gray-500">mm</span></span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Contrapeso E:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{contrapesoEsquerdo}<span className="text-xs text-gray-500">%</span></span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Contrapeso D:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{contrapesoDirecto}<span className="text-xs text-gray-500">%</span></span>
-              </div>
-              
-              <div className="border-t border-gray-600 my-3"></div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Velocidade:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{(Math.random() * 0.5 + 0.1).toFixed(2)} <span className="text-xs text-gray-500">m/s</span></span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Velocidade Nominal:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">0.25 <span className="text-xs text-gray-500">m/s</span></span>
+          {/* DADOS OPERACIONAIS - RESPONSIVIDADE FLUIDA */}
+          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+            {/* Header */}
+            <div
+              className="bg-edp-marine text-white"
+              style={{ padding: `${getResponsiveCardSpacing(8)}px ${getResponsiveCardSpacing(10)}px` }}
+            >
+              <h3
+                className="font-bold uppercase tracking-wide leading-tight"
+                style={{ fontSize: `${getResponsiveCardFontSize(12, 'header')}px` }}
+              >
+                DADOS OPERACIONAIS
+              </h3>
+            </div>
+
+            {/* Conteúdo */}
+            <div style={{ padding: `${getResponsiveCardSpacing(10)}px` }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: `${getResponsiveCardSpacing(6)}px` }}>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                  >
+                    Posição Porta:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                  >
+                    {(reguaPortaJusante * 12.5 / 100).toFixed(2)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m</span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                  >
+                    Abertura:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                  >
+                    {reguaPortaJusante}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Diferença E/D:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">mm</span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Contrapeso E:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {contrapesoEsquerdo}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Contrapeso D:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {contrapesoDirecto}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Velocidade:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {(Math.random() * 0.5 + 0.1).toFixed(2)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Velocidade Nominal:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    0.25 <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </InfoCard>
+          </div>
 
-          {/* STATUS OPERACIONAIS - USANDO STATUSCARD PADRÃO */}
-          <div className="flex flex-col gap-2">
-            <StatusCard 
+          {/* STATUS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
+            <StatusCard
               title="COMANDO EM AUTOMÁTICO"
               variant="automatic"
+              containerWidth={cardWidth()}
             />
-            
-            <StatusCard 
+
+            <StatusCard
               title="IGUALDADE DE NÍVEIS PRESENTE"
               variant="success"
+              containerWidth={cardWidth()}
             />
-            
-            <StatusCard 
+
+            <StatusCard
               title="FALTA IGUALDADE DE NÍVEIS"
               variant="error"
+              containerWidth={cardWidth()}
             />
           </div>
         </div>
       )}
 
-      {/* PAINEL INDUSTRIAL ISA-104 - DIREITA */}
-      {!isMobile && espacoDisponivelDireita > 100 && windowDimensions.width >= 1500 && (
-        <div 
-          className="absolute top-8 z-10 flex flex-col gap-4"
-          style={{ 
-            right: '16px',
-            width: `${Math.max(380, Math.min(espacoDisponivelDireita - 20, 600))}px`,
-            maxHeight: 'calc(100vh - 120px)'
+      {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - POSICIONAMENTO PROPORCIONAL */}
+      {!isMobile && isInitialized && (
+        <div
+          className="absolute z-50 flex flex-col"
+          style={{
+            top: `${alturaTotal * 0.05}px`,
+            right: `${maxWidth * 0.02}px`,
+            width: `${cardWidth()}px`,
+            gap: `${Math.max(6, maxWidth * 0.005)}px`
           }}
         >
-          {/* MOTORES - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="MOTORES" variant="motor">
-            {/* MOTOR DIREITO */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR DIREITO</div>
-                <div className={`w-3 h-3 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-500'}`}></div>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {Math.round(1450 + Math.random() * 100)} <span className="text-xs text-gray-500">RPM</span>
+          {/* MOTORES - RESPONSIVIDADE FLUIDA */}
+          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+            {/* Header */}
+            <div
+              className="bg-edp-marine text-white"
+              style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+            >
+              <h3
+                className="font-bold uppercase tracking-wide"
+                style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
+              >
+                MOTORES
+              </h3>
+            </div>
+
+            {/* Conteúdo */}
+            <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
+              {/* MOTOR DIREITO */}
+              <div style={{ marginBottom: `${Math.max(8, maxWidth * 0.008)}px` }}>
+                <div className="flex justify-between items-center" style={{ marginBottom: `${Math.max(4, maxWidth * 0.004)}px` }}>
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    MOTOR DIREITO
+                  </span>
+                  <div className={`rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, maxWidth * 0.006)}px`, height: `${Math.max(8, maxWidth * 0.006)}px` }}></div>
                 </div>
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-xs text-gray-500">A</span>
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {Math.round(1450 + Math.random() * 100)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">RPM</span>
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {(12.5 + Math.random() * 2).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">A</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+
+              {/* MOTOR ESQUERDO */}
+              <div style={{ marginTop: `${Math.max(8, maxWidth * 0.008)}px` }}>
+                <div className="flex justify-between items-center" style={{ marginBottom: `${Math.max(4, maxWidth * 0.004)}px` }}>
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    MOTOR ESQUERDO
+                  </span>
+                  <div className={`rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, maxWidth * 0.006)}px`, height: `${Math.max(8, maxWidth * 0.006)}px` }}></div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {Math.round(1450 + Math.random() * 100)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">RPM</span>
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    {(12.5 + Math.random() * 2).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">A</span>
+                  </span>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="border-t border-slate-600 my-3"></div>
+          {/* SISTEMA STATUS - RESPONSIVIDADE FLUIDA */}
+          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+            {/* Header */}
+            <div
+              className="bg-edp-marine text-white"
+              style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+            >
+              <h3
+                className="font-bold uppercase tracking-wide"
+                style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
+              >
+                SISTEMA
+              </h3>
+            </div>
 
-            {/* MOTOR ESQUERDO */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR ESQUERDO</div>
-                <div className={`w-3 h-3 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-500'}`}></div>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {Math.round(1450 + Math.random() * 100)} <span className="text-xs text-gray-500">RPM</span>
+            {/* Conteúdo */}
+            <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(6, maxWidth * 0.005)}px` }}>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Pressão:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    2.4 <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">bar</span>
+                  </span>
                 </div>
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-xs text-gray-500">A</span>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Temperatura:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    24.5<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">°C</span>
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Vibração:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    NORMAL
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span
+                    className="font-medium text-[#212E3E] uppercase tracking-wide"
+                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                  >
+                    Status Geral:
+                  </span>
+                  <span
+                    className="font-mono font-bold text-[#212E3E]"
+                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                  >
+                    OPERACIONAL
+                  </span>
                 </div>
               </div>
             </div>
-          </InfoCard>
-
-          {/* SISTEMA STATUS - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="SISTEMA" variant="system">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Pressão:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">2.4 <span className="text-xs text-gray-500">bar</span></span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Temperatura:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">24.5<span className="text-xs text-gray-500">°C</span></span>
-              </div>
-              
-              <div className="border-t border-gray-600 my-3"></div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vibração:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">NORMAL</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Status Geral:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">OPERACIONAL</span>
-              </div>
-            </div>
-          </InfoCard>
+          </div>
         </div>
       )}
 
@@ -500,17 +734,17 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-2 md:p-4"
           onClick={() => setMenuParametrosOpen(false)}
-          style={{ 
+          style={{
             touchAction: 'none',
             overscrollBehavior: 'contain',
             WebkitOverflowScrolling: 'touch'
           }}
         >
           {/* Dialog Container */}
-          <div 
+          <div
             className="
               bg-white shadow-2xl overflow-hidden flex flex-col
               w-full max-w-[280px] max-h-[75vh] rounded-t-2xl
@@ -522,7 +756,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
-            style={{ 
+            style={{
               touchAction: 'pan-y',
               overscrollBehavior: 'contain'
             }}
@@ -550,9 +784,9 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             </div>
 
             {/* Conteúdo com scroll */}
-            <div 
-              className="flex-1 overflow-y-auto overscroll-contain" 
-              style={{ 
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain"
+              style={{
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
                 overscrollBehavior: 'contain'
@@ -560,155 +794,155 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             >
               <div className="p-1.5 md:p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-4">
-                
-                {/* PROGRAMA ABERTURA AUTOMÁTICA */}
-                <Card 
-                  title="PROGRAMA ABERTURA" 
-                  icon={<ArrowUpIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Posição Alvo:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">8.50 m</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">RPM Configurado:</span>
-                      <div className="flex items-center gap-0.5 md:gap-2">
-                        <ArrowUpIcon className="w-2.5 h-2.5 md:w-4 md:h-4 text-slate-600" />
-                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">1450 RPM</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 md:gap-3 pt-1">
-                      <button className="flex-1 bg-[#212E3E] hover:bg-[#2A3A4E] text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
-                        <PlayIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
-                        INICIAR
-                      </button>
-                      <button className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
-                        <StopIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
-                        PARAR
-                      </button>
-                    </div>
-                  </div>
-                </Card>
 
-                {/* PROGRAMA FECHAMENTO AUTOMÁTICO */}
-                <Card 
-                  title="PROGRAMA FECHAMENTO" 
-                  icon={<ArrowDownIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Posição Alvo:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.00 m</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">RPM Configurado:</span>
-                      <div className="flex items-center gap-0.5 md:gap-2">
-                        <ArrowDownIcon className="w-2.5 h-2.5 md:w-4 md:h-4 text-slate-600" />
-                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">1200 RPM</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 md:gap-3 pt-1">
-                      <button className="flex-1 bg-[#212E3E] hover:bg-[#2A3A4E] text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
-                        <PlayIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
-                        INICIAR
-                      </button>
-                      <button className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
-                        <StopIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
-                        PARAR
-                      </button>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* PARÂMETROS LASER JUSANTE */}
-                <Card 
-                  title="LASER JUSANTE" 
-                  icon={<EyeIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Área Protegida:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">LIVRE</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Leitura Cota:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">
-                        {(reguaPortaJusante * 12.5 / 100 + 125.5).toFixed(2)} m
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Status:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">OPERACIONAL</span>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* LIMITES E ALARMES */}
-                <Card 
-                  title="LIMITES & ALARMES" 
-                  icon={<ShieldCheckIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="grid grid-cols-2 gap-1 md:gap-3">
-                      <div className="space-y-1 md:space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[8px] md:text-sm">Limite Abertura:</span>
-                          <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">12.50 m</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[8px] md:text-sm">Limite Fecho:</span>
-                          <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">0.00 m</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1 md:space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[8px] md:text-sm">Desnível Defeito:</span>
-                          <span className="text-slate-600 font-mono font-bold text-[8px] md:text-sm">±5 mm</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[8px] md:text-sm">Desnível Stop:</span>
-                          <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">±10 mm</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-1 md:pt-3 border-t border-gray-200">
+                  {/* PROGRAMA ABERTURA AUTOMÁTICA */}
+                  <Card
+                    title="PROGRAMA ABERTURA"
+                    icon={<ArrowUpIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Desnível Alarme:</span>
-                        <span className="text-gray-900 font-mono font-bold text-[8px] md:text-lg">±15 mm</span>
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Posição Alvo:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">8.50 m</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">RPM Configurado:</span>
+                        <div className="flex items-center gap-0.5 md:gap-2">
+                          <ArrowUpIcon className="w-2.5 h-2.5 md:w-4 md:h-4 text-slate-600" />
+                          <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">1450 RPM</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 md:gap-3 pt-1">
+                        <button className="flex-1 bg-[#212E3E] hover:bg-[#2A3A4E] text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
+                          <PlayIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          INICIAR
+                        </button>
+                        <button className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
+                          <StopIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          PARAR
+                        </button>
                       </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
 
+                  {/* PROGRAMA FECHAMENTO AUTOMÁTICO */}
+                  <Card
+                    title="PROGRAMA FECHAMENTO"
+                    icon={<ArrowDownIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Posição Alvo:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.00 m</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">RPM Configurado:</span>
+                        <div className="flex items-center gap-0.5 md:gap-2">
+                          <ArrowDownIcon className="w-2.5 h-2.5 md:w-4 md:h-4 text-slate-600" />
+                          <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">1200 RPM</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 md:gap-3 pt-1">
+                        <button className="flex-1 bg-[#212E3E] hover:bg-[#2A3A4E] text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
+                          <PlayIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          INICIAR
+                        </button>
+                        <button className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-1 md:py-3 px-1 md:px-4 rounded transition-colors flex items-center justify-center gap-0.5 md:gap-2 font-medium text-[8px] md:text-sm">
+                          <StopIcon className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                          PARAR
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* PARÂMETROS LASER JUSANTE */}
+                  <Card
+                    title="LASER JUSANTE"
+                    icon={<EyeIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Área Protegida:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">LIVRE</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Leitura Cota:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">
+                          {(reguaPortaJusante * 12.5 / 100 + 125.5).toFixed(2)} m
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Status:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">OPERACIONAL</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* LIMITES E ALARMES */}
+                  <Card
+                    title="LIMITES & ALARMES"
+                    icon={<ShieldCheckIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
+                      <div className="grid grid-cols-2 gap-1 md:gap-3">
+                        <div className="space-y-1 md:space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[8px] md:text-sm">Limite Abertura:</span>
+                            <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">12.50 m</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[8px] md:text-sm">Limite Fecho:</span>
+                            <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">0.00 m</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1 md:space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[8px] md:text-sm">Desnível Defeito:</span>
+                            <span className="text-slate-600 font-mono font-bold text-[8px] md:text-sm">±5 mm</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[8px] md:text-sm">Desnível Stop:</span>
+                            <span className="text-gray-900 font-mono font-bold text-[8px] md:text-sm">±10 mm</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-1 md:pt-3 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600 font-medium text-[8px] md:text-sm">Desnível Alarme:</span>
+                          <span className="text-gray-900 font-mono font-bold text-[8px] md:text-lg">±15 mm</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                </div>
               </div>
-            </div>
 
-            {/* Footer com ações */}
-            <div className="bg-gray-50 px-1.5 py-1.5 md:px-4 md:py-4 border-t border-gray-200 flex-shrink-0 safe-area-bottom">
-              <div className="flex flex-col-reverse gap-1 md:flex-row md:justify-end md:gap-3">
-                <button
-                  onClick={() => setMenuParametrosOpen(false)}
-                  className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-700 rounded transition-colors font-medium text-[9px] md:text-base"
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  Fechar
-                </button>
-                <button 
-                  className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  Salvar Configurações
-                </button>
+              {/* Footer com ações */}
+              <div className="bg-gray-50 px-1.5 py-1.5 md:px-4 md:py-4 border-t border-gray-200 flex-shrink-0 safe-area-bottom">
+                <div className="flex flex-col-reverse gap-1 md:flex-row md:justify-end md:gap-3">
+                  <button
+                    onClick={() => setMenuParametrosOpen(false)}
+                    className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-700 rounded transition-colors font-medium text-[9px] md:text-base"
+                    style={{ touchAction: 'manipulation' }}
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
+                    style={{ touchAction: 'manipulation' }}
+                  >
+                    Salvar Configurações
+                  </button>
                 </div>
               </div>
             </div>
@@ -718,7 +952,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
 
       {/* Container do SVG - SISTEMA ORIGINAL INALTERADO */}
-      <div 
+      <div
         ref={containerRef}
         className="w-full max-w-[1920px] flex flex-col items-center relative z-10"
         style={{
@@ -729,7 +963,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       >
 
         {isInitialized && containerDimensions.width > 100 && windowDimensions.width > 0 ? (
-          <div 
+          <div
             className="relative w-full flex flex-col items-center justify-center"
             style={{
               maxWidth: `${maxWidth}px`,
@@ -738,7 +972,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             }}
           >
             {/* SVG Base Porta Jusante - CENTRALIZADO */}
-            <div 
+            <div
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
               style={{
                 width: `${basePortaWidth}px`,
@@ -763,7 +997,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             </div>
 
             {/* 🎯 CONTRAPESO DIREITO - COM MOVIMENTO PROPORCIONAL */}
-            <div 
+            <div
               className="absolute transition-all duration-200 ease-in-out"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
@@ -774,14 +1008,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 zIndex: 10
               }}
             >
-              <ContraPeso60t 
+              <ContraPeso60t
                 websocketValue={contrapesoDirecto}
                 editMode={false}
               />
             </div>
 
             {/* 🎯 CONTRAPESO ESQUERDO - COM MOVIMENTO PROPORCIONAL */}
-            <div 
+            <div
               className="absolute transition-all duration-200 ease-in-out"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
@@ -792,14 +1026,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 zIndex: 10
               }}
             >
-              <ContraPeso60t 
+              <ContraPeso60t
                 websocketValue={contrapesoEsquerdo}
                 editMode={false}
               />
             </div>
 
             {/* 📏 RÉGUA PORTA JUSANTE - WEBSOCKET ÍNDICE 39 */}
-            <div 
+            <div
               className="absolute transition-all duration-200 ease-in-out"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
@@ -810,14 +1044,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 zIndex: 5
               }}
             >
-              <PortaJusanteRegua 
+              <PortaJusanteRegua
                 websocketValue={reguaPortaJusante}
                 editMode={false}
               />
             </div>
 
             {/* ⚙️ MOTOR DIREITO - WEBSOCKET ÍNDICE 28 */}
-            <div 
+            <div
               className="absolute transition-all duration-200 ease-in-out"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
@@ -828,7 +1062,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 zIndex: 15
               }}
             >
-              <MotorJusante 
+              <MotorJusante
                 websocketValue={motorDireito}
                 editMode={false}
                 direction="left"
@@ -836,7 +1070,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             </div>
 
             {/* ⚙️ MOTOR ESQUERDO - WEBSOCKET ÍNDICE 29 - ESPELHADO */}
-            <div 
+            <div
               className="absolute transition-all duration-200 ease-in-out"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
@@ -847,7 +1081,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 zIndex: 15
               }}
             >
-              <MotorJusante 
+              <MotorJusante
                 websocketValue={motorEsquerdo}
                 editMode={false}
                 direction="right"
@@ -856,7 +1090,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* 🚪 INDICADOR STATUS PORTA - ÚNICO (CONDICIONAL) */}
             {reguaPortaJusante >= 95 && (
-              <div 
+              <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
                   top: `${(alturaTotal * 5) / 100}px`, // 5% do topo
@@ -876,7 +1110,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             )}
 
             {reguaPortaJusante <= 5 && (
-              <div 
+              <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
                   bottom: `${(alturaTotal * 5) / 100}px`, // 5% do fundo
@@ -900,9 +1134,9 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         ) : (
           /* Loading otimizado - mantém proporções corretas */
           <div className="w-full flex items-center justify-center">
-            <div 
+            <div
               className="w-full bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-lg animate-pulse"
-              style={{ 
+              style={{
                 height: '600px',
                 maxWidth: '800px',
                 backgroundSize: '200% 100%',

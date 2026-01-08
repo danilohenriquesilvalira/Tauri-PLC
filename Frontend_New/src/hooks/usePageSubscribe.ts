@@ -104,7 +104,9 @@ export const usePageSubscribe = (
 
     try {
       ws.send(JSON.stringify(subscribeCmd));
-      console.log(`📡 [${pageName}] Subscribe enviado:`, subscribeCmd);
+      if (import.meta.env.DEV) {
+        console.log(`📡 [${pageName}] Subscribe enviado:`, subscribeCmd);
+      }
       hasSubscribedRef.current = true;
       return true;
     } catch (error) {

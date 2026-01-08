@@ -106,8 +106,9 @@ const MOTOR_CONFIG = {
 
 const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = React.useState({ width: 0, height: 0 });
-  const [windowDimensions, setWindowDimensions] = React.useState({ width: 0, height: 0 });
+  // 🎯 VALORES INICIAIS ESTÁVEIS - evita re-renders extras no carregamento
+  const [containerDimensions, setContainerDimensions] = React.useState({ width: 1200, height: 600 });
+  const [windowDimensions, setWindowDimensions] = React.useState({ width: 1200, height: 800 });
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
@@ -205,7 +206,9 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
         data_type: 'STRING'
       });
       
-      console.log('📡 [PortaMontante] Subscribe MONT enviado:', subscribeCmd);
+      if (import.meta.env.DEV) {
+        console.log('📡 [PortaMontante] Subscribe MONT enviado:', subscribeCmd);
+      }
     }
   }, [connectionStatus.connected, sendCommand]);
   
@@ -254,34 +257,36 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const motorDireito = animMotorDireito;
   const motorEsquerdo = animMotorEsquerdo;
   
-  // 🐛 DEBUG: Log dos valores MONT WebSocket para verificar se estão funcionando
+  // Performance optimization: Debug logging only in development
   React.useEffect(() => {
-    console.log('🎯 [PortaMontante] Debug Tags MONT WebSocket:', {
-      reguaPortaMontanteRaw: reguaPortaMontanteRaw,
-      contrapesoDirectoRaw: contrapesoDirectoRaw,
-      contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
-      motorDireitoVeloc: motorDireitoVeloc,
-      motorEsquerdoVeloc: motorEsquerdoVeloc,
-      velocidadeSubida: velocidadeSubida,
-      velocidadeDescida: velocidadeDescida,
-      animMotorDireito: animMotorDireito,
-      animMotorEsquerdo: animMotorEsquerdo,
-      reguaPortaMontante: reguaPortaMontante,
-      contrapesoDirecto: contrapesoDirecto,
-      contrapesoEsquerdo: contrapesoEsquerdo,
-      tagsDisponiveis: {
-        MONT_PORTA: !!plcData?.tags?.['MONT_MOVIMENTAR_PORTA_MONTANTE'],
-        MONT_CONTRA_DIR: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'],
-        MONT_CONTRA_ESQ: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'],
-        MONT_MOTOR_DIR: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR'],
-        MONT_MOTOR_ESQ: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ'],
-        MONT_VELOC_SUB: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_SUB'],
-        MONT_VELOC_DESC: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_DESC'],
-        MONT_ANIM_DIR: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_DIR'],
-        MONT_ANIM_ESQ: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_ESQ']
-      },
-      connected: connectionStatus.connected
-    });
+    if (import.meta.env.DEV) {
+      console.log('🎯 [PortaMontante] Debug Tags MONT WebSocket:', {
+        reguaPortaMontanteRaw: reguaPortaMontanteRaw,
+        contrapesoDirectoRaw: contrapesoDirectoRaw,
+        contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
+        motorDireitoVeloc: motorDireitoVeloc,
+        motorEsquerdoVeloc: motorEsquerdoVeloc,
+        velocidadeSubida: velocidadeSubida,
+        velocidadeDescida: velocidadeDescida,
+        animMotorDireito: animMotorDireito,
+        animMotorEsquerdo: animMotorEsquerdo,
+        reguaPortaMontante: reguaPortaMontante,
+        contrapesoDirecto: contrapesoDirecto,
+        contrapesoEsquerdo: contrapesoEsquerdo,
+        tagsDisponiveis: {
+          MONT_PORTA: !!plcData?.tags?.['MONT_MOVIMENTAR_PORTA_MONTANTE'],
+          MONT_CONTRA_DIR: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'],
+          MONT_CONTRA_ESQ: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'],
+          MONT_MOTOR_DIR: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR'],
+          MONT_MOTOR_ESQ: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ'],
+          MONT_VELOC_SUB: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_SUB'],
+          MONT_VELOC_DESC: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_DESC'],
+          MONT_ANIM_DIR: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_DIR'],
+          MONT_ANIM_ESQ: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_ESQ']
+        },
+        connected: connectionStatus.connected
+      });
+    }
   }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo, 
       reguaPortaMontanteRaw, reguaPortaMontante, motorDireitoVeloc, motorEsquerdoVeloc,
       velocidadeSubida, velocidadeDescida, animMotorDireito, animMotorEsquerdo, connectionStatus.connected]);
@@ -298,6 +303,48 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const motorEsquerdoConfig = motorConfigAtual.esquerdo;
   
   
+  // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
+  const cardWidthValue = React.useMemo(() => {
+    // 🎯 MESMO CÁLCULO QUE OS OUTROS COMPONENTES ATÉ 1920px
+    const baseCardWidth = maxWidth * 0.18;
+    
+    // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
+    if (containerDimensions.width > 1920) {
+      // Usar a largura real do container para calcular
+      const expandedMaxWidth = Math.min(containerDimensions.width - 32, 2560); // Máximo 2560px
+      return expandedMaxWidth * 0.18;
+    }
+    
+    return baseCardWidth;
+  }, [maxWidth, containerDimensions.width]);
+
+  // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
+  const cardWidth = () => cardWidthValue;
+
+  // 🎯 SISTEMA RESPONSIVO MEMOIZADO PARA PERFORMANCE
+  const getResponsiveCardFontSize = React.useCallback((baseSize: number, type: 'header' | 'label' | 'value' = 'label') => {
+    const cardW = cardWidthValue;
+    
+    // Escala baseada na largura do card (300px = escala base 1.0)
+    let scaleFactor = cardW / 300;
+    scaleFactor = Math.max(scaleFactor, 0.7); // Mínimo 70%
+    scaleFactor = Math.min(scaleFactor, 1.4); // Máximo 140%
+    
+    // Ajustes por tipo
+    if (type === 'header') scaleFactor *= 1.1;
+    else if (type === 'value') scaleFactor *= 1.05;
+    
+    return Math.max(baseSize * scaleFactor, type === 'header' ? 10 : 8);
+  }, [cardWidthValue]);
+
+  const getResponsiveCardSpacing = React.useCallback((baseSpacing: number) => {
+    const cardW = cardWidthValue;
+    let scaleFactor = cardW / 300; // 300px = escala base 1.0
+    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80%
+    scaleFactor = Math.min(scaleFactor, 1.3); // Máximo 130%
+    return Math.max(baseSpacing * scaleFactor, 4);
+  }, [cardWidthValue]);
+
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
   const larguraTotalTela = windowDimensions.width;
   const espacoUsadoPorComponentes = maxWidth; // Usar maxWidth que mantém o tamanho original
@@ -306,137 +353,231 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const espacoDisponivelEsquerda = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
   const espacoDisponivelDireita = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
 
-  // Debug completo do espaço disponível
-  console.log('📐 ESPAÇO DISPONÍVEL REAL:', {
-    tela_largura: windowDimensions.width,
-    container_largura: containerDimensions.width,
-    sidebar_aberto: sidebarOpen,
-    espaco_usado_componentes: espacoUsadoPorComponentes,
-    componentes_largura_maxima: maxWidth,
-    componentes_largura_real: basePortaWidth,
-    espaco_sobrando_total: espacoSobrandoTotal,
-    espaco_disponivel_esquerda: espacoDisponivelEsquerda,
-    espaco_disponivel_direita: espacoDisponivelDireita,
-    condicao_esquerda: espacoDisponivelEsquerda > 100,
-    condicao_direita: espacoDisponivelDireita > 100 && windowDimensions.width >= 1500,
-    config_usada: isMobile ? 'mobile' : 'desktop',
-    isMobile: isMobile
-  });
+  // Performance optimization: Debug logging only in development
+  if (import.meta.env.DEV) {
+    console.log('🎯 PORTAMONTANTE - CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
+      container_width: containerDimensions.width,
+      maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
+      card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
+      card_expandido: `${cardWidthValue.toFixed(0)}px`,
+      diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
+      usando_expansao: containerDimensions.width > 1920 ? '✅ SIM' : '❌ NÃO',
+      espaco_disponivel_esquerda: espacoDisponivelEsquerda,
+      espaco_disponivel_direita: espacoDisponivelDireita
+    });
+  }
 
   return (
     <div className="w-full h-auto flex flex-col items-center relative">
 
       {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA */}
-      {!isMobile && espacoDisponivelEsquerda > 100 && (
+      {!isMobile && (
         <div 
-          className="absolute top-8 z-10 flex flex-col gap-4"
+          className="absolute z-50 flex flex-col"
           style={{ 
-            left: '16px',
-            width: `${Math.max(380, Math.min(espacoDisponivelEsquerda - 20, 600))}px`,
-            maxHeight: 'calc(100vh - 120px)'
+            top: `${alturaTotal * 0.05}px`,
+            left: `${maxWidth * 0.02}px`,
+            width: `${cardWidth()}px`,
+            gap: `${Math.max(6, maxWidth * 0.005)}px`
           }}
         >
-          {/* DADOS OPERACIONAIS - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="DADOS OPERACIONAIS" variant="industrial">
-            <div className="space-y-3">
+          {/* DADOS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
+          <InfoCard title="DADOS OPERACIONAIS" variant="industrial" containerWidth={cardWidth()}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: `${getResponsiveCardSpacing(6)}px` }}>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Posição Porta:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{(reguaPortaMontante * 12.5 / 100).toFixed(2)} <span className="text-xs text-gray-500">m</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Posição Porta:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {(reguaPortaMontante * 12.5 / 100).toFixed(2)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m</span>
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Abertura:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{reguaPortaMontante}<span className="text-xs text-gray-500">%</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Abertura:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {reguaPortaMontante}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
+                </span>
               </div>
               
-              <div className="border-t border-gray-600 my-3"></div>
+              <div className="border-t border-gray-300" style={{ margin: `${getResponsiveCardSpacing(4)}px 0` }}></div>
               
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Diferença E/D:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-xs text-gray-500">mm</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Diferença E/D:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">mm</span>
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Contrapeso E:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{contrapesoEsquerdo}<span className="text-xs text-gray-500">%</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Contrapeso E:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {contrapesoEsquerdo}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Contrapeso D:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{contrapesoDirecto}<span className="text-xs text-gray-500">%</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Contrapeso D:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {contrapesoDirecto}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
+                </span>
               </div>
               
-              <div className="border-t border-gray-600 my-3"></div>
+              <div className="border-t border-gray-300" style={{ margin: `${getResponsiveCardSpacing(4)}px 0` }}></div>
               
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vel. Subida:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{velocidadeSubida.toFixed(3)} <span className="text-xs text-gray-500">m/s</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Vel. Subida:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {velocidadeSubida.toFixed(3)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m/s</span>
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vel. Descida:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">{velocidadeDescida.toFixed(3)} <span className="text-xs text-gray-500">m/s</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Vel. Descida:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {velocidadeDescida.toFixed(3)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m/s</span>
+                </span>
               </div>
             </div>
           </InfoCard>
 
-          {/* STATUS OPERACIONAIS - USANDO STATUSCARD PADRÃO */}
-          <div className="flex flex-col gap-2">
-            <StatusCard 
+          {/* STATUS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
+            <StatusCard
               title="COMANDO EM AUTOMÁTICO"
               variant="automatic"
+              containerWidth={cardWidth()}
             />
-            
-            <StatusCard 
+
+            <StatusCard
               title="IGUALDADE DE NÍVEIS PRESENTE"
               variant="success"
+              containerWidth={cardWidth()}
             />
-            
-            <StatusCard 
+
+            <StatusCard
               title="FALTA IGUALDADE DE NÍVEIS"
               variant="error"
+              containerWidth={cardWidth()}
             />
           </div>
         </div>
       )}
 
       {/* PAINEL INDUSTRIAL ISA-104 - DIREITA */}
-      {!isMobile && espacoDisponivelDireita > 100 && windowDimensions.width >= 1500 && (
+      {!isMobile && (
         <div 
-          className="absolute top-8 z-10 flex flex-col gap-4"
+          className="absolute z-50 flex flex-col"
           style={{ 
-            right: '16px',
-            width: `${Math.max(380, Math.min(espacoDisponivelDireita - 20, 600))}px`,
-            maxHeight: 'calc(100vh - 120px)'
+            top: `${alturaTotal * 0.05}px`,
+            right: `${maxWidth * 0.02}px`,
+            width: `${cardWidth()}px`,
+            gap: `${Math.max(6, maxWidth * 0.005)}px`
           }}
         >
-          {/* MOTORES - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="MOTORES" variant="motor">
+          {/* MOTORES - RESPONSIVIDADE INTELIGENTE */}
+          <InfoCard title="MOTORES" variant="motor" containerWidth={cardWidth()}>
             {/* MOTOR DIREITO */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR DIREITO</div>
-                <div className={`w-3 h-3 rounded-full ${animMotorDireito > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
+            <div style={{ marginBottom: `${getResponsiveCardSpacing(8)}px` }}>
+              <div className="flex justify-between items-center" style={{ marginBottom: `${getResponsiveCardSpacing(4)}px` }}>
+                <div 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  MOTOR DIREITO
+                </div>
+                <div className={`rounded-full ${animMotorDireito > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, getResponsiveCardSpacing(6))}px`, height: `${Math.max(8, getResponsiveCardSpacing(6))}px` }}></div>
               </div>
               <div className="flex justify-between items-center">
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {motorDireitoVeloc.toFixed(1)} <span className="text-xs text-gray-500">RPM</span>
+                <div 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {motorDireitoVeloc.toFixed(1)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">RPM</span>
                 </div>
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
+                <div 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(12, 'value')}px` }}
+                >
                   {animMotorDireito > 0 ? 'LIGADO' : 'PARADO'}
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-slate-600 my-3"></div>
+            <div className="border-t border-gray-300" style={{ margin: `${getResponsiveCardSpacing(4)}px 0` }}></div>
 
             {/* MOTOR ESQUERDO */}
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">MOTOR ESQUERDO</div>
-                <div className={`w-3 h-3 rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></div>
+              <div className="flex justify-between items-center" style={{ marginBottom: `${getResponsiveCardSpacing(4)}px` }}>
+                <div 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  MOTOR ESQUERDO
+                </div>
+                <div className={`rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, getResponsiveCardSpacing(6))}px`, height: `${Math.max(8, getResponsiveCardSpacing(6))}px` }}></div>
               </div>
               <div className="flex justify-between items-center">
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
-                  {motorEsquerdoVeloc.toFixed(1)} <span className="text-xs text-gray-500">RPM</span>
+                <div 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  {motorEsquerdoVeloc.toFixed(1)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">RPM</span>
                 </div>
-                <div className="text-lg font-mono font-bold text-[#212E3E]">
+                <div 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(12, 'value')}px` }}
+                >
                   {animMotorEsquerdo > 0 ? 'LIGADO' : 'PARADO'}
                 </div>
               </div>
@@ -444,26 +585,66 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           </InfoCard>
 
           {/* SISTEMA STATUS - USANDO INFOCARD PADRÃO */}
-          <InfoCard title="SISTEMA" variant="system">
-            <div className="space-y-3">
+          <InfoCard title="SISTEMA" variant="system" containerWidth={cardWidth()}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: `${getResponsiveCardSpacing(6)}px` }}>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Pressão:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">2.4 <span className="text-xs text-gray-500">bar</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Pressão:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  2.4 <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">bar</span>
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Temperatura:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">24.5<span className="text-xs text-gray-500">°C</span></span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Temperatura:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                >
+                  24.5<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">°C</span>
+                </span>
               </div>
               
-              <div className="border-t border-gray-600 my-3"></div>
+              <div className="border-t border-gray-300" style={{ margin: `${getResponsiveCardSpacing(4)}px 0` }}></div>
               
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Vibração:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">NORMAL</span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Vibração:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(12, 'value')}px` }}
+                >
+                  NORMAL
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-[#212E3E] uppercase tracking-wide">Status Geral:</span>
-                <span className="text-lg font-mono font-bold text-[#212E3E]">OPERACIONAL</span>
+                <span 
+                  className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
+                  style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                >
+                  Status Geral:
+                </span>
+                <span 
+                  className="font-mono font-bold text-[#212E3E]"
+                  style={{ fontSize: `${getResponsiveCardFontSize(12, 'value')}px` }}
+                >
+                  OPERACIONAL
+                </span>
               </div>
             </div>
           </InfoCard>

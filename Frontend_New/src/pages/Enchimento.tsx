@@ -595,10 +595,48 @@ const VALVULA_VERTICAL_CONFIG = {
 
 const Enchimento: React.FC<EnchimentoProps> = () => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = React.useState({ width: 0, height: 0 });
-  const [windowDimensions, setWindowDimensions] = React.useState({ width: 0, height: 0 });
+  // 🚀 PERFORMANCE: Estados estáveis para evitar flashes visuais
+  const [containerDimensions, setContainerDimensions] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const width = Math.min(window.innerWidth - 32, 1920);
+      return { width, height: 600 };
+    }
+    return { width: 1200, height: 600 }; // Fallback estável
+  });
+  
+  const [windowDimensions, setWindowDimensions] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return { width: window.innerWidth, height: window.innerHeight };
+    }
+    return { width: 1920, height: 1080 }; // Fallback estável
+  });
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
+
+  // 🚀 PERFORMANCE: Callback otimizado para resize (fora do useLayoutEffect)
+  const updateDimensions = React.useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const newDimensions = { width: rect.width, height: rect.height };
+      
+      setContainerDimensions(prev => {
+        if (Math.abs(prev.width - newDimensions.width) > 10 || 
+            Math.abs(prev.height - newDimensions.height) > 10) {
+          return newDimensions;
+        }
+        return prev;
+      });
+    }
+    
+    const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
+    setWindowDimensions(prev => {
+      if (Math.abs(prev.width - newWindowDimensions.width) > 10 || 
+          Math.abs(prev.height - newWindowDimensions.height) > 10) {
+        return newWindowDimensions;
+      }
+      return prev;
+    });
+  }, []);
 
   // UseLayoutEffect para calcular dimensões ANTES da renderização visual
   React.useLayoutEffect(() => {
@@ -623,50 +661,31 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
     // Executar imediatamente (sem timeout)
     initializeDimensions();
     
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newDimensions = { width: rect.width, height: rect.height };
-        
-        setContainerDimensions(prev => {
-          if (Math.abs(prev.width - newDimensions.width) > 10 || 
-              Math.abs(prev.height - newDimensions.height) > 10) {
-            return newDimensions;
-          }
-          return prev;
-        });
-      }
-      
-      const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-      setWindowDimensions(prev => {
-        if (Math.abs(prev.width - newWindowDimensions.width) > 10 || 
-            Math.abs(prev.height - newWindowDimensions.height) > 10) {
-          return newWindowDimensions;
-        }
-        return prev;
-      });
-    };
-    
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [updateDimensions]);
 
   // Detectar se é mobile
   const isMobile = React.useMemo(() => windowDimensions.width < 1024, [windowDimensions.width]);
 
-  // 🎯 SISTEMA IDÊNTICO AO PORTA JUSANTE/MONTANTE
-  const enchimentoAspectRatio = 1348 / 600; // Baseado no container: width="1348" height="600"
-  
-  // 📐 EXATAMENTE IGUAL PORTA JUSANTE - maxWidth direto
-  const maxWidth = Math.min(containerDimensions.width - 32, 1920); // 32px = margem mínima
-  
-  // 🎯 ENCHIMENTO: sistema de escala igual PortaJusante
-  const enchimentoScale = isMobile ? 90 : 100; // 90% mobile, 100% desktop
-  const baseEnchimentoWidth = (maxWidth * enchimentoScale) / 100;
-  const baseEnchimentoHeight = baseEnchimentoWidth / enchimentoAspectRatio;
-  
-  // 🎯 ALTURA TOTAL DINÂMICA - igual sistema PortaJusante
-  const alturaTotal = baseEnchimentoHeight;
+  // 🚀 PERFORMANCE: MEMOIZAÇÃO DOS CÁLCULOS DE DIMENSÕES
+  const dimensionCalculations = React.useMemo(() => {
+    const enchimentoAspectRatio = 1348 / 600; // Baseado no container: width="1348" height="600"
+    const maxWidth = Math.min(containerDimensions.width - 32, 1920); // 32px = margem mínima
+    const enchimentoScale = isMobile ? 90 : 100; // 90% mobile, 100% desktop
+    const baseEnchimentoWidth = (maxWidth * enchimentoScale) / 100;
+    const baseEnchimentoHeight = baseEnchimentoWidth / enchimentoAspectRatio;
+    const alturaTotal = baseEnchimentoHeight;
+
+    return {
+      maxWidth,
+      baseEnchimentoWidth,
+      baseEnchimentoHeight,
+      alturaTotal
+    };
+  }, [containerDimensions.width, isMobile]);
+
+  const { maxWidth, alturaTotal } = dimensionCalculations;
   
   // 📡 USAR O SISTEMA PLC EXISTENTE
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
@@ -697,27 +716,49 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
     }
   }, [connectionStatus.connected, sendCommand]);
   
-  // 🔥 SISTEMA REAL - SEM SIMULAÇÃO
-  
-  // 🎯 PISTÕES - TAGS REAIS DO WEBSOCKET ENCH (MOVIMENTO REAL 0-100%)
-  const pistaoDireitoRaw = parseInt(plcData?.tags?.['ENCH_MED_AB_CILIND.POS_DIR_INT'] || '0', 10);   // Pistão direito - valor real WebSocket
-  const pistaoEsquerdoRaw = parseInt(plcData?.tags?.['ENCH_MED_AB_CILIND.POS_ESQ_INT'] || '0', 10);  // Pistão esquerdo - valor real WebSocket
+  // 🚀 PERFORMANCE: MEMOIZAÇÃO COMPLETA DO PROCESSAMENTO WEBSOCKET (60+ TAGS)
+  // Processa todas as tags WebSocket uma única vez para evitar re-renders
+  const webSocketData = React.useMemo(() => {
+    if (!plcData?.tags) return null;
 
-  // 🎯 DADOS COMPLEMENTARES - PISTÃO DIREITO
-  const tempoAberturaDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_A'] || '0', 10);        // Tempo abertura (int)
-  const velocidadeDireito = parseFloat(plcData?.tags?.['ENCH_POSICAO_COMP.VELOC_C_A'] || '0');                   // Velocidade m/s (real)
-  const tempoAberturaLentaDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_A'] || '0', 10); // Tempo abertura lenta (int)
-  const tempoFechoDireito = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_A'] || '0', 10);         // Tempo fecho (int)
-  const posicaoMetrosDireito = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.MED_CILIND_DIR'] || '0');           // Posição em metros (real)
-  const posicaoPorcentagemDireito = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.PORC_CILIND_DIR'] || '0');     // Posição em % (real)
+    return {
+      // 🎯 PISTÕES - TAGS REAIS DO WEBSOCKET ENCH (MOVIMENTO REAL 0-100%)
+      pistaoDireitoRaw: parseInt(plcData.tags['ENCH_MED_AB_CILIND.POS_DIR_INT'] || '0', 10),
+      pistaoEsquerdoRaw: parseInt(plcData.tags['ENCH_MED_AB_CILIND.POS_ESQ_INT'] || '0', 10),
 
-  // 🎯 DADOS COMPLEMENTARES - PISTÃO ESQUERDO (assumindo tags similares)
-  const tempoAberturaEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_B'] || '0', 10);        // Tempo abertura (int)
-  const velocidadeEsquerdo = parseFloat(plcData?.tags?.['ENCH_POSICAO_COMP.VELOC_C_B'] || '0');                   // Velocidade m/s (real)
-  const tempoAberturaLentaEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_B'] || '0', 10); // Tempo abertura lenta (int)
-  const tempoFechoEsquerdo = parseInt(plcData?.tags?.['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_B'] || '0', 10);         // Tempo fecho (int)
-  const posicaoMetrosEsquerdo = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.MED_CILIND_ESQ'] || '0');           // Posição em metros (real)
-  const posicaoPorcentagemEsquerdo = parseFloat(plcData?.tags?.['ENCH_MED_AB_CILIND.PORC_CILIND_ESQ'] || '0');     // Posição em % (real)
+      // 🎯 DADOS COMPLEMENTARES - PISTÃO DIREITO
+      tempoAberturaDireito: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_A'] || '0', 10),
+      velocidadeDireito: parseFloat(plcData.tags['ENCH_POSICAO_COMP.VELOC_C_A'] || '0'),
+      tempoAberturaLentaDireito: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_A'] || '0', 10),
+      tempoFechoDireito: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_A'] || '0', 10),
+      posicaoMetrosDireito: parseFloat(plcData.tags['ENCH_MED_AB_CILIND.MED_CILIND_DIR'] || '0'),
+      posicaoPorcentagemDireito: parseFloat(plcData.tags['ENCH_MED_AB_CILIND.PORC_CILIND_DIR'] || '0'),
+
+      // 🎯 DADOS COMPLEMENTARES - PISTÃO ESQUERDO
+      tempoAberturaEsquerdo: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_SUB_B'] || '0', 10),
+      velocidadeEsquerdo: parseFloat(plcData.tags['ENCH_POSICAO_COMP.VELOC_C_B'] || '0'),
+      tempoAberturaLentaEsquerdo: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_ESTAB_B'] || '0', 10),
+      tempoFechoEsquerdo: parseInt(plcData.tags['ENCH_POSICAO_COMP.CONTAG_TEMP_DESC_B'] || '0', 10),
+      posicaoMetrosEsquerdo: parseFloat(plcData.tags['ENCH_MED_AB_CILIND.MED_CILIND_ESQ'] || '0'),
+      posicaoPorcentagemEsquerdo: parseFloat(plcData.tags['ENCH_MED_AB_CILIND.PORC_CILIND_ESQ'] || '0')
+    };
+  }, [plcData?.tags]);
+
+  // Extract values with fallbacks for performance
+  const pistaoDireitoRaw = webSocketData?.pistaoDireitoRaw || 0;
+  const pistaoEsquerdoRaw = webSocketData?.pistaoEsquerdoRaw || 0;
+  const tempoAberturaDireito = webSocketData?.tempoAberturaDireito || 0;
+  const velocidadeDireito = webSocketData?.velocidadeDireito || 0;
+  const tempoAberturaLentaDireito = webSocketData?.tempoAberturaLentaDireito || 0;
+  const tempoFechoDireito = webSocketData?.tempoFechoDireito || 0;
+  const posicaoMetrosDireito = webSocketData?.posicaoMetrosDireito || 0;
+  const posicaoPorcentagemDireito = webSocketData?.posicaoPorcentagemDireito || 0;
+  const tempoAberturaEsquerdo = webSocketData?.tempoAberturaEsquerdo || 0;
+  const velocidadeEsquerdo = webSocketData?.velocidadeEsquerdo || 0;
+  const tempoAberturaLentaEsquerdo = webSocketData?.tempoAberturaLentaEsquerdo || 0;
+  const tempoFechoEsquerdo = webSocketData?.tempoFechoEsquerdo || 0;
+  const posicaoMetrosEsquerdo = webSocketData?.posicaoMetrosEsquerdo || 0;
+  const posicaoPorcentagemEsquerdo = webSocketData?.posicaoPorcentagemEsquerdo || 0;
   
   // 🎯 NORMALIZAÇÃO DIRETA DOS PISTÕES (0-100% do WebSocket)
   // WebSocket já envia valores normalizados para controle direto do eixo Y
@@ -731,38 +772,66 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
     return Math.max(0, Math.min(100, pistaoEsquerdoRaw));
   }, [pistaoEsquerdoRaw]);
   
-  // 🎯 BOMBAS/MOTORES - TAGS REAIS DO WEBSOCKET ENCH (0,1,2,3 - ANIMAÇÃO)
-  const bombaMotorDireito = parseInt(plcData?.tags?.['ENCH_ANIM_WINCC_ANIM_BOMBA_A_ENCH'] || '0', 10);  // Bomba direita (0=parada, 1,2=verde, 3=vermelha)
-  const bombaMotorEsquerdo = parseInt(plcData?.tags?.['ENCH_ANIM_WINCC_ANIM_BOMBA_B_ENCH'] || '0', 10); // Bomba esquerda (0=parada, 1,2=verde, 3=vermelha)
+  // 🚀 PERFORMANCE: MEMOIZAÇÃO DAS VÁLVULAS, MOTORES E PIPES
+  const valvulasData = React.useMemo(() => {
+    if (!plcData?.tags) return null;
 
-  
-  // 🎯 CILINDROS - TAGS REAIS DO WEBSOCKET ENCH  
-  const cilindroDireito = plcData?.tags?.['ENCH_DEF_AG_CILIND_A_DIR'] === 'TRUE' ? 1 : 0;  // Cilindro direito
-  const cilindroEsquerdo = plcData?.tags?.['ENCH_DEF_AG_CILIND_B_ESQ'] === 'TRUE' ? 1 : 0; // Cilindro esquerdo
+    return {
+      // 🎯 BOMBAS/MOTORES - TAGS REAIS DO WEBSOCKET ENCH (0,1,2,3 - ANIMAÇÃO)
+      bombaMotorDireito: parseInt(plcData.tags['ENCH_ANIM_WINCC_ANIM_BOMBA_A_ENCH'] || '0', 10),
+      bombaMotorEsquerdo: parseInt(plcData.tags['ENCH_ANIM_WINCC_ANIM_BOMBA_B_ENCH'] || '0', 10),
 
-  // 🎯 TUBULAÇÕES LADO DIREITO COM TAGS REAIS ENCH (Pipes 1-9)
-  
-  // Tags reais do WebSocket ENCH para lado DIREITO  
-  const pipe1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;            // Pipe 1 DIREITA
-  const pipe2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;         // Pipe 2 DIREITA  
-  const pipe3Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;     // Pipe 3 DIREITA
-  const pipe4Real = plcData?.tags?.['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0;            // Pipe 4 DIREITA
-  const pipe5Real = plcData?.tags?.['ENCH_HMI_B_LIG_VD2_0_DIR'] === 'TRUE' ? 1 : 0;     // Pipe 5 DIREITA
-  const pipe6Real = plcData?.tags?.['ENCH_RM_BOMB_DIR'] === 'TRUE' ? 1 : 0;             // Pipe 6 DIREITA
-  const pipe7Real = plcData?.tags?.['ENCH_HMI_VD1_VD2_LIG_DIR'] === 'TRUE' ? 1 : 0;     // Pipe 7 DIREITA
-  const pipe8Real = plcData?.tags?.['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0;              // Pipe 8 DIREITA
-  const pipe9Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;         // Pipe 9 DIREITA
+      // 🎯 CILINDROS - TAGS REAIS DO WEBSOCKET ENCH  
+      cilindroDireito: plcData.tags['ENCH_DEF_AG_CILIND_A_DIR'] === 'TRUE' ? 1 : 0,
+      cilindroEsquerdo: plcData.tags['ENCH_DEF_AG_CILIND_B_ESQ'] === 'TRUE' ? 1 : 0,
 
-  // Tags reais do WebSocket ENCH para lado ESQUERDO
-  const pipe1EsqReal = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 1 ESQUERDA
-  const pipe2EsqReal = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;          // Pipe 2 ESQUERDA
-  const pipe3EsqReal = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;       // Pipe 3 ESQUERDA
-  const pipe4EsqReal = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;          // Pipe 4 ESQUERDA
-  const pipe5EsqReal = plcData?.tags?.['ENCH_HMI_B_LIG_VD2_0_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 5 ESQUERDA
-  const pipe6EsqReal = plcData?.tags?.['ENCH_RM_BOMB_ESQ'] === 'TRUE' ? 1 : 0;               // Pipe 6 ESQUERDA
-  const pipe7EsqReal = plcData?.tags?.['ENCH_HMI_VD1_VD2_LIG_ESQ'] === 'TRUE' ? 1 : 0;       // Pipe 7 ESQUERDA
-  const pipe8EsqReal = plcData?.tags?.['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0;            // Pipe 8 ESQUERDA
-  const pipe9EsqReal = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;           // Pipe 9 ESQUERDA
+      // 🎯 TUBULAÇÕES LADO DIREITO COM TAGS REAIS ENCH (Pipes 1-9)
+      pipe1Real: plcData.tags['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0,
+      pipe2Real: plcData.tags['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0,
+      pipe3Real: plcData.tags['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0,
+      pipe4Real: plcData.tags['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0,
+      pipe5Real: plcData.tags['ENCH_HMI_B_LIG_VD2_0_DIR'] === 'TRUE' ? 1 : 0,
+      pipe6Real: plcData.tags['ENCH_RM_BOMB_DIR'] === 'TRUE' ? 1 : 0,
+      pipe7Real: plcData.tags['ENCH_HMI_VD1_VD2_LIG_DIR'] === 'TRUE' ? 1 : 0,
+      pipe8Real: plcData.tags['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0,
+      pipe9Real: plcData.tags['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0,
+
+      // Tags reais do WebSocket ENCH para lado ESQUERDO
+      pipe1EsqReal: plcData.tags['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe2EsqReal: plcData.tags['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe3EsqReal: plcData.tags['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0,
+      pipe4EsqReal: plcData.tags['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe5EsqReal: plcData.tags['ENCH_HMI_B_LIG_VD2_0_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe6EsqReal: plcData.tags['ENCH_RM_BOMB_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe7EsqReal: plcData.tags['ENCH_HMI_VD1_VD2_LIG_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe8EsqReal: plcData.tags['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0,
+      pipe9EsqReal: plcData.tags['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0
+    };
+  }, [plcData?.tags]);
+
+  // Extract optimized values
+  const bombaMotorDireito = valvulasData?.bombaMotorDireito || 0;
+  const bombaMotorEsquerdo = valvulasData?.bombaMotorEsquerdo || 0;
+  const cilindroDireito = valvulasData?.cilindroDireito || 0;
+  const cilindroEsquerdo = valvulasData?.cilindroEsquerdo || 0;
+  const pipe1Real = valvulasData?.pipe1Real || 0;
+  const pipe2Real = valvulasData?.pipe2Real || 0;
+  const pipe3Real = valvulasData?.pipe3Real || 0;
+  const pipe4Real = valvulasData?.pipe4Real || 0;
+  const pipe5Real = valvulasData?.pipe5Real || 0;
+  const pipe6Real = valvulasData?.pipe6Real || 0;
+  const pipe7Real = valvulasData?.pipe7Real || 0;
+  const pipe8Real = valvulasData?.pipe8Real || 0;
+  const pipe9Real = valvulasData?.pipe9Real || 0;
+  const pipe1EsqReal = valvulasData?.pipe1EsqReal || 0;
+  const pipe2EsqReal = valvulasData?.pipe2EsqReal || 0;
+  const pipe3EsqReal = valvulasData?.pipe3EsqReal || 0;
+  const pipe4EsqReal = valvulasData?.pipe4EsqReal || 0;
+  const pipe5EsqReal = valvulasData?.pipe5EsqReal || 0;
+  const pipe6EsqReal = valvulasData?.pipe6EsqReal || 0;
+  const pipe7EsqReal = valvulasData?.pipe7EsqReal || 0;
+  const pipe8EsqReal = valvulasData?.pipe8EsqReal || 0;
+  const pipe9EsqReal = valvulasData?.pipe9EsqReal || 0;
   
   // 🎯 MAPEAMENTO PIPES LADO DIREITO → BITS SVG
   const bit12 = pipe1Real;     // Pipe 1 DIREITA - ENCH_SIN_AG_SUBID
@@ -786,114 +855,139 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const bit27 = pipe8EsqReal;  // Pipe 8 ESQUERDA - ENCH_EM_SUB_RAP_ESQ (BIT ÚNICO)
   const bit28 = pipe9EsqReal;  // Pipe 9 ESQUERDA - ENCH_OM_VD2_COMP_ESQ (BIT ÚNICO)
   
-  // 🎯 VÁLVULAS VERTICAIS - BITS ÚNICOS COM TAGS ESPECÍFICOS
-  const valvulaVerticalDireita = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;  // VÁLVULA VERTICAL DIREITA
-  const valvulaVerticalEsquerda = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0; // VÁLVULA VERTICAL ESQUERDA
+  // 🚀 PERFORMANCE: MEMOIZAÇÃO DAS VÁLVULAS COMPLEXAS
+  const valvulasComplexasData = React.useMemo(() => {
+    if (!plcData?.tags) return null;
+
+    return {
+      // 🎯 VÁLVULAS VERTICAIS - BITS ÚNICOS COM TAGS ESPECÍFICOS
+      valvulaVerticalDireita: plcData.tags['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0,
+      valvulaVerticalEsquerda: plcData.tags['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0,
+
+      // Bits extras do SVG
+      bit13: Number(plcData?.bit_data?.status_bits?.[1]?.[13] || 0),
+      bit36: Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0),
+
+      // 🎯 VÁLVULAS VRC - TAGS REAIS DO WEBSOCKET ENCH
+      valvulaEsquerda1: plcData.tags['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0,
+      valvulaEsquerda2: plcData.tags['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0,
+      valvulaEsquerda3: plcData.tags['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0,
+      valvulaDireita1: plcData.tags['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0,
+      valvulaDireita2: plcData.tags['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0,
+      valvulaDireita3: plcData.tags['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0,
+
+      // VÁLVULAS GAVETA
+      valvulaGavetaEsquerda1Real: plcData.tags['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0,
+      valvulaGavetaEsquerda2Real: plcData.tags['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0,
+      valvulaGavetaEsquerda3Real: plcData.tags['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0,
+      valvulaGavetaDireita1Real: plcData.tags['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0,
+      valvulaGavetaDireita2Real: plcData.tags['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0,
+      valvulaGavetaDireita3Real: plcData.tags['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0,
+
+      // 🎯 VÁLVULAS DIRECIONAIS - TAGS REAIS DO WEBSOCKET ENCH
+      valvulaDirecionalDireita1Real: plcData.tags['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0,
+      valvulaDirecionalDireita2Real: plcData.tags['ENCH_OM_VALV_DIST_COMP_B'] === 'TRUE' ? 1 : 0,
+      valvulaDirecionalDireita3Real: plcData.tags['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0,
+      valvulaDirecionalEsquerda1Real: plcData.tags['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0,
+      valvulaDirecionalEsquerda2Real: plcData.tags['ENCH_OM_VALV_DIST_COMP_A'] === 'TRUE' ? 1 : 0,
+      valvulaDirecionalEsquerda3Real: plcData.tags['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0
+    };
+  }, [plcData?.tags, plcData?.bit_data?.status_bits]);
+
+  // Extract optimized values
+  const valvulaVerticalDireita = valvulasComplexasData?.valvulaVerticalDireita || 0;
+  const valvulaVerticalEsquerda = valvulasComplexasData?.valvulaVerticalEsquerda || 0;
+  const bit13 = valvulasComplexasData?.bit13 || 0;
+  const bit33 = pipe2EsqReal; // Uses already optimized value
+  const bit34 = pipe3EsqReal; // Uses already optimized value
+  const bit36 = valvulasComplexasData?.bit36 || 0;
+
+  // VRC Valves
+  const valvulaEsquerda1 = valvulasComplexasData?.valvulaEsquerda1 || 0;
+  const valvulaEsquerda2 = valvulasComplexasData?.valvulaEsquerda2 || 0;
+  const valvulaEsquerda3 = valvulasComplexasData?.valvulaEsquerda3 || 0;
+  const valvulaDireita1 = valvulasComplexasData?.valvulaDireita1 || 0;
+  const valvulaDireita2 = valvulasComplexasData?.valvulaDireita2 || 0;
+  const valvulaDireita3 = valvulasComplexasData?.valvulaDireita3 || 0;
+
+  // Flange valves (derived from VRC)
+  const valvulaFlangeEsquerda1 = valvulaEsquerda1;
+  const valvulaFlangeEsquerda2 = valvulaEsquerda2;
+  const valvulaFlangeEsquerda3 = valvulaEsquerda3;
+  const valvulaFlangeDireita1 = valvulaDireita1;
+  const valvulaFlangeDireita2 = valvulaDireita2;
+  const valvulaFlangeDireita3 = valvulaDireita3;
+
+  // Gaveta valves
+  const valvulaGavetaEsquerda1 = valvulasComplexasData?.valvulaGavetaEsquerda1Real || 0;
+  const valvulaGavetaEsquerda2 = valvulasComplexasData?.valvulaGavetaEsquerda2Real || 0;
+  const valvulaGavetaEsquerda3 = valvulasComplexasData?.valvulaGavetaEsquerda3Real || 0;
+  const valvulaGavetaDireita1 = valvulasComplexasData?.valvulaGavetaDireita1Real || 0;
+  const valvulaGavetaDireita2 = valvulasComplexasData?.valvulaGavetaDireita2Real || 0;
+  const valvulaGavetaDireita3 = valvulasComplexasData?.valvulaGavetaDireita3Real || 0;
+
+  // Directional valves
+  const valvulaDirecionalEsquerda1 = valvulasComplexasData?.valvulaDirecionalEsquerda1Real || 0;
+  const valvulaDirecionalEsquerda2 = valvulasComplexasData?.valvulaDirecionalEsquerda2Real || 0;
+  const valvulaDirecionalEsquerda3 = valvulasComplexasData?.valvulaDirecionalEsquerda3Real || 0;
+  const valvulaDirecionalDireita1 = valvulasComplexasData?.valvulaDirecionalDireita1Real || 0;
+  const valvulaDirecionalDireita2 = valvulasComplexasData?.valvulaDirecionalDireita2Real || 0;
+  const valvulaDirecionalDireita3 = valvulasComplexasData?.valvulaDirecionalDireita3Real || 0;
   
-  // Bits extras do SVG (elementos adicionais dos pipes principais)
-  const bit13 = Number(plcData?.bit_data?.status_bits?.[1]?.[13] || 0);  // Disponível
-  const bit33 = pipe2EsqReal;  // Pipe 2 ESQUERDA - elemento extra (CORRIGIDO)
-  const bit34 = pipe3EsqReal;  // Pipe 3 ESQUERDA - elemento extra (mesmo tag)
-  const bit36 = Number(plcData?.bit_data?.status_bits?.[2]?.[4] || 0);   // Disponível
+  // 🚀 PERFORMANCE: MEMOIZAÇÃO DE TODAS AS CONFIGURAÇÕES RESPONSIVAS
+  const responsiveConfigs = React.useMemo(() => {
+    const baseConfig = isMobile ? BASE_PISTAO_CONFIG.mobile : BASE_PISTAO_CONFIG.desktop;
+    const pistaoConfig = isMobile ? PISTAO_CONFIG.mobile : PISTAO_CONFIG.desktop;
+    const cilindroConfig = isMobile ? CILINDRO_CONFIG.mobile : CILINDRO_CONFIG.desktop;
+    const pipeSystemConfig = isMobile ? PIPE_SYSTEM_CONFIG.mobile : PIPE_SYSTEM_CONFIG.desktop;
+    const suportePistaConfig = isMobile ? SUPORTE_PISTA_CONFIG.mobile : SUPORTE_PISTA_CONFIG.desktop;
+    const baseFundoEnchimentoConfig = isMobile ? BASE_FUNDO_ENCHIMENTO_CONFIG.mobile : BASE_FUNDO_ENCHIMENTO_CONFIG.desktop;
+    const valvulaConfig = isMobile ? VALVULA_CONFIG.mobile : VALVULA_CONFIG.desktop;
 
-  // Extrair bits para válvulas - CORRIGIDO ✓
-  // V1 = Bit 18, V2 = Bit 19, V3 = Bit 12
-  // 🎯 VÁLVULAS VRC - USANDO TAGS REAIS DO WEBSOCKET ENCH
-  
-  // LADO ESQUERDO na animação 
-  const valvulaEsquerda1 = plcData?.tags?.['ENCH_EM_SUB_LENTA'] === 'TRUE' ? 1 : 0;     // VRC1 ESQUERDO
-  const valvulaEsquerda2 = plcData?.tags?.['ENCH_EM_SUB_RAP'] === 'TRUE' ? 1 : 0;       // VRC2 ESQUERDO  
-  const valvulaEsquerda3 = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VRC3 ESQUERDO
-  
-  // LADO DIREITO na animação 
-  const valvulaDireita1 = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;          // VRC1 DIREITO
-  const valvulaDireita2 = plcData?.tags?.['ENCH_EM_SUB_RAP_ESQ'] === 'TRUE' ? 1 : 0;            // VRC2 DIREITO
-  const valvulaDireita3 = plcData?.tags?.['ENCH_EM_SUB_LENTA_ESQ'] === 'TRUE' ? 1 : 0;           // VRC3 DIREITO
+    return {
+      // Configurações BASE PISTAO
+      basePistaoDireitoConfig: baseConfig.direito,
+      basePistaoEsquerdoConfig: baseConfig.esquerdo,
+      
+      // Configurações PISTÃO MÓVEL
+      pistaoDireitoConfig: pistaoConfig.direito,
+      pistaoEsquerdoConfig: pistaoConfig.esquerdo,
+      
+      // Configurações CILINDROS
+      cilindroDireitoConfig: cilindroConfig.direito,
+      cilindroEsquerdoConfig: cilindroConfig.esquerdo,
+      
+      // Configurações PIPE SYSTEM
+      pipeSystemConfig: pipeSystemConfig,
+      
+      // Configurações SUPORTE PISTA
+      suportePistaEsquerdoConfig: suportePistaConfig.esquerdo,
+      suportePistaDireitoConfig: suportePistaConfig.direito,
+      
+      // Configurações BASE FUNDO ENCHIMENTO
+      baseFundoEnchimentoConfig: baseFundoEnchimentoConfig,
+      
+      // Configurações VÁLVULAS
+      valvulaEsquerda1Config: valvulaConfig.esquerda1,
+      valvulaEsquerda2Config: valvulaConfig.esquerda2,
+      valvulaEsquerda3Config: valvulaConfig.esquerda3,
+      valvulaDireita1Config: valvulaConfig.direita1,
+      valvulaDireita2Config: valvulaConfig.direita2,
+      valvulaDireita3Config: valvulaConfig.direita3
+    };
+  }, [isMobile]);
 
-  // Extrair bits para válvulas flange - CORRIGIDO ✓
-  const valvulaFlangeEsquerda1 = valvulaEsquerda1; // V1 - Bit 18
-  const valvulaFlangeEsquerda2 = valvulaEsquerda2; // V2 - Bit 19
-  const valvulaFlangeEsquerda3 = valvulaEsquerda3; // V3 - Bit 12
-
-  // LADO DIREITO (bits 13, 24, 23)
-  const valvulaFlangeDireita1 = valvulaDireita1; // Bit 13
-  const valvulaFlangeDireita2 = valvulaDireita2; // Bit 24
-  const valvulaFlangeDireita3 = valvulaDireita3; // Bit 23
-
-
-  
-  // LADO DIREITO VISUAL (VG1, VG2, VG3) - variáveis "Esquerda" 
-  const valvulaGavetaEsquerda1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;         // VG1 DIREITA VISUAL
-  const valvulaGavetaEsquerda2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA'] === 'TRUE' ? 1 : 0;      // VG2 DIREITA VISUAL  
-  const valvulaGavetaEsquerda3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID'] === 'TRUE' ? 1 : 0;  // VG3 DIREITA VISUAL
-  
-  // LADO ESQUERDO VISUAL (VG4, VG5, VG6) - variáveis "Direita"
-  const valvulaGavetaDireita1Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;      // VG4 ESQUERDA VISUAL  
-  const valvulaGavetaDireita2Real = plcData?.tags?.['ENCH_SIN_CIRC_SUBIDA_ESQ'] === 'TRUE' ? 1 : 0;      // VG5 ESQUERDA VISUAL
-  const valvulaGavetaDireita3Real = plcData?.tags?.['ENCH_SIN_AG_SUBID_ESQ'] === 'TRUE' ? 1 : 0;      // VG6 ESQUERDA VISUAL (mesmo que VG4)
-  
-  // Valores finais das válvulas gaveta (NOMES TROCADOS MAS FUNCIONAL)
-  const valvulaGavetaEsquerda1 = valvulaGavetaEsquerda1Real; // VG1 DIREITA VISUAL ✅
-  const valvulaGavetaEsquerda2 = valvulaGavetaEsquerda2Real; // VG2 DIREITA VISUAL ✅
-  const valvulaGavetaEsquerda3 = valvulaGavetaEsquerda3Real; // VG3 DIREITA VISUAL ✅
-  const valvulaGavetaDireita1 = valvulaGavetaDireita1Real;   // VG4 ESQUERDA VISUAL ✅
-  const valvulaGavetaDireita2 = valvulaGavetaDireita2Real;   // VG5 ESQUERDA VISUAL ✅
-  const valvulaGavetaDireita3 = valvulaGavetaDireita3Real;   // VG6 ESQUERDA VISUAL ✅
-
-  // 🎯 VÁLVULAS DIRECIONAIS - TAGS REAIS DO WEBSOCKET ENCH
-  
-  // LADO DIREITO na tela: VCD, VD1, VD2 (botões VD1, VD2, VD3)
-  const valvulaDirecionalDireita1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_B'] === 'TRUE' ? 1 : 0;   // VCD ESQUERDO
-  const valvulaDirecionalDireita2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_B'] === 'TRUE' ? 1 : 0;   // VD1 ESQUERDO
-  const valvulaDirecionalDireita3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_ESQ'] === 'TRUE' ? 1 : 0;       // VD2 ESQUERDO
-  
-  // LADO ESQUERDO na tela: VCD, VD1, VD2 (botões VD4, VD5, VD6)
-  const valvulaDirecionalEsquerda1Real = plcData?.tags?.['ENCH_OM_VALV_DESC_COMP_A'] === 'TRUE' ? 1 : 0;  // VCD DIREITO
-  const valvulaDirecionalEsquerda2Real = plcData?.tags?.['ENCH_OM_VALV_DIST_COMP_A'] === 'TRUE' ? 1 : 0;  // VD1 DIREITO
-  const valvulaDirecionalEsquerda3Real = plcData?.tags?.['ENCH_OM_VD2_COMP_DIR'] === 'TRUE' ? 1 : 0;      // VD2 DIREITO
-  
-  // Valores finais das válvulas direcionais (sem simulação)
-  const valvulaDirecionalEsquerda1 = valvulaDirecionalEsquerda1Real; // VCD ESQUERDO
-  const valvulaDirecionalEsquerda2 = valvulaDirecionalEsquerda2Real; // VD1 ESQUERDO  
-  const valvulaDirecionalEsquerda3 = valvulaDirecionalEsquerda3Real; // VD2 ESQUERDO
-  const valvulaDirecionalDireita1 = valvulaDirecionalDireita1Real;   // VCD DIREITO
-  const valvulaDirecionalDireita2 = valvulaDirecionalDireita2Real;   // VD1 DIREITO
-  const valvulaDirecionalDireita3 = valvulaDirecionalDireita3Real;   // VD2 DIREITO
-  
-  // Configuração responsiva BASE
-  const baseConfigAtual = isMobile ? BASE_PISTAO_CONFIG.mobile : BASE_PISTAO_CONFIG.desktop;
-  const basePistaoDireitoConfig = baseConfigAtual.direito;
-  const basePistaoEsquerdoConfig = baseConfigAtual.esquerdo;
-
-  // Configuração responsiva PISTÃO MÓVEL
-  const pistaoConfigAtual = isMobile ? PISTAO_CONFIG.mobile : PISTAO_CONFIG.desktop;
-  const pistaoDireitoConfig = pistaoConfigAtual.direito;
-  const pistaoEsquerdoConfig = pistaoConfigAtual.esquerdo;
-
-  // Configuração responsiva CILINDROS
-  const cilindroConfigAtual = isMobile ? CILINDRO_CONFIG.mobile : CILINDRO_CONFIG.desktop;
-  const cilindroDireitoConfig = cilindroConfigAtual.direito;
-  const cilindroEsquerdoConfig = cilindroConfigAtual.esquerdo;
-
-  // Configuração responsiva PIPE SYSTEM
-  const pipeSystemConfigAtual = isMobile ? PIPE_SYSTEM_CONFIG.mobile : PIPE_SYSTEM_CONFIG.desktop;
-
-  // Configuração responsiva SUPORTE PISTA
-  const suportePistaConfigAtual = isMobile ? SUPORTE_PISTA_CONFIG.mobile : SUPORTE_PISTA_CONFIG.desktop;
-  const suportePistaEsquerdoConfig = suportePistaConfigAtual.esquerdo;
-  const suportePistaDireitoConfig = suportePistaConfigAtual.direito;
-
-  // Configuração responsiva BASE FUNDO ENCHIMENTO
-  const baseFundoEnchimentoConfigAtual = isMobile ? BASE_FUNDO_ENCHIMENTO_CONFIG.mobile : BASE_FUNDO_ENCHIMENTO_CONFIG.desktop;
-
-  // Configuração responsiva VÁLVULAS
-  const valvulaConfigAtual = isMobile ? VALVULA_CONFIG.mobile : VALVULA_CONFIG.desktop;
-  const valvulaEsquerda1Config = valvulaConfigAtual.esquerda1;
-  const valvulaEsquerda2Config = valvulaConfigAtual.esquerda2;
-  const valvulaEsquerda3Config = valvulaConfigAtual.esquerda3;
-  const valvulaDireita1Config = valvulaConfigAtual.direita1;
-  const valvulaDireita2Config = valvulaConfigAtual.direita2;
-  const valvulaDireita3Config = valvulaConfigAtual.direita3;
+  // Extract configurations for easy access
+  const {
+    basePistaoDireitoConfig, basePistaoEsquerdoConfig,
+    pistaoDireitoConfig, pistaoEsquerdoConfig,
+    cilindroDireitoConfig, cilindroEsquerdoConfig,
+    pipeSystemConfig: pipeSystemConfigAtual,
+    suportePistaEsquerdoConfig, suportePistaDireitoConfig,
+    baseFundoEnchimentoConfig: baseFundoEnchimentoConfigAtual,
+    valvulaEsquerda1Config, valvulaEsquerda2Config, valvulaEsquerda3Config,
+    valvulaDireita1Config, valvulaDireita2Config, valvulaDireita3Config
+  } = responsiveConfigs;
 
   // Configuração responsiva VÁLVULAS FLANGE
   const valvulaFlangeConfigAtual = isMobile ? VALVULA_FLANGE_CONFIG.mobile : VALVULA_FLANGE_CONFIG.desktop;

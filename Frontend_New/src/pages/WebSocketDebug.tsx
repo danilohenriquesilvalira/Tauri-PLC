@@ -230,7 +230,7 @@ const WebSocketDebug: React.FC = () => {
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit',
-      fractionalSecondDigits: 3 
+      // fractionalSecondDigits: 3 // Temporarily commented for TypeScript compatibility 
     });
     setMessages(prev => [{ time, type, content }, ...prev].slice(0, 100));
   }, []);
