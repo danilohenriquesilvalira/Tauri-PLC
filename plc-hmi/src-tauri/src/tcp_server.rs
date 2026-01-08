@@ -26,13 +26,13 @@ const BUFFER_CAPACITY: usize = 8192;
 const MAX_BUFFER_POOL_SIZE: usize = 20; // Máximo 20 buffers por pool (400KB total)
 const MAX_TOTAL_BUFFERS: usize = 100; // Limite global de buffers (2MB total)
 
-const READ_TIMEOUT_SECS: u64 = 5;
-const INACTIVITY_TIMEOUT_SECS: u64 = 15;
-const FRAGMENT_WARN_SECS: u64 = 3;
-const FRAGMENT_CLEAR_SECS: u64 = 5;
+const READ_TIMEOUT_SECS: u64 = 15;           // ⚡ WAN: 5s → 15s (fibra MEO com latência variável)
+const INACTIVITY_TIMEOUT_SECS: u64 = 180;    // ⚡ WAN: 120s → 180s (3min para rede industrial)
+const FRAGMENT_WARN_SECS: u64 = 30;          // ⚡ WAN: 10s → 30s (fragmentos WAN)
+const FRAGMENT_CLEAR_SECS: u64 = 90;         // ⚡ WAN: 30s → 90s (pacotes podem demorar)
 const WATCHDOG_CHECK_INTERVAL_MS: u64 = 2000;
-// ✅ OTIMIZAÇÃO: Capacidade reduzida para evitar acúmulo de eventos
-const EVENT_CHANNEL_CAPACITY: usize = 500; // Reduzido de 1000 para 500
+// ⚡ OTIMIZAÇÃO: Capacidade aumentada para evitar backpressure
+const EVENT_CHANNEL_CAPACITY: usize = 5000; // ⚡ AUMENTADO: 500 → 5000 para alto volume
 
 // ============================================================================
 // BUFFER POOL
@@ -565,6 +565,12 @@ impl TcpServer {
         let connected_clients = self.connected_clients.clone();
         let active_connections = self.active_connections.clone();
         let app_handle = self.app_handle.clone();
+        let buffer_pool = self.buffer_pool.clone();
+        let latest_data = self.latest_data.clone();
+        let bytes_received = self.bytes_received.clone();
+        let unique_plcs = self.unique_plcs.clone();
+        let ip_to_id = self.ip_to_id.clone();
+        let plc_configs_cache = self.plc_configs_cache.clone();
         
         let watchdog = tokio::spawn(async move {
             println!("🐕 WATCHDOG INICIADO");
@@ -573,11 +579,103 @@ impl TcpServer {
                 tokio::time::Duration::from_millis(WATCHDOG_CHECK_INTERVAL_MS)
             );
             
+            let mut iteration_count = 0u64;
+            
             while is_running.load(Ordering::SeqCst) {
                 interval.tick().await;
+                iteration_count += 1;
                 
                 let now = std::time::Instant::now();
                 let mut dead_connections: Vec<String> = Vec::new();
+                
+                // ⚡ MONITORAMENTO + LIMPEZA LEVE a cada 30 iterações (~1 min)
+                if iteration_count % 30 == 0 {
+                    let (total_buffers, cache_size) = (
+                        buffer_pool.get_memory_stats().3,
+                        latest_data.len()
+                    );
+                    let bytes_map_size = bytes_received.read().await.len();
+                    let plcs_unique = unique_plcs.read().await.len();
+                    
+                    println!("📊 WATCHDOG: Buffers={} Cache={} BytesMap={} PLCs={} Conexões={}", 
+                        total_buffers, cache_size, bytes_map_size, plcs_unique, connection_health.len());
+                    
+                    // 🧹 Limpar latest_data > 5min
+                    let now_timestamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    
+                    let before = latest_data.len();
+                    latest_data.retain(|_, packet| {
+                        (now_timestamp - packet.timestamp) < 300
+                    });
+                    let after = latest_data.len();
+                    
+                    if before > after {
+                        println!("🗑️ WATCHDOG: Limpou {} entradas antigas (latest_data)", before - after);
+                    }
+                    
+                    // 🧹 Validar connected_clients contra connection_health
+                    let health_ips: std::collections::HashSet<String> = connection_health.iter()
+                        .filter(|e| e.value().is_alive)
+                        .map(|e| e.key().clone())
+                        .collect();
+                    
+                    let mut clients = connected_clients.write().await;
+                    let before_clients = clients.len();
+                    clients.retain(|ip| health_ips.contains(ip));
+                    let after_clients = clients.len();
+                    
+                    if before_clients > after_clients {
+                        println!("🗑️ WATCHDOG: Removeu {} clientes fantasma", before_clients - after_clients);
+                    }
+                }
+                
+                // 🧹 LIMPEZA PESADA: connection_health órfãos a cada 1h (1800 iter)
+                if iteration_count % 1800 == 0 {
+                    let now = std::time::Instant::now();
+                    let before = connection_health.len();
+                    
+                    connection_health.retain(|_, health| {
+                        now.duration_since(health.last_data_received).as_secs() < 86400  // 24h
+                    });
+                    
+                    let after = connection_health.len();
+                    if before > after {
+                        println!("🗑️ WATCHDOG: Limpou {} connection_health órfãos (> 24h)", before - after);
+                    }
+                }
+                
+                // 🧹 RESETAR bytes_received a cada 24h (43200 iter de 2s)
+                if iteration_count % 43200 == 0 {
+                    bytes_received.write().await.clear();
+                    println!("🗑️ WATCHDOG: Resetou bytes_received (reset diário)");
+                }
+                
+                // 🧹 LIMPEZA PROFUNDA: unique_plcs, ip_to_id, plc_configs a cada 7 dias (302400 iter)
+                if iteration_count % 302400 == 0 {
+                    let active_ips: std::collections::HashSet<String> = connection_health.iter()
+                        .map(|e| e.key().clone())
+                        .collect();
+                    
+                    let mut plcs = unique_plcs.write().await;
+                    let before_plcs = plcs.len();
+                    plcs.retain(|ip| active_ips.contains(ip));
+                    let after_plcs = plcs.len();
+                    
+                    let mut id_map = ip_to_id.write().await;
+                    let before_ids = id_map.len();
+                    id_map.retain(|ip, _| active_ips.contains(ip));
+                    let after_ids = id_map.len();
+                    
+                    let before_configs = plc_configs_cache.len();
+                    plc_configs_cache.retain(|ip, _| active_ips.contains(ip));
+                    let after_configs = plc_configs_cache.len();
+                    
+                    println!("🗑️ WATCHDOG: Limpeza profunda (7 dias): unique_plcs={}->{}, ip_to_id={}->{}, configs={}->{}", 
+                        before_plcs, after_plcs, before_ids, after_ids, before_configs, after_configs);
+                }
                 
                 for entry in connection_health.iter() {
                     let health = entry.value();
@@ -595,7 +693,7 @@ impl TcpServer {
                             "seconds_since_data": seconds_since_data,
                             "total_bytes": health.total_bytes,
                             "packet_count": health.packet_count,
-                            "reason": "Watchdog: sem atividade"
+                            "reason": format!("Watchdog: sem atividade há {}s (timeout: {}s)", seconds_since_data, INACTIVITY_TIMEOUT_SECS)
                         }));
                     } else if seconds_since_data > INACTIVITY_TIMEOUT_SECS / 2 {
                         println!("⚠️ WATCHDOG: {} LENTA! Sem dados há {}s", health.ip, seconds_since_data);
@@ -621,7 +719,7 @@ impl TcpServer {
                         println!("💀 WATCHDOG: Matando conexão: {}", ip);
                         // 🛡️ FIX: Usar timeout para evitar deadlock
                         match tokio::time::timeout(
-                            tokio::time::Duration::from_millis(500),
+                            tokio::time::Duration::from_millis(5000),  // ⚡ AUMENTADO: 500ms → 5s
                             connection_handles.write()
                         ).await {
                             Ok(mut handles) => {
@@ -638,7 +736,7 @@ impl TcpServer {
                         
                         // 🛡️ FIX: Timeout também para connected_clients
                         if let Ok(mut clients) = tokio::time::timeout(
-                            tokio::time::Duration::from_millis(200),
+                            tokio::time::Duration::from_millis(2000),  // ⚡ AUMENTADO: 200ms → 2s
                             connected_clients.write()
                         ).await {
                             clients.retain(|x| x != &ip);

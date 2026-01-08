@@ -161,8 +161,8 @@ pub fn parse_plc_data_cached(raw_data: &[u8], ip: &str, cached_config: Option<Pl
     
     // 🚀 USAR CONFIG DO CACHE - ZERO LOCKS!
     let variables = if let Some(config) = cached_config {
-        println!("⚡ PLC {}: Usando config CACHEADA ({} blocos, {} bytes) - PERFORMANCE MÁXIMA!", 
-                 ip, config.blocks.len(), config.total_size);
+        // ✅ LOG REMOVIDO: muito verboso em produção (2Hz = 120 logs/min)
+        // Config cacheada é o caminho normal, não precisa logar sempre
         
         if config.total_size == data_len {
             parse_with_config(raw_data, &config.blocks)
@@ -219,7 +219,7 @@ pub fn parse_plc_data(raw_data: &[u8], ip: &str, db: Option<&Arc<Database>>) -> 
         parse_auto_detect(raw_data)
     };
     
-    println!("📊 PLC {}: Parseados {} variáveis", ip, variables.len());
+    // ✅ LOG REMOVIDO: muito verboso em produção
     
     PlcDataPacket {
         ip: ip.to_string(),

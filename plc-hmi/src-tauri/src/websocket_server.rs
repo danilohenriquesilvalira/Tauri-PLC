@@ -1738,8 +1738,8 @@ impl WebSocketServer {
                         &database_clone
                     ).await;
                     
-                    // 📊 LOG PERIÓDICO COM MÉTRICAS DE BACKPRESSURE + EMISSÃO DE EVENTOS
-                    if last_bp_log.elapsed().as_secs() >= 30 {
+                    // 📊 LOG PERIÓDICO COM MÉTRICAS (5 min em produção, só critical events no meio)
+                    if last_bp_log.elapsed().as_secs() >= 300 {
                         let metrics = bp.get_metrics();
                         let (cache_size, _mappings_size, _tracking_size, memory_pct) = smart_cache_clone.get_memory_stats();
                         println!("📊 WebSocket Status:");
