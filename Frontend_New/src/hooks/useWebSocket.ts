@@ -468,8 +468,13 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
 
       ws.onmessage = (event) => {
         try {
+          // 🔍 DEBUG: Verificar se WebSocket está recebendo dados em tempo real
           if (import.meta.env.DEV) {
-            console.log('📥 RAW WebSocket Message:', event.data);
+            const now = Date.now();
+            if (!window.wsDebugTime) window.wsDebugTime = now;
+            const interval = now - window.wsDebugTime;
+            window.wsDebugTime = now;
+            console.log(`📥 WebSocket RX [${interval}ms]:`, event.data.substring(0, 200));
           }
           
           const tagData = processWebSocketData(event.data);
@@ -479,17 +484,18 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
             const newData = convertToPLCData(tagData, dataRef.current);
             setData(newData);
             
-            // 🚀 CACHE: Persistir dados no localStorage para evitar flashes
+            // ⚡ OTIMIZAÇÃO: Cache apenas a cada 5 segundos para reduzir overhead
+            const now = Date.now();
             if (typeof window !== 'undefined' && newData?.tags && Object.keys(newData.tags).length > 0) {
-              try {
-                localStorage.setItem('plc-websocket-cache', JSON.stringify({
-                  data: newData,
-                  timestamp: Date.now()
-                }));
-              } catch (error) {
-                // Ignorar erro de localStorage (pode estar cheio)
-                if (import.meta.env.DEV) {
-                  console.warn('Erro ao salvar cache WebSocket:', error);
+              if (!window.lastCacheTime || (now - window.lastCacheTime) > 5000) {
+                try {
+                  localStorage.setItem('plc-websocket-cache', JSON.stringify({
+                    data: newData,
+                    timestamp: now
+                  }));
+                  window.lastCacheTime = now;
+                } catch (error) {
+                  // Ignorar erro de localStorage
                 }
               }
             }

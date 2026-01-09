@@ -16,7 +16,8 @@ import {
   WrenchScrewdriverIcon,
   UserIcon,
   ExclamationTriangleIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import { Card } from '../components/ui/Card';
 import { InfoCard } from '../components/ui/InfoCard';
@@ -250,8 +251,14 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
   const [showTrendDialog, setShowTrendDialog] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
-  // ✅ DETECÇÃO MOBILE ESTÁVEL - baseada no viewport, não na window (padrão PortaJusante)
-  const [isMobile, setIsMobile] = React.useState(false);
+  // ✅ DETECÇÃO MOBILE ESTÁVEL - INICIALIZAÇÃO CORRETA PARA EVITAR SALTO
+  const [isMobile, setIsMobile] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      return vw < 1024;
+    }
+    return false;
+  });
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -486,9 +493,117 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
   return (
     <div className="w-full h-screen flex flex-col items-center justify-end pb-8 relative">
 
+      {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
+      {isMobile && (
+        <div
+          className="w-full mt-4 mb-4 relative"
+          style={{
+            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+          }}
+        >
+          <div
+            className="mx-auto"
+            style={{
+              maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
+            }}
+          >
+            {/* Cards horizontais compactos - sempre visíveis */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              {/* CARD NÍVEIS */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    NÍVEIS
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Montante:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {nivelMontante.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Caldeira:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {nivelCaldeira.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Jusante:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {nivelJusante.toFixed(2)} <span className="text-gray-500 text-[6px]">m</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-      {/* PAINÉIS INFORMATIVOS - ÁREA SUPERIOR COMPLETA - RESPONSIVIDADE FLUIDA */}
-      {isInitialized && containerDimensions.width > 100 && (
+              {/* CARD SISTEMA */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    SISTEMA
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Status:</div>
+                    <div className={`font-mono font-bold text-[10px] ${statusCaldeira === 'normal' ? 'text-green-600' : statusCaldeira === 'alerta' ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {statusCaldeira === 'normal' ? 'NORMAL' : statusCaldeira === 'alerta' ? 'ALERTA' : 'CRÍTICO'}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Diferença:</div>
+                    <div className={`font-mono font-bold text-[10px] ${Math.abs(diffMontCald) > 0.05 ? 'text-red-600' : 'text-green-600'}`}>
+                      {Math.abs(diffMontCald).toFixed(3)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Operação:</div>
+                      <div className="font-mono font-bold text-green-600 text-[9px]">
+                        AUTO
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD VÁLVULAS */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    VÁLVULAS
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Mont-Cald:</div>
+                    <div className={`w-3 h-3 mx-auto rounded-full ${bitMontanteCaldeira ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Cald-Jus:</div>
+                    <div className={`w-3 h-3 mx-auto rounded-full ${bitCaldeiraJusante ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Ativas:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {[bitMontanteCaldeira, bitCaldeiraJusante].filter(Boolean).length} <span className="text-gray-500 text-[6px]">/ 2</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAINÉIS INFORMATIVOS - ÁREA SUPERIOR COMPLETA - APENAS DESKTOP */}
+      {!isMobile && isInitialized && containerDimensions.width > 100 && (
         <div
           className="absolute top-5 z-10"
           style={{
@@ -1241,35 +1356,64 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
       />
 
 
-      {/* BOTÃO MOBILE - Posicionado na parte inferior da tela */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="xl:hidden fixed bottom-20 right-4 z-50 px-4 py-3 bg-[#212E3E] text-white rounded-xl shadow-lg flex items-center gap-2 touch-manipulation transition-all duration-200"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-          <CogIcon className="w-3 h-3" />
-        </div>
-        <div className="text-left min-w-0">
-          <div className="font-bold text-xs leading-tight">PARÂMETROS</div>
-          <div className="text-xs opacity-80 leading-tight">Sistema</div>
-        </div>
-      </button>
+      {/* 📱 BOTÃO MOBILE - ESTILO PADRÃO PORTA MONTANTE/JUSANTE/ENCHIMENTO */}
+      {isMobile && (
+        <button
+          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
+          className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
+          style={{
+            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
+          <div 
+            className="bg-white/20 rounded p-0.5 flex items-center justify-center"
+            style={{
+              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+            }}
+          >
+            <CogIcon 
+              className="text-white"
+              style={{ 
+                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              }} 
+            />
+          </div>
+          <span className="font-medium tracking-wide">PARÂMETROS</span>
+          <div 
+            className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
+            style={{
+              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+            }}
+          >
+            <ChevronUpIcon className="w-full h-full text-white/80" />
+          </div>
+        </button>
+      )}
 
-      {/* BOTÃO DESKTOP - Posicionado na parte inferior da tela */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="hidden xl:flex fixed bottom-6 right-6 z-50 px-8 py-5 bg-[#212E3E] text-white rounded-2xl shadow-2xl items-center gap-5 hover:scale-105 transition-all duration-200 touch-manipulation"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-          <CogIcon className="w-6 h-6" />
-        </div>
-        <div className="text-left">
-          <div className="font-bold text-lg">PARÂMETROS</div>
-          <div className="text-sm opacity-80">Eclusa Régua</div>
-        </div>
-      </button>
+      {/* 🖥️ BOTÃO DESKTOP - ESTILO PADRÃO */}
+      {!isMobile && (
+        <button
+          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
+          className="fixed bottom-6 right-6 z-50 px-8 py-5 bg-[#212E3E] text-white rounded-2xl shadow-2xl flex items-center gap-5 hover:scale-105 transition-all duration-200 touch-manipulation"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+            <CogIcon className="w-6 h-6" />
+          </div>
+          <div className="text-left">
+            <div className="font-bold text-lg">PARÂMETROS</div>
+            <div className="text-sm opacity-80">Eclusa Régua</div>
+          </div>
+        </button>
+      )}
 
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (

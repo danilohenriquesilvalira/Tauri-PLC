@@ -1646,7 +1646,7 @@ pub async fn get_system_memory_stats(
         if let Some(ws_server) = ws_server_guard.as_ref() {
             let cache_stats = ws_server.get_cache_memory_stats();
             let ws_stats = ws_server.get_stats();
-            (cache_stats.0, cache_stats.3, cache_stats.1, cache_stats.2, ws_stats.active_connections as usize)
+            (cache_stats.0, cache_stats.2, cache_stats.1, 0, ws_stats.active_connections as usize)
         } else {
             (0, 0.0, 0, 0, 0)
         }

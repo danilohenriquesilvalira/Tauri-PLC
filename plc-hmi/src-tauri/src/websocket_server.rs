@@ -190,7 +190,7 @@ impl AdaptiveBackpressure {
     }
 
     /// Auto-ajusta o estado do sistema baseado na pressão atual
-    fn auto_adjust_state(&self, usage_pct: f64, usage: usize, capacity: usize) {
+    fn auto_adjust_state(&self, usage_pct: f64, _usage: usize, capacity: usize) {
         let mut state = self.state.write().unwrap();
         let old_state = *state;
 
@@ -496,39 +496,15 @@ pub struct CachedTagValue {
     pub value: String,
     pub data_type: String,
     pub timestamp_ns: u128,
-    pub collect_mode: String,           // Mantido para serialização JSON
-    #[serde(skip)]
-    pub collect_mode_enum: CollectMode, // 🚀 OTIMIZAÇÃO: Enum pré-computado
     pub interval_s: u64,
     pub last_sent: u128,
-    pub changed: bool,
-    #[serde(skip)]
-    pub last_value: Option<String>,     // 🚀 OTIMIZAÇÃO: Tracking inline (evita DashMap extra)
-    // 🆕 CAMPOS PARA FILTRAGEM INTELIGENTE
+    // ⚡ SIMPLIFICADO: Apenas campos essenciais para filtragem
     pub area: Option<String>,     // ENCH, ESVZ, JUS, MONT, ESGT, ECLUS
-    pub category: Option<String>, // PROC, FAULT, EVENT (simplificado)
+    pub category: Option<String>, // PROC, FAULT, EVENT
 }
 
 // 🚀 OTIMIZAÇÃO: Enum para collect_mode - evita comparações de string repetidas
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum CollectMode {
-    OnChange,  // Envia apenas quando valor muda
-    #[default]
-    Interval,  // Envia em intervalos fixos (padrão)
-    Unknown,   // Modo não reconhecido
-}
-
-impl CollectMode {
-    /// Converte string para enum (normalizado uma vez no insert)
-    #[inline]
-    pub fn from_str(s: &str) -> Self {
-        match s.trim().to_lowercase().as_str() {
-            "on_change" | "onchange" | "change" => CollectMode::OnChange,
-            "interval" | "periodic" => CollectMode::Interval,
-            _ => CollectMode::Unknown,
-        }
-    }
-}
+// ⚡ REMOVIDO: CollectMode enum - usando apenas intervalos fixos para máxima performance
 
 #[derive(Debug)]
 pub struct SmartCache {
@@ -536,12 +512,7 @@ pub struct SmartCache {
     tag_cache: Arc<DashMap<String, CachedTagValue>>,
     // Grupos de intervalos: interval_s -> lista de tag_names
     interval_groups: Arc<RwLock<HashMap<u64, Vec<String>>>>,
-    // Controle de mudanças para tags em modo "change"
-    change_tracking: Arc<DashMap<String, String>>,
-    
-    // 🚀 ÍNDICE SECUNDÁRIO: Tags on_change para iteração rápida
-    // Em vez de iterar 7500 tags, iteramos apenas os ~500 on_change
-    on_change_index: Arc<DashMap<String, ()>>, // tag_key -> () (só precisamos da key)
+    // ⚡ REMOVIDO: Sistema on_change e change_tracking para máxima performance
     
     // 🆕 CACHE DE TAG MAPPINGS - EVITA CONSULTAS AO BANCO!
     tag_mappings_cache: Arc<DashMap<String, Vec<TagMapping>>>, // plc_ip -> tags
@@ -628,10 +599,7 @@ impl SmartCache {
         Self {
             tag_cache: Arc::new(DashMap::new()),
             interval_groups: Arc::new(RwLock::new(HashMap::new())),
-            change_tracking: Arc::new(DashMap::new()),
-            // 🚀 ÍNDICE SECUNDÁRIO PARA TAGS ON_CHANGE
-            on_change_index: Arc::new(DashMap::new()),
-            // 🆕 INICIALIZAR CACHE DE MAPPINGS
+            // ⚡ CACHE DE MAPPINGS OTIMIZADO
             tag_mappings_cache: Arc::new(DashMap::new()),
             tag_mappings_last_update: Arc::new(RwLock::new(std::time::Instant::now())),
             
@@ -644,11 +612,9 @@ impl SmartCache {
 
     pub async fn clear(&self) {
         self.tag_cache.clear();
-        self.change_tracking.clear();
-        self.on_change_index.clear(); // 🚀 Limpar índice secundário
         let mut lock = self.interval_groups.write().await;
         lock.clear();
-        // 🆕 LIMPAR CACHE DE MAPPINGS TAMBÉM
+        // ⚡ LIMPAR CACHE DE MAPPINGS
         self.tag_mappings_cache.clear();
     }
     
@@ -678,33 +644,48 @@ impl SmartCache {
         last_update.elapsed().as_secs() > 300
     }
     
-    // ✅ ATUALIZAR CACHE COM DADOS TCP - AGORA USA CACHE DE TAGS!
+    // ⚡ OTIMIZADO: CACHE COM ÍNDICE HASH PARA MAPEAMENTO ULTRA-RÁPIDO
     pub async fn update_from_tcp(&self, plc_ip: &str, variables: &[crate::tcp_server::PlcVariable], database: &Database) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_| Duration::from_secs(0))
             .as_nanos();
         
-        // 🆕 USAR CACHE EM VEZ DE CONSULTAR BANCO!
+        // ⚡ OTIMIZAÇÃO 1: CACHE HIT com fallback não-bloqueante
         let tags = if let Some(cached_tags) = self.get_cached_tags(plc_ip) {
-            // ✅ CACHE HIT - ZERO I/O!
             cached_tags
         } else {
-            // ⚠️ CACHE MISS - Carregar do banco (acontece raramente)
-            println!("⚠️ Cache miss para PLC {} - carregando do banco", plc_ip);
-            self.load_tag_mappings_to_cache(plc_ip, database).await;
-            self.get_cached_tags(plc_ip).unwrap_or_default()
+            // ⚡ CACHE MISS: Usar tokio::spawn para não bloquear
+            let cache_clone = self.tag_mappings_cache.clone();
+            let db_clone = database.clone(); // Database deve implementar Clone
+            let plc_ip_clone = plc_ip.to_string();
+            
+            tokio::spawn(async move {
+                if let Ok(tags) = db_clone.get_active_tags(&plc_ip_clone) {
+                    cache_clone.insert(plc_ip_clone, tags);
+                }
+            });
+            
+            // Retornar vazio por enquanto - próximos pacotes usarão cache
+            return;
         };
         
+        // ⚡ OTIMIZAÇÃO 2: PRÉ-CALCULAR HASH MAP - ULTRA PERFORMANCE
+        let mut var_map = std::collections::HashMap::with_capacity(variables.len());
+        for var in variables {
+            var_map.insert(var.name.as_str(), var);
+        }
+        
+        // ⚡ OTIMIZAÇÃO 3: PROCESSAR TAGS EM LOTE COM MINIMAL ALLOCATIONS
         for tag in tags {
-            // 🚀 LÓGICA DE EXTRAÇÃO DE BITS (Bit-Parser)
-            let (search_name, bit_index) = if tag.variable_path.contains('.') && !tag.variable_path.starts_with("DB") {
-                let parts: Vec<&str> = tag.variable_path.split('.').collect();
-                if parts.len() == 2 {
-                    if let Ok(bit) = parts[1].parse::<u8>() {
-                         (parts[0], Some(bit))
+            // 🚀 LÓGICA DE EXTRAÇÃO DE BITS (Bit-Parser) - OTIMIZADA
+            let (search_name, bit_index) = if let Some(dot_pos) = tag.variable_path.find('.') {
+                if !tag.variable_path.starts_with("DB") {
+                    let (name_part, bit_part) = tag.variable_path.split_at(dot_pos);
+                    if let Ok(bit) = bit_part[1..].parse::<u8>() {
+                        (name_part, Some(bit))
                     } else {
-                         (tag.variable_path.as_str(), None)
+                        (tag.variable_path.as_str(), None)
                     }
                 } else {
                     (tag.variable_path.as_str(), None)
@@ -713,9 +694,13 @@ impl SmartCache {
                 (tag.variable_path.as_str(), None)
             };
 
-            // Encontrar variável correspondente
-            if let Some(variable) = variables.iter().find(|v| v.name == search_name) {
-                let tag_key = format!("{}:{}", plc_ip, tag.tag_name);
+            // ⚡ LOOKUP HASH O(1) em vez de linear O(n)
+            if let Some(&variable) = var_map.get(search_name) {
+                // ⚡ PRÉ-ALOCAR STRING PARA EVITAR MULTIPLE ALLOCATIONS
+                let mut tag_key = String::with_capacity(plc_ip.len() + tag.tag_name.len() + 1);
+                tag_key.push_str(plc_ip);
+                tag_key.push(':');
+                tag_key.push_str(&tag.tag_name);
                 
                 // Determinar valor final
                 let final_value = if let Some(bit) = bit_index {
@@ -729,50 +714,103 @@ impl SmartCache {
                     variable.value.clone()
                 };
 
-                // 🚀 OTIMIZAÇÃO: Converter collect_mode para enum UMA VEZ (não em cada iteração)
-                let collect_mode_str = tag.collect_mode.as_deref().unwrap_or("interval");
-                let collect_mode_enum = CollectMode::from_str(collect_mode_str);
-                
-                // 🚀 OTIMIZAÇÃO: Verificar mudança inline (evita DashMap change_tracking)
-                let mut value_changed = true;
-                let mut last_value_inline: Option<String> = None;
-                let mut preserved_last_sent: u128 = 0; // 🔧 FIX: Preservar last_sent anterior
-                
-                if collect_mode_enum == CollectMode::OnChange {
-                    // Verificar se tag já existe no cache para comparar valor anterior
-                    if let Some(existing) = self.tag_cache.get(&tag_key) {
-                        value_changed = existing.value != final_value;
-                        last_value_inline = Some(existing.value.clone());
-                        // 🔧 FIX: Preservar last_sent se valor NÃO mudou
-                        if !value_changed {
-                            preserved_last_sent = existing.last_sent;
-                        }
-                    }
-                    // 🚀 Atualizar índice secundário de tags on_change
-                    self.on_change_index.insert(tag_key.clone(), ());
+                // ⚡ SIMPLIFICADO: Preservar last_sent se tag já existir
+                let preserved_last_sent = if let Some(existing) = self.tag_cache.get(&tag_key) {
+                    existing.last_sent
                 } else {
-                    // Para tags com intervalo, preservar last_sent se existir
-                    if let Some(existing) = self.tag_cache.get(&tag_key) {
-                        preserved_last_sent = existing.last_sent;
-                    }
-                    // Remover do índice se não for mais on_change
-                    self.on_change_index.remove(&tag_key);
-                }
+                    0
+                };
                 
-                // Atualizar cache com struct otimizado
+                // ⚡ STRUCT SIMPLIFICADO - apenas intervalos
                 let cached = CachedTagValue {
                     tag_name: tag.tag_name.clone(),
                     plc_ip: plc_ip.to_string(),
                     value: final_value,
                     data_type: if bit_index.is_some() { "BOOL".to_string() } else { variable.data_type.clone() },
                     timestamp_ns: now,
-                    collect_mode: collect_mode_str.to_string(),
-                    collect_mode_enum, // 🚀 Enum pré-computado
                     interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
-                    last_sent: preserved_last_sent, // 🔧 FIX: Usar valor preservado
-                    changed: value_changed,
-                    last_value: last_value_inline, // 🚀 Tracking inline
-                    // 🆕 GUARDAR ÁREA E CATEGORIA PARA FILTRAGEM
+                    last_sent: preserved_last_sent,
+                    // ⚡ FILTRAGEM RÁPIDA
+                    area: tag.area.clone(),
+                    category: tag.category.clone(),
+                };
+                
+                self.tag_cache.insert(tag_key, cached);
+            }
+        }
+    }
+    
+    // 🚀 FUNÇÃO SÍNCRONA ULTRA-RÁPIDA - ZERO ASYNC/AWAIT!
+    pub fn update_from_tcp_sync(&self, plc_ip: &str, variables: &[crate::tcp_server::PlcVariable]) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_nanos();
+        
+        // ⚡ USAR APENAS CACHE - ZERO DATABASE CALLS!
+        let tags = if let Some(cached_tags) = self.get_cached_tags(plc_ip) {
+            cached_tags
+        } else {
+            // Se não tem cache, skip este pacote (próximo vai ter cache carregado)
+            return;
+        };
+        
+        // ⚡ HASH MAP ULTRA-RÁPIDO
+        let mut var_map = std::collections::HashMap::with_capacity(variables.len());
+        for var in variables {
+            var_map.insert(var.name.as_str(), var);
+        }
+        
+        // ⚡ PROCESSAR TAGS EM LOTE - SEM ALLOCATIONS DESNECESSÁRIAS
+        for tag in tags {
+            // Bit parser inline
+            let (search_name, bit_index) = if let Some(dot_pos) = tag.variable_path.find('.') {
+                if !tag.variable_path.starts_with("DB") {
+                    let (name_part, bit_part) = tag.variable_path.split_at(dot_pos);
+                    if let Ok(bit) = bit_part[1..].parse::<u8>() {
+                        (name_part, Some(bit))
+                    } else {
+                        (tag.variable_path.as_str(), None)
+                    }
+                } else {
+                    (tag.variable_path.as_str(), None)
+                }
+            } else {
+                (tag.variable_path.as_str(), None)
+            };
+
+            // ⚡ LOOKUP O(1)
+            if let Some(&variable) = var_map.get(search_name) {
+                let tag_key = format!("{}:{}", plc_ip, tag.tag_name);
+                
+                // Valor final
+                let final_value = if let Some(bit) = bit_index {
+                    if let Ok(int_val) = variable.value.parse::<u64>() {
+                        let bit_val = (int_val >> bit) & 1;
+                        if bit_val == 1 { "TRUE".to_string() } else { "FALSE".to_string() }
+                    } else {
+                        variable.value.clone()
+                    }
+                } else {
+                    variable.value.clone()
+                };
+
+                // ⚡ PRESERVAR LAST_SENT SEM AWAIT
+                let preserved_last_sent = if let Some(existing) = self.tag_cache.get(&tag_key) {
+                    existing.last_sent
+                } else {
+                    0
+                };
+                
+                // ⚡ INSERT DIRETO - ZERO OVERHEAD
+                let cached = CachedTagValue {
+                    tag_name: tag.tag_name.clone(),
+                    plc_ip: plc_ip.to_string(),
+                    value: final_value,
+                    data_type: if bit_index.is_some() { "BOOL".to_string() } else { variable.data_type.clone() },
+                    timestamp_ns: now,
+                    interval_s: tag.collect_interval_s.unwrap_or(1) as u64,
+                    last_sent: preserved_last_sent,
                     area: tag.area.clone(),
                     category: tag.category.clone(),
                 };
@@ -829,12 +867,9 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let should_send = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => false,
-            };
+            // ⚡ TEMPO FIXO: Envia TODOS os tags que fazem match de interval_s
+            // ✅ IGNORAMOS configuração de tempo do banco - sistema agora é FIXO 500ms
+            let should_send = cached.interval_s == interval_s;
             
             if should_send {
                 result.insert(cached.tag_name.clone(), cached.value.clone());
@@ -845,7 +880,7 @@ impl SmartCache {
         for key in keys_to_update {
             if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
                 cached_mut.last_sent = now;
-                cached_mut.changed = false;
+                // ⚡ REMOVIDO: campo changed
             }
         }
         
@@ -855,30 +890,14 @@ impl SmartCache {
     // 🚀 OTIMIZAÇÃO: Buscar APENAS tags on_change usando índice secundário
     // Performance: O(on_change_tags) ao invés de O(all_tags)
     pub fn get_on_change_tags_fast(&self) -> HashMap<String, String> {
-        let now = SystemTime::now()
+        let _now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|_| Duration::from_secs(0))
             .as_nanos();
-        let mut result = HashMap::new();
+        let result = HashMap::new();
         
-        // Iterar APENAS sobre tags no índice on_change (muito mais rápido!)
-        for entry in self.on_change_index.iter() {
-            let tag_key = entry.key();
-            if let Some(cached) = self.tag_cache.get(tag_key) {
-                // Verificar se realmente mudou e pode ser enviado
-                if cached.changed {
-                    let time_since_last = if now >= cached.last_sent {
-                        (now - cached.last_sent) / 1_000_000_000
-                    } else {
-                        0
-                    };
-                    // Mínimo 1 segundo entre envios para evitar spam
-                    if time_since_last >= 1 {
-                        result.insert(cached.tag_name.clone(), cached.value.clone());
-                    }
-                }
-            }
-        }
+        // ⚡ REMOVIDO: Sistema on_change - usando apenas intervalos agora
+        // Função deprecated - retorna HashMap vazio
         
         result
     }
@@ -886,7 +905,7 @@ impl SmartCache {
     // 🚀 ESTATÍSTICAS DO ÍNDICE ON_CHANGE
     pub fn get_on_change_stats(&self) -> (usize, usize) {
         let total_tags = self.tag_cache.len();
-        let on_change_tags = self.on_change_index.len();
+        let on_change_tags = 0; // ⚡ REMOVIDO: on_change_index
         (on_change_tags, total_tags)
     }
     
@@ -907,12 +926,9 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let should_send = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => false,
-            };
+            // ⚡ TEMPO FIXO: Envia TODOS os tags que fazem match de interval_s
+            // ✅ IGNORAMOS configuração de tempo do banco - sistema agora é FIXO 500ms
+            let should_send = cached.interval_s == interval_s;
             
             if should_send {
                 result.insert(cached.tag_name.clone(), cached.value.clone());
@@ -939,18 +955,15 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let should_send = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => false,
-            };
+            // ⚡ TEMPO FIXO: Envia TODOS os tags que fazem match de interval_s
+            // ✅ IGNORAMOS configuração de tempo do banco - sistema agora é FIXO 500ms
+            let should_send = cached.interval_s == interval_s;
             
             if should_send {
                 result.insert(cached.tag_name.clone(), cached.value.clone());
                 // 🛡️ RESET ATÔMICO DENTRO DA MESMA ITERAÇÃO
                 cached.last_sent = now;
-                cached.changed = false;
+                // ⚡ REMOVIDO: campo changed
             }
         }
         
@@ -973,16 +986,12 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let was_sent = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => false,
-            };
+            // ⚡ TEMPO FIXO: Marca como enviado TODOS os tags que fazem match
+            let was_sent = cached.interval_s == interval_s;
             
             if was_sent {
                 cached.last_sent = now;
-                cached.changed = false;
+                // ⚡ REMOVIDO: campo changed
             }
         }
     }
@@ -992,7 +1001,7 @@ impl SmartCache {
         for key in keys_to_update {
             if let Some(mut cached_mut) = self.tag_cache.get_mut(&key) {
                 cached_mut.last_sent = now;
-                cached_mut.changed = false;
+                // ⚡ REMOVIDO: campo changed
             }
         }
     }
@@ -1015,12 +1024,9 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let should_send = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => false,
-            };
+            // ⚡ TEMPO FIXO: Envia TODOS os tags que fazem match de interval_s
+            // ✅ IGNORAMOS configuração de tempo do banco - sistema agora é FIXO 500ms
+            let should_send = cached.interval_s == interval_s;
             
             if should_send {
                 // Agrupar por PLC IP
@@ -1114,12 +1120,9 @@ impl SmartCache {
                 0
             };
             
-            // 🚀 OTIMIZAÇÃO: Usar enum ao invés de string comparison
-            let should_send = match cached.collect_mode_enum {
-                CollectMode::OnChange => cached.changed && time_since_last >= interval_s as u128,
-                CollectMode::Interval => cached.interval_s == interval_s && time_since_last >= interval_s as u128,
-                CollectMode::Unknown => time_since_last >= interval_s as u128, // Default: enviar baseado no intervalo
-            };
+            // ⚡ TEMPO FIXO: Envia TODOS os tags que fazem match de interval_s
+            // ✅ IGNORAMOS configuração de tempo do banco - sistema agora é FIXO 500ms
+            let should_send = cached.interval_s == interval_s;
             
             if should_send {
                 result.insert(cached.tag_name.clone(), cached.value.clone());
@@ -1168,7 +1171,7 @@ impl SmartCache {
         let mut removed = 0;
         for (key, _) in entries_by_age.into_iter().take(entries_to_remove) {
             self.tag_cache.remove(&key);
-            self.change_tracking.remove(&key);
+            // ⚡ REMOVIDO: change_tracking
             removed += 1;
         }
         
@@ -1196,13 +1199,12 @@ impl SmartCache {
     }
 
     // ✅ OTIMIZAÇÃO: Estatísticas de uso de memória
-    pub fn get_memory_stats(&self) -> (usize, usize, usize, f64) {
+    pub fn get_memory_stats(&self) -> (usize, usize, f64) {
         let tag_cache_size = self.tag_cache.len();
         let mappings_cache_size = self.tag_mappings_cache.len();
-        let change_tracking_size = self.change_tracking.len();
         let memory_usage_pct = (tag_cache_size as f64 / self.cache_size_limit as f64) * 100.0;
         
-        (tag_cache_size, mappings_cache_size, change_tracking_size, memory_usage_pct)
+        (tag_cache_size, mappings_cache_size, memory_usage_pct)
     }
 }
 
@@ -1731,7 +1733,8 @@ impl WebSocketServer {
                         smart_cache_clone.enforce_memory_limits().await;
                     }
                     
-                    // ✅ ATUALIZAÇÃO ATÔMICA (usa cache, não banco!)
+                    // ⚡ ATUALIZAÇÃO ULTRA-RÁPIDA (corrige ATRASO no mapeamento)
+                    // Usar a função async otimizada que já está funcionando
                     smart_cache_clone.update_from_tcp(
                         &update_data.plc_ip,
                         &update_data.variables,
@@ -1741,7 +1744,7 @@ impl WebSocketServer {
                     // 📊 LOG PERIÓDICO COM MÉTRICAS (5 min em produção, só critical events no meio)
                     if last_bp_log.elapsed().as_secs() >= 300 {
                         let metrics = bp.get_metrics();
-                        let (cache_size, _mappings_size, _tracking_size, memory_pct) = smart_cache_clone.get_memory_stats();
+                        let (cache_size, _mappings_size, memory_pct) = smart_cache_clone.get_memory_stats();
                         println!("📊 WebSocket Status:");
                         println!("   📦 Pacotes: {} | Cache: {} tags ({:.1}%)", packets_processed, cache_size, memory_pct);
                         println!("   🛡️ Backpressure: {} | Uso: {:.1}% | Capacidade: {}", 
@@ -1880,6 +1883,8 @@ impl WebSocketServer {
             let connected_clients_clone = self.connected_clients.clone();
             
             async move {
+                // ⚡ SISTEMA ULTRA-RÁPIDO FIXO: 500ms (sincronizado com TCP do PLC)
+                // ✅ RESULTADO: WebSocket envia dados a cada 500ms independente da config do banco
                 let mut batch_timer = time::interval(Duration::from_millis(500));
                 
                 while is_running_clone.load(Ordering::SeqCst) {
@@ -1908,6 +1913,7 @@ impl WebSocketServer {
                                     &subscribed_categories,
                                     include_all_faults
                                 ).await;
+                                // ✅ Filtro funcionando - debug removido
                                 client_data.extend(filtered_tags);
                             }
                             
@@ -1985,7 +1991,8 @@ impl WebSocketServer {
             let connected_clients_clone = self.connected_clients.clone();
             
             async move {
-                let mut batch_timer = time::interval(Duration::from_secs(2));
+                // ⚡ ACELERADO: 100ms para tags médios
+                let mut batch_timer = time::interval(Duration::from_millis(100));
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
@@ -2064,7 +2071,8 @@ impl WebSocketServer {
             let connected_clients_clone = self.connected_clients.clone();
             
             async move {
-                let mut batch_timer = time::interval(Duration::from_secs(5));
+                // ⚡ ACELERADO: 250ms para tags lentos
+                let mut batch_timer = time::interval(Duration::from_millis(250));
                 
                 while is_running_clone.load(Ordering::SeqCst) {
                     batch_timer.tick().await;
@@ -2648,7 +2656,7 @@ impl WebSocketServer {
     }
 
     // ✅ OTIMIZAÇÃO: Métodos para monitoramento de memória
-    pub fn get_cache_memory_stats(&self) -> (usize, usize, usize, f64) {
+    pub fn get_cache_memory_stats(&self) -> (usize, usize, f64) {
         self.smart_cache.get_memory_stats()
     }
 

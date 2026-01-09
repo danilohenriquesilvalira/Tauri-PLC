@@ -34,9 +34,9 @@ const CONTRAPESO_CONFIG = {
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
-      verticalPercent: 42.7,    // % da altura total (posição Y)
-      horizontalPercent: 22,  // % da largura total (posição X)
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 37.2,    // % da altura total (posição Y)
+      horizontalPercent: 23.5,  // % da largura total (posição X)
+      widthPercent: 5,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     }
   },
@@ -114,8 +114,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
   const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
-  // ✅ DETECÇÃO MOBILE ESTÁVEL - baseada no viewport, não na window
-  const [isMobile, setIsMobile] = React.useState(false);
+  // ✅ DETECÇÃO MOBILE ESTÁVEL - INICIALIZAÇÃO CORRETA PARA EVITAR SALTO
+  const [isMobile, setIsMobile] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      return vw < 1024;
+    }
+    return false;
+  });
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -130,7 +136,30 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     return () => mediaQuery.removeListener(checkMobile);
   }, []);
 
-  // ✅ USEEFFECT ESTABILIZADO - sem race conditions
+  // ✅ USELAYOUTEFFECT PARA EVITAR SALTO VISUAL - executa ANTES da renderização
+  React.useLayoutEffect(() => {
+    const initializeDimensions = () => {
+      if (typeof window !== 'undefined') {
+        const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
+        setWindowDimensions(newWindowDimensions);
+
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          setContainerDimensions({ width: rect.width, height: rect.height });
+        } else {
+          // Fallback: calcular dimensões baseado na janela
+          const width = Math.min(newWindowDimensions.width - 32, 1920);
+          setContainerDimensions({ width, height: width / 5.7 });
+        }
+      }
+    };
+
+    // Inicializar dimensões imediatamente
+    initializeDimensions();
+    setIsInitialized(true);
+  }, []);
+
+  // ✅ USEEFFECT PARA UPDATES POSTERIORES - sem race conditions
   React.useEffect(() => {
     const updateDimensions = () => {
       const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -159,11 +188,8 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       }
     };
 
-    // ✅ Delay inicial para garantir que o DOM esteja pronto
-    const timeoutId = setTimeout(() => {
-      updateDimensions();
-      setIsInitialized(true);
-    }, 100);
+    // Primeira atualização após inicialização
+    updateDimensions();
 
     // ✅ Debounce no resize para evitar cálculos excessivos
     let resizeTimeout: NodeJS.Timeout;
@@ -176,7 +202,6 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     window.addEventListener('orientationchange', debouncedResize);
 
     return () => {
-      clearTimeout(timeoutId);
       clearTimeout(resizeTimeout);
       window.removeEventListener('resize', debouncedResize);
       window.removeEventListener('orientationchange', debouncedResize);
@@ -842,7 +867,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             border: '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          <div
+          <div 
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
               width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
@@ -850,16 +875,16 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
             }}
           >
-            <CogIcon
+            <CogIcon 
               className="text-white"
-              style={{
+              style={{ 
                 width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
                 height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
-              }}
+              }} 
             />
           </div>
           <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div
+          <div 
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
               width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,

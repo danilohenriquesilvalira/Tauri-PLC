@@ -11,19 +11,11 @@ const ContraPeso20t: React.FC<ContraPeso20tProps> = ({
 }) => {
   const valor = websocketValue;
 
-  // Detectar se é mobile
-  const [isMobile, setIsMobile] = React.useState(false);
-  
-  React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // ⚡ OTIMIZAÇÃO: Detectar mobile sem listeners para evitar re-renders
+  const isMobile = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  }, []); // Calculado apenas uma vez
   
   // COMPONENTE 100% ORIGINAL - sem movimento CSS adicional
   const maxDescida = 350;

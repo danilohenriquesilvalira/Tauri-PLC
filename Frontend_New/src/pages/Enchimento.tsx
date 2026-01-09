@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePLC } from '../contexts/PLCContext';
-import { CogIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { CogIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon, BoltIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { Card } from '../components/ui/Card';
 import BasePistaoEnchimento from '../components/Enchimento/BasePistaoEnchimento';
 import PistaoEnchimento from '../components/Enchimento/PistaoEnchimento';
@@ -1032,6 +1032,128 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   return (
     <div className="w-full h-auto flex flex-col items-center relative">
 
+      {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
+      {isMobile && (
+        <div
+          className="w-full mt-4 mb-4 relative"
+          style={{
+            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+          }}
+        >
+          <div
+            className="mx-auto"
+            style={{
+              maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
+            }}
+          >
+            {/* Cards horizontais compactos - sempre visíveis */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              {/* CARD PISTÕES */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    PISTÕES
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Direito:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {posicaoMetrosDireito.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Esquerdo:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {posicaoMetrosEsquerdo.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Abertura:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {((posicaoPorcentagemDireito + posicaoPorcentagemEsquerdo) / 2).toFixed(1)} <span className="text-gray-500 text-[6px]">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD SISTEMA */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    SISTEMA
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Velocidade:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {((velocidadeDireito + velocidadeEsquerdo) / 2).toFixed(3)} <span className="text-gray-500 text-[7px]">m/s</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Estado:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {posicaoPorcentagemDireito > 50 ? 'ABRINDO' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL'}
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Sync:</div>
+                      <div className={`font-mono font-bold text-[9px] ${Math.abs(posicaoPorcentagemDireito - posicaoPorcentagemEsquerdo) < 5 ? 'text-green-600' : 'text-red-600'}`}>
+                        {Math.abs(posicaoPorcentagemDireito - posicaoPorcentagemEsquerdo) < 5 ? 'OK' : 'ERRO'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD VÁLVULAS */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    VÁLVULAS
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Gavetas:</div>
+                      <div className="flex justify-center gap-0.5">
+                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda1 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda2 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda3 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Direcionais:</div>
+                      <div className="flex justify-center gap-0.5">
+                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda1 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda2 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda3 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Ativas:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {[valvulaGavetaEsquerda1, valvulaGavetaEsquerda2, valvulaGavetaEsquerda3, 
+                          valvulaDirecionalEsquerda1, valvulaDirecionalEsquerda2, valvulaDirecionalEsquerda3,
+                          valvulaGavetaDireita1, valvulaGavetaDireita2, valvulaGavetaDireita3
+                        ].filter(Boolean).length} <span className="text-gray-500 text-[6px]">/ 9</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Container do Sistema de Enchimento */}
       <div 
         ref={containerRef}
@@ -1801,7 +1923,8 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             />
           </div>
 
-          {/* 🎯 CARD PISTÃO DIREITO - ESTILO PADRÃO INFOCARD */}
+          {/* 🎯 CARD PISTÃO DIREITO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
+          {!isMobile && (
           <div 
             className="absolute z-50"
             style={{
@@ -1933,8 +2056,10 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               </div>
             </div>
           </div>
+          )}
 
-          {/* 🎯 CARD PISTÃO ESQUERDO - ESTILO PADRÃO INFOCARD */}
+          {/* 🎯 CARD PISTÃO ESQUERDO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
+          {!isMobile && (
           <div 
             className="absolute z-50"
             style={{
@@ -2066,6 +2191,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
         ) : (
           /* Loading otimizado - mantém proporções corretas */
@@ -2091,35 +2217,64 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       </div>
 
 
-      {/* BOTÃO MOBILE - Mesmo estilo do desktop, porém menor (abaixo de 1024px) */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="xl:hidden fixed top-20 right-4 z-50 px-4 py-3 bg-[#212E3E] text-white rounded-xl shadow-lg flex items-center gap-2 touch-manipulation transition-all duration-200"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-          <CogIcon className="w-3 h-3" />
-        </div>
-        <div className="text-left min-w-0">
-          <div className="font-bold text-xs leading-tight">PARÂMETROS</div>
-          <div className="text-xs opacity-80 leading-tight">Enchimento</div>
-        </div>
-      </button>
+      {/* 📱 BOTÃO MOBILE - ESTILO PADRÃO PORTA MONTANTE/JUSANTE */}
+      {isMobile && (
+        <button
+          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
+          className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
+          style={{
+            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
+          <div 
+            className="bg-white/20 rounded p-0.5 flex items-center justify-center"
+            style={{
+              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+            }}
+          >
+            <CogIcon 
+              className="text-white"
+              style={{ 
+                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              }} 
+            />
+          </div>
+          <span className="font-medium tracking-wide">PARÂMETROS</span>
+          <div 
+            className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
+            style={{
+              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+            }}
+          >
+            <ChevronUpIcon className="w-full h-full text-white/80" />
+          </div>
+        </button>
+      )}
 
-      {/* BOTÃO DESKTOP - Grande com texto NO FUNDO (acima de 1024px) */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="hidden xl:flex fixed bottom-6 right-6 z-50 px-8 py-5 bg-[#212E3E] text-white rounded-2xl shadow-2xl items-center gap-5 hover:scale-105 transition-all duration-200 touch-manipulation"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-          <CogIcon className="w-6 h-6" />
-        </div>
-        <div className="text-left">
-          <div className="font-bold text-lg">PARÂMETROS</div>
-          <div className="text-sm opacity-80">Sistema de Enchimento</div>
-        </div>
-      </button>
+      {/* 🖥️ BOTÃO DESKTOP - ESCONDIDO (só mobile tem botão agora) */}
+      {!isMobile && (
+        <button
+          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
+          className="fixed bottom-6 right-6 z-50 px-8 py-5 bg-[#212E3E] text-white rounded-2xl shadow-2xl flex items-center gap-5 hover:scale-105 transition-all duration-200 touch-manipulation"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+            <CogIcon className="w-6 h-6" />
+          </div>
+          <div className="text-left">
+            <div className="font-bold text-lg">PARÂMETROS</div>
+            <div className="text-sm opacity-80">Sistema de Enchimento</div>
+          </div>
+        </button>
+      )}
 
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (

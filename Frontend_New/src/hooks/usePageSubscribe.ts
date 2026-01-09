@@ -118,11 +118,8 @@ export const usePageSubscribe = (
   // Enviar subscribe quando WebSocket conectar
   useEffect(() => {
     if (ws?.readyState === WebSocket.OPEN && !hasSubscribedRef.current) {
-      // Pequeno delay para garantir que a conexão está estável
-      const timer = setTimeout(() => {
-        sendSubscribe();
-      }, 100);
-      return () => clearTimeout(timer);
+      // ⚡ OTIMIZAÇÃO: Send imediato para máxima velocidade
+      sendSubscribe();
     }
   }, [ws?.readyState, sendSubscribe]);
 

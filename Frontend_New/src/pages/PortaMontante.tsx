@@ -260,39 +260,17 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const motorDireito = animMotorDireito;
   const motorEsquerdo = animMotorEsquerdo;
 
-  // Performance optimization: Debug logging only in development
+  // 🔍 DEBUG CRÍTICO: Monitorar valores em tempo real para detectar atraso
   React.useEffect(() => {
     if (import.meta.env.DEV) {
-      console.log('🎯 [PortaMontante] Debug Tags MONT WebSocket:', {
-        reguaPortaMontanteRaw: reguaPortaMontanteRaw,
-        contrapesoDirectoRaw: contrapesoDirectoRaw,
-        contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
-        motorDireitoVeloc: motorDireitoVeloc,
-        motorEsquerdoVeloc: motorEsquerdoVeloc,
-        velocidadeSubida: velocidadeSubida,
-        velocidadeDescida: velocidadeDescida,
-        animMotorDireito: animMotorDireito,
-        animMotorEsquerdo: animMotorEsquerdo,
-        reguaPortaMontante: reguaPortaMontante,
-        contrapesoDirecto: contrapesoDirecto,
-        contrapesoEsquerdo: contrapesoEsquerdo,
-        tagsDisponiveis: {
-          MONT_PORTA: !!plcData?.tags?.['MONT_MOVIMENTAR_PORTA_MONTANTE'],
-          MONT_CONTRA_DIR: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_DIREITO'],
-          MONT_CONTRA_ESQ: !!plcData?.tags?.['MONT_MOVIMENTAR_CONTRA_PESO_ESQUERDO'],
-          MONT_MOTOR_DIR: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_ESCRAV_DIR'],
-          MONT_MOTOR_ESQ: !!plcData?.tags?.['MONT_GEST_MOT.VELOC_MOT_MEST_ESQ'],
-          MONT_VELOC_SUB: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_SUB'],
-          MONT_VELOC_DESC: !!plcData?.tags?.['MONT_VELOC_VAR.VELOC_1_DESC'],
-          MONT_ANIM_DIR: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_DIR'],
-          MONT_ANIM_ESQ: !!plcData?.tags?.['MONT_WINCC_ANIM_MONT_MOT_ESQ']
-        },
-        connected: connectionStatus.connected
-      });
+      const now = Date.now();
+      if (!window.lastContrapesoTime) window.lastContrapesoTime = now;
+      const interval = now - window.lastContrapesoTime;
+      window.lastContrapesoTime = now;
+      
+      console.log(`🎯 [${interval}ms] MONT Contrapeso D: ${contrapesoDirecto}% | E: ${contrapesoEsquerdo}% | Raw: ${contrapesoDirectoRaw}/${contrapesoEsquerdoRaw}`);
     }
-  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo,
-    reguaPortaMontanteRaw, reguaPortaMontante, motorDireitoVeloc, motorEsquerdoVeloc,
-    velocidadeSubida, velocidadeDescida, animMotorDireito, animMotorEsquerdo, connectionStatus.connected]);
+  }, [contrapesoDirecto, contrapesoEsquerdo, contrapesoDirectoRaw, contrapesoEsquerdoRaw]);
 
   // Configuração responsiva SIMPLES - igual outros componentes
   const configAtual = isMobile ? CONTRAPESO_CONFIG.mobile : CONTRAPESO_CONFIG.desktop;

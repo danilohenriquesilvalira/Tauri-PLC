@@ -47,6 +47,7 @@ pub struct WebSocketDbConfig {
 }
 
 // ✅ DATABASE COM CONNECTION POOLING OTIMIZADO
+#[derive(Clone)] // ⚡ ADICIONADO: Clone para otimizações não-bloqueantes
 pub struct Database {
     read_conn: Arc<Mutex<Connection>>,   // ✅ Conexão para leitura
     write_conn: Arc<Mutex<Connection>>,  // ✅ Conexão para escrita

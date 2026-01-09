@@ -1697,17 +1697,23 @@ export const TagConfigurationModal: React.FC<TagConfigurationModalProps> = ({ pl
                       </select>
                     </div>
 
-                    {/* Intervalo de Ciclo */}
+                    {/* Intervalo de Ciclo - AGORA FIXO */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Intervalo (segundos)</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Intervalo (segundos)
+                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded">FIXO: 500ms</span>
+                      </label>
                       <input
                         type="number"
                         min="1"
                         max="3600"
                         value={newTag.collect_interval_s}
                         onChange={e => setNewTag({ ...newTag, collect_interval_s: Math.max(1, parseInt(e.target.value) || 1) })}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E]"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:border-[#212E3E] bg-gray-100"
+                        disabled={true}
+                        title="⚡ Sistema otimizado: Todos os tags agora enviados a cada 500ms (tempo fixo)"
                       />
+                      <p className="text-[10px] text-green-600 mt-1">⚡ WebSocket otimizado: Enviado automaticamente a cada 500ms (independe desta configuração)</p>
                     </div>
 
                     {/* 🆕 ÁREA DO EQUIPAMENTO */}
