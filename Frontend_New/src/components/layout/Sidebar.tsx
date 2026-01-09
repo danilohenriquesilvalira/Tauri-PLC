@@ -12,7 +12,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
-type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'porta_jusante' | 'porta_montante' | 'usuarios' | 'falhas';
+type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'porta_jusante' | 'porta_montante' | 'falhas';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -63,8 +63,6 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       setActiveItem('enchimento');
     } else if (pathname.includes('falhas')) {
       setActiveItem('falhas');
-    } else if (pathname.includes('usuarios')) {
-      setActiveItem('usuarios');
     } else {
       setActiveItem('dashboard');
     }
@@ -88,8 +86,7 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       porta_montante: '/Logo_Sidebar/PortaMontante.svg',
       enchimento: '/Logo_Sidebar/Enchimento.svg',
       eclusa: '/Logo_Sidebar/Eclusa_Regua.svg',
-      falhas: '/Logo_Sidebar/Falhas.svg',
-      usuarios: '/Logo_Sidebar/Usuarios.svg'
+      falhas: '/Logo_Sidebar/Falhas.svg'
     };
     return icons[itemId];
   };
@@ -130,12 +127,6 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       label: 'Falhas',
       icon: ExclamationTriangleIcon,
       path: '/falhas'
-    },
-    {
-      id: 'usuarios' as NavItem,
-      label: 'Usuários',
-      icon: UsersIcon,
-      path: '/usuarios'
     }
   ], []);
 
@@ -264,7 +255,7 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       {/* Mobile Bottom Navigation */}
       {isMobile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-edp-marine border-t border-edp-neutral-darker h-16">
-          <div className="grid grid-cols-7 gap-0 h-full">
+          <div className="grid grid-cols-6 gap-0 h-full">
             {navigationItems.map((item) => {
               const isActive = activeItem === item.id;
               

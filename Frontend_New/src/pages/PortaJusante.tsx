@@ -28,9 +28,9 @@ interface PortaJusanteProps {
 const CONTRAPESO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 42.7,    // % da altura total (posição Y)
-      horizontalPercent: 70,  // % da largura total (posição X)
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 37.2,    // % da altura total (posição Y)
+      horizontalPercent: 71.5,  // % da largura total (posição X)
+      widthPercent: 5,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
@@ -42,15 +42,15 @@ const CONTRAPESO_CONFIG = {
   },
   mobile: {
     direito: {
-      verticalPercent: 36.8,    // % da altura total (posição Y) - mesmo que desktop
-      horizontalPercent: 85.3,  // % da largura total (posição X) - ajustado para mobile
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 36.4,    // % da altura total (posição Y) - mesmo que desktop
+      horizontalPercent: 83.2,  // % da largura total (posição X) - ajustado para mobile
+      widthPercent: 7.5,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
-      verticalPercent: 36.8,    // % da altura total (posição Y) - mesmo que desktop
-      horizontalPercent: 6.8,  // % da largura total (posição X) - ajustado para mobile
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 36.4,    // % da altura total (posição Y) - mesmo que desktop
+      horizontalPercent: 9.2,  // % da largura total (posição X) - ajustado para mobile
+      widthPercent: 7.5,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     }
   }
@@ -65,9 +65,9 @@ const REGUA_CONFIG = {
     heightPercent: 52,        // % da altura total (tamanho) - 2% MENOR
   },
   mobile: {
-    verticalPercent: 46,      // % da altura total (posição Y)
-    horizontalPercent: 26,    // % da largura total (posição X) - ajustado para mobile
-    widthPercent: 48,         // % da largura total (tamanho) - MAIOR no mobile
+    verticalPercent: 38.4,      // % da altura total (posição Y)
+    horizontalPercent: 27.6,    // % da largura total (posição X) - ajustado para mobile
+    widthPercent: 44.8,         // % da largura total (tamanho) - MAIOR no mobile
     heightPercent: 83,        // % da altura total (tamanho) - MAIOR
   }
 };
@@ -92,14 +92,14 @@ const MOTOR_CONFIG = {
   mobile: {
     direito: {
       verticalPercent: -4,      // % da altura total (posição Y)
-      horizontalPercent: 81.5,    // % da largura total (posição X)
-      widthPercent: 13.5,       // % da largura total (tamanho) - 10% menor
+      horizontalPercent: 80.2,    // % da largura total (posição X)
+      widthPercent: 12,       // % da largura total (tamanho) - 10% menor
       heightPercent: 16.2,      // % da altura total (tamanho) - 10% menor
     },
     esquerdo: {
       verticalPercent: -4,      // % da altura total (posição Y)
-      horizontalPercent: 5,    // % da largura total (posição X)
-      widthPercent: 13.5,       // % da largura total (tamanho) - 10% menor
+      horizontalPercent: 7.7,    // % da largura total (posição X)
+      widthPercent: 12,       // % da largura total (tamanho) - 10% menor
       heightPercent: 16.2,      // % da altura total (tamanho) - 10% menor
     }
   }
@@ -112,6 +112,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const [windowDimensions, setWindowDimensions] = React.useState({ width: 1200, height: 800 }); // Valores iniciais estáveis
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
+  const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
   // ✅ DETECÇÃO MOBILE ESTÁVEL - baseada no viewport, não na window
   const [isMobile, setIsMobile] = React.useState(false);
@@ -295,14 +296,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const cardWidthValue = React.useMemo(() => {
     // 🎯 MESMO CÁLCULO QUE OS OUTROS COMPONENTES ATÉ 1920px
     const baseCardWidth = maxWidth * 0.18;
-    
+
     // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
     if (containerDimensions.width > 1920) {
       // Usar a largura real do container para calcular
       const expandedMaxWidth = Math.min(containerDimensions.width - 32, 2560); // Máximo 2560px
       return expandedMaxWidth * 0.18;
     }
-    
+
     return baseCardWidth;
   }, [maxWidth, containerDimensions.width]);
 
@@ -312,16 +313,16 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   // 🎯 SISTEMA RESPONSIVO MEMOIZADO PARA PERFORMANCE
   const getResponsiveCardFontSize = React.useCallback((baseSize: number, type: 'header' | 'label' | 'value' = 'label') => {
     const cardW = cardWidthValue;
-    
+
     // Escala baseada na largura do card (300px = escala base 1.0)
     let scaleFactor = cardW / 300;
     scaleFactor = Math.max(scaleFactor, 0.7); // Mínimo 70%
     scaleFactor = Math.min(scaleFactor, 1.4); // Máximo 140%
-    
+
     // Ajustes por tipo
     if (type === 'header') scaleFactor *= 1.1;
     else if (type === 'value') scaleFactor *= 1.05;
-    
+
     return Math.max(baseSize * scaleFactor, type === 'header' ? 10 : 8);
   }, [cardWidthValue]);
 
@@ -364,7 +365,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       }}
     >
 
-      {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - POSICIONAMENTO PROPORCIONAL */}
+      {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - DESKTOP */}
       {!isMobile && isInitialized && (
         <div
           className="absolute z-50 flex flex-col"
@@ -529,7 +530,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         </div>
       )}
 
-      {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - POSICIONAMENTO PROPORCIONAL */}
+      {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - DESKTOP */}
       {!isMobile && isInitialized && (
         <div
           className="absolute z-50 flex flex-col"
@@ -701,21 +702,174 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         </div>
       )}
 
+      {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
+      {isMobile && (
+        <div
+          className="w-full mt-4 mb-4 relative"
+          style={{
+            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+          }}
+        >
+          <div
+            className="mx-auto"
+            style={{
+              maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
+            }}
+          >
+            {/* Cards horizontais compactos - sempre visíveis */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              {/* CARD DADOS */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    DADOS
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Posição:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {(reguaPortaJusante * 12.5 / 100).toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Abertura:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {reguaPortaJusante}<span className="text-gray-500 text-[7px]">%</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Dif. E/D:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500 text-[6px]">mm</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-      {/* BOTÃO MOBILE - Mesmo estilo do desktop, porém menor (abaixo de 1024px) */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="xl:hidden fixed bottom-20 right-4 z-50 px-4 py-3 bg-[#212E3E] text-white rounded-xl shadow-lg flex items-center gap-2 touch-manipulation transition-all duration-200"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-          <CogIcon className="w-3 h-3" />
+              {/* CARD MOTORES */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    MOTORES
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  {/* MOTOR DIREITO */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[7px] text-gray-600 font-medium uppercase">M. DIREITO</span>
+                      <div className={`w-1.5 h-1.5 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
+                        {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
+                      </span>
+                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
+                        {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-1">
+                    {/* MOTOR ESQUERDO */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[7px] text-gray-600 font-medium uppercase">M. ESQUERDO</span>
+                        <div className={`w-1.5 h-1.5 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
+                          {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
+                        </span>
+                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
+                          {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD CONTRAPESOS */}
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-edp-marine text-white px-2 py-1">
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
+                    CONTRAPESOS
+                  </h3>
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Esquerdo:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {contrapesoEsquerdo}<span className="text-gray-500 text-[7px]">%</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Direito:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {contrapesoDirecto}<span className="text-gray-500 text-[7px]">%</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1">
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
+                      <div className="font-mono font-bold text-green-600 text-[8px]">
+                        OPER.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
-        <div className="text-left min-w-0">
-          <div className="font-bold text-xs leading-tight">PARÂMETROS</div>
-          <div className="text-xs opacity-80 leading-tight">Porta Jusante</div>
-        </div>
-      </button>
+      )}
+
+      {/* BOTÃO MOBILE - Canto inferior direito */}
+      {isMobile && (
+        <button
+          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
+          className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
+          style={{
+            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
+          <div
+            className="bg-white/20 rounded p-0.5 flex items-center justify-center"
+            style={{
+              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+            }}
+          >
+            <CogIcon
+              className="text-white"
+              style={{
+                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              }}
+            />
+          </div>
+          <span className="font-medium tracking-wide">PARÂMETROS</span>
+          <div
+            className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
+            style={{
+              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+            }}
+          >
+            <ChevronUpIcon className="w-full h-full text-white/80" />
+          </div>
+        </button>
+      )}
 
       {/* BOTÃO DESKTOP - Grande com texto NO FUNDO (acima de 1024px) */}
       <button
@@ -1088,20 +1242,20 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               />
             </div>
 
-            {/* 🚪 INDICADOR STATUS PORTA - ÚNICO (CONDICIONAL) */}
+            {/* 🚪 INDICADOR STATUS PORTA - RESPONSIVO MOBILE/DESKTOP */}
             {reguaPortaJusante >= 95 && (
               <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
-                  top: `${(alturaTotal * 5) / 100}px`, // 5% do topo
-                  left: `${(maxWidth * 42) / 100}px`, // Centralizado
-                  width: `${(maxWidth * 16) / 100}px`, // Mais largo
-                  height: `${(alturaTotal * 6) / 100}px` // Menor altura
+                  top: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
+                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
+                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
                 }}
               >
-                <div className="bg-green-600 border border-green-500 rounded-md p-3 w-full">
+                <div className={`bg-green-600 border border-green-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
                   <div className="text-center">
-                    <div className="text-xs font-bold text-[#212E3E] uppercase tracking-wide">
+                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                       PORTA ABERTA
                     </div>
                   </div>
@@ -1113,15 +1267,15 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
-                  bottom: `${(alturaTotal * 5) / 100}px`, // 5% do fundo
-                  left: `${(maxWidth * 42) / 100}px`, // Centralizado
-                  width: `${(maxWidth * 16) / 100}px`, // Mais largo
-                  height: `${(alturaTotal * 6) / 100}px` // Menor altura
+                  bottom: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
+                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
+                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
                 }}
               >
-                <div className="bg-yellow-600 border border-yellow-500 rounded-md p-3 w-full">
+                <div className={`bg-yellow-600 border border-yellow-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
                   <div className="text-center">
-                    <div className="text-xs font-bold text-[#212E3E] uppercase tracking-wide">
+                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                       PORTA FECHADA
                     </div>
                   </div>

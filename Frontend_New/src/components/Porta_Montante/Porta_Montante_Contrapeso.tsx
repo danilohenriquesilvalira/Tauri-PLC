@@ -10,10 +10,26 @@ const ContraPeso20t: React.FC<ContraPeso20tProps> = ({
 
 }) => {
   const valor = websocketValue;
+
+  // Detectar se é mobile
+  const [isMobile, setIsMobile] = React.useState(false);
+  
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // COMPONENTE 100% ORIGINAL - sem movimento CSS adicional
   const maxDescida = 350;
-  const posicaoContrapeso = (valor * maxDescida) / 100;
+  // Empurrar todo conjunto para baixo no mobile para alongar a corda
+  const extensaoMobile = isMobile ? 80 : 0;
+  const posicaoContrapeso = (valor * maxDescida) / 100 + extensaoMobile;
   
   // Altura da corda - do topo até o ponto de conexão
   const pontoConexaoOriginal = 20;
