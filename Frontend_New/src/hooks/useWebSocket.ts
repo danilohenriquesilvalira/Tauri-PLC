@@ -332,15 +332,16 @@ export const useWebSocket = (initialUrl?: string): UseWebSocketReturn => {
   }, []);
   
   // 🚀 CACHE: Carregar valores persistidos do localStorage para evitar flashes
+  // ⚡ OTIMIZADO: Cache reduzido para 30 segundos para evitar dados desatualizados na navegação
   const loadCachedData = (): PLCData | null => {
     if (typeof window === 'undefined') return null;
-    
+
     try {
       const cached = localStorage.getItem('plc-websocket-cache');
       if (cached) {
         const parsed = JSON.parse(cached);
-        // Verificar se cache não é muito antigo (max 5 minutos)
-        if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+        // Verificar se cache não é muito antigo (max 30 segundos - reduzido de 5 minutos)
+        if (Date.now() - parsed.timestamp < 30 * 1000) {
           if (import.meta.env.DEV) {
             console.log('🔄 Cache WebSocket restaurado:', Object.keys(parsed.data?.tags || {}).length, 'tags');
           }

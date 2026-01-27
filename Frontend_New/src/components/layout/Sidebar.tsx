@@ -22,28 +22,40 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
   const [activeItem, setActiveItem] = useState<NavItem>('dashboard');
-  const [isMobile, setIsMobile] = useState(false);
+  // Inicializar com o valor correto para evitar flash no mobile
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Detectar se é mobile - OTIMIZADO COM DEBOUNCE
+  // Detectar se é mobile - OTIMIZADO COM DEBOUNCE (só para resize)
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
-    const checkIsMobile = () => {
+
+    // Verificação inicial IMEDIATA (sem debounce)
+    const initialCheck = window.innerWidth < 1024;
+    if (initialCheck !== isMobile) {
+      setIsMobile(initialCheck);
+    }
+
+    // Debounce apenas para eventos de resize
+    const handleResize = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         const newIsMobile = window.innerWidth < 1024;
-        setIsMobile(prev => prev !== newIsMobile ? newIsMobile : prev); // Só atualiza se mudou
-      }, 150); // Debounce 150ms
+        setIsMobile(prev => prev !== newIsMobile ? newIsMobile : prev);
+      }, 150);
     };
-    
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile, { passive: true });
-    
+
+    window.addEventListener('resize', handleResize, { passive: true });
+
     return () => {
       clearTimeout(timeoutId);
-      window.removeEventListener('resize', checkIsMobile);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -132,11 +144,11 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
 
   return (
     <>
-      {/* Desktop Sidebar - SEM TRANSIÇÕES */}
+      {/* Desktop Sidebar - ESCONDIDO NO MOBILE VIA CSS (lg:flex) */}
       <aside className={`
-        h-screen bg-edp-marine z-50 flex flex-col sticky top-0 
+        h-screen bg-edp-marine z-50 flex-col sticky top-0
         ${isOpen ? 'w-64' : 'w-16'}
-        ${isMobile ? 'hidden' : 'flex'}
+        hidden lg:flex
       `}>
         
         {/* Header do Sidebar */}
@@ -252,10 +264,9 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
         )}
       </aside>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-edp-marine border-t border-edp-neutral-darker h-16">
-          <div className="grid grid-cols-6 gap-0 h-full">
+      {/* Mobile Bottom Navigation - VISÍVEL NO MOBILE VIA CSS (lg:hidden) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-edp-marine border-t border-edp-neutral-darker h-16 flex lg:hidden">
+        <div className="grid grid-cols-6 gap-0 h-full w-full">
             {navigationItems.map((item) => {
               const isActive = activeItem === item.id;
               
@@ -284,7 +295,6 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
             })}
           </div>
         </div>
-      )}
     </>
   );
 };

@@ -5,31 +5,34 @@ interface PortaJusanteReguaProps {
   editMode?: boolean;
 }
 
-const PortaJusanteRegua: React.FC<PortaJusanteReguaProps> = ({ 
-  websocketValue = 0, 
-  editMode = false 
+const PortaJusanteRegua: React.FC<PortaJusanteReguaProps> = ({
+  websocketValue = 0,
+  editMode = false
 }) => {
-  const valor = websocketValue;
-  
-  // Movimento vertical - PROPORCIONAL À ALTURA DO CONTAINER
-  // Usar porcentagem da altura do container (igual outros componentes)
-  const maxDeslocamentoPercent = 65; // 65% da altura do container - MOVIMENTO MUITO MAIOR
-  const deslocamentoVertical = (valor / 100) * maxDeslocamentoPercent;
+  // Memoizar o valor para evitar recálculos desnecessários
+  const deslocamentoVertical = React.useMemo(() => {
+    const maxDeslocamentoPercent = 65; // 65% da altura do container
+    return (websocketValue / 100) * maxDeslocamentoPercent;
+  }, [websocketValue]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
       {/* SVG DIRETO NO CONTAINER - SEM DIV INTERMEDIÁRIA */}
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 576 580" 
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 576 580"
         preserveAspectRatio="xMidYMid meet"
-        fill="none" 
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
         style={{
-          transform: `translateY(-${deslocamentoVertical}%)`,
-          transition: 'transform 0.5s ease-in-out'
+          transform: `translateY(-${deslocamentoVertical}%) translateZ(0)`,
+          transition: 'transform 0.5s ease-in-out',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
         }}
       >
         <rect x="0.5" y="0.5" width="574.458" height="578.427" fill="#595959" stroke="#D8D9D9"/>

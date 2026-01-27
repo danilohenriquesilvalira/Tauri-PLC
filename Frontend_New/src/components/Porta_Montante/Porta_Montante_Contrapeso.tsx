@@ -5,39 +5,40 @@ interface ContraPeso20tProps {
   editMode?: boolean;
 }
 
-const ContraPeso20t: React.FC<ContraPeso20tProps> = ({ 
-  websocketValue = 0, 
-
+const ContraPeso20t: React.FC<ContraPeso20tProps> = ({
+  websocketValue = 0,
 }) => {
-  const valor = websocketValue;
-
-  // ⚡ OTIMIZAÇÃO: Detectar mobile sem listeners para evitar re-renders
-  const isMobile = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth < 1024;
-  }, []); // Calculado apenas uma vez
-  
-  // COMPONENTE 100% ORIGINAL - sem movimento CSS adicional
-  const maxDescida = 350;
-  // Empurrar todo conjunto para baixo no mobile para alongar a corda
-  const extensaoMobile = isMobile ? 80 : 0;
-  const posicaoContrapeso = (valor * maxDescida) / 100 + extensaoMobile;
-  
-  // Altura da corda - do topo até o ponto de conexão
-  const pontoConexaoOriginal = 20;
-  const alturaCorda = pontoConexaoOriginal + posicaoContrapeso;
+  // Memoizar cálculos para evitar recálculos desnecessários
+  const { posicaoContrapeso, alturaCorda } = React.useMemo(() => {
+    const maxDescida = 350;
+    // Detectar mobile apenas no cálculo
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    const extensaoMobile = isMobile ? 80 : 0;
+    const posicao = (websocketValue * maxDescida) / 100 + extensaoMobile;
+    const pontoConexaoOriginal = 20;
+    return {
+      posicaoContrapeso: posicao,
+      alturaCorda: pontoConexaoOriginal + posicao
+    };
+  }, [websocketValue]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
       {/* SVG IGUAL A RÉGUA - sem limitação fixa */}
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 109 600" 
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 109 600"
         preserveAspectRatio="xMidYMid meet"
-        fill="none" 
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
+        style={{
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
+        }}
       >
         {/* Contrapeso COM MOVIMENTO INTERNO ORIGINAL */}
         <g transform={`translate(0, ${posicaoContrapeso})`}>

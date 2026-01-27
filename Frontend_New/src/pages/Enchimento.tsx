@@ -35,15 +35,15 @@ const BASE_PISTAO_CONFIG = {
   },
   mobile: {
     direito: {
-      verticalPercent: 144,
-      horizontalPercent: 78,
-      widthPercent: 21.84, // 31.2 * 0.7 (redução de 30%)
+      verticalPercent: 46,
+      horizontalPercent: 1,
+      widthPercent: 20, // 31.2 * 0.7 (redução de 30%)
       heightPercent: 55, // 62.4 * 0.7 (redução de 30%)
     },
     esquerdo: {
-      verticalPercent: 144,
-      horizontalPercent: 0.2,
-      widthPercent: 21.84, // 31.2 * 0.7 (redução de 30%)
+      verticalPercent: 46,
+      horizontalPercent: 78.6,
+      widthPercent: 20, // 31.2 * 0.7 (redução de 30%)
       heightPercent: 55, // 62.4 * 0.7 (redução de 30%)
     }
   }
@@ -67,16 +67,16 @@ const PISTAO_CONFIG = {
   },
   mobile: {
     direito: {
-      verticalPercent: 125,
-      horizontalPercent: 71.2,
-      widthPercent: 35.378, // 50.54 * 0.7 (redução de 30%)
-      heightPercent: 82, // 86.64 * 0.7 (redução de 30%)
+      verticalPercent: 31.3,
+      horizontalPercent: -7,
+      widthPercent: 36, // 50.54 * 0.7 (redução de 30%)
+      heightPercent: 60, // 86.64 * 0.7 (redução de 30%)
     },
     esquerdo: {
-      verticalPercent: 125,
-      horizontalPercent: -6.5,
-      widthPercent: 35.378, // 50.54 * 0.7 (redução de 30%)
-      heightPercent: 82, // 86.64 * 0.7 (redução de 30%)
+      verticalPercent: 31.3,
+      horizontalPercent: 70.5,
+      widthPercent: 36, // 50.54 * 0.7 (redução de 30%)
+      heightPercent: 60, // 86.64 * 0.7 (redução de 30%)
     }
   }
 };
@@ -99,16 +99,16 @@ const CILINDRO_CONFIG = {
   },
   mobile: {
     direito: {
-      verticalPercent: 63.8,
-      horizontalPercent: 77.6,
-      widthPercent: 22.7, // 22.338893 * 0.98 (redução adicional de 2%)
-      heightPercent: 68.9,  // 65.15509 * 0.98 (redução adicional de 2%)
+      verticalPercent: 6,
+      horizontalPercent: 79,
+      widthPercent: 20, // 22.338893 * 0.98 (redução adicional de 2%)
+      heightPercent: 36.6,  // 65.15509 * 0.98 (redução adicional de 2%)
     },
     esquerdo: {
-      verticalPercent: 63.8,
-      horizontalPercent: -0.3,
-      widthPercent: 22.7, // 22.338893 * 0.98 (redução adicional de 2%)
-      heightPercent: 68.9,  // 65.15509 * 0.98 (redução adicional de 2%)
+      verticalPercent: 6,
+      horizontalPercent: 1,
+      widthPercent: 20, // 22.338893 * 0.98 (redução adicional de 2%)
+      heightPercent: 36.5,  // 65.15509 * 0.98 (redução adicional de 2%)
     }
   }
 };
@@ -122,7 +122,7 @@ const PIPE_SYSTEM_CONFIG = {
     heightPercent: 94,      // % da altura total (tamanho) - ajustável
   },
   mobile: {
-    verticalPercent: 50,      // % da altura total (posição Y) - ajustável
+    verticalPercent: -25,      // % da altura total (posição Y) - ajustável
     horizontalPercent: 0,    // % da largura total (posição X) - ajustável
     widthPercent: 100,       // % da largura total (tamanho) - ajustável
     heightPercent: 100,      // % da altura total (tamanho) - ajustável
@@ -147,16 +147,16 @@ const SUPORTE_PISTA_CONFIG = {
   },
   mobile: {
     esquerdo: {
-      verticalPercent: 117,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: -14,     // % da largura total (posição X) - ajustável
-      widthPercent: 50,         // % da largura total (tamanho) - ajustável
-      heightPercent: 26,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 12,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 0.4,     // % da largura total (posição X) - ajustável
+      widthPercent: 21,         // % da largura total (tamanho) - ajustável
+      heightPercent: 58,        // % da altura total (tamanho) - ajustável
     },
     direito: {
-      verticalPercent: 117.1,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 63.8,    // % da largura total (posição X) - ajustável
-      widthPercent: 50,         // % da largura total (tamanho) - ajustável
-      heightPercent: 26.5,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 12,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 78.4,    // % da largura total (posição X) - ajustável
+      widthPercent: 21,         // % da largura total (tamanho) - ajustável
+      heightPercent: 58,        // % da altura total (tamanho) - ajustável
     }
   }
 };
@@ -170,10 +170,10 @@ const BASE_FUNDO_ENCHIMENTO_CONFIG = {
     heightPercent: 100,       // % da altura total (tamanho) - ajustável
   },
   mobile: {
-    verticalPercent: 87,       // % da altura total (posição Y) - ajustável
-    horizontalPercent: -5,     // % da largura total (posição X) - ajustável
-    widthPercent: 110,        // % da largura total (tamanho) - ajustável
-    heightPercent: 115,       // % da altura total (tamanho) - ajustável
+    verticalPercent: 0,       // % da altura total (posição Y) - ajustável
+    horizontalPercent: 0,     // % da largura total (posição X) - ajustável
+    widthPercent: 100,        // % da largura total (tamanho) - ajustável
+    heightPercent: 100,       // % da altura total (tamanho) - ajustável
   }
 };
 
@@ -222,40 +222,40 @@ const VALVULA_CONFIG = {
   mobile: {
     // LADO ESQUERDO - 3 válvulas
     esquerda1: {
-      verticalPercent: 35,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 10,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 35.6,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 55,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 15,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 39.3,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 75,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 20,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 43,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas
     direita1: {
-      verticalPercent: 35,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 75,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 55.6,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 55,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 0,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 59.3,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 75,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 0,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 63,    // % da largura total (posição X) - ajustável
+      widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 12,        // % da altura total (tamanho) - ajustável
     }
   }
@@ -306,41 +306,41 @@ const VALVULA_FLANGE_CONFIG = {
   mobile: {
     // LADO ESQUERDO - 3 válvulas flange
     esquerda1: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 34.28,    // % da largura total (posição X) - ajustável
-      widthPercent: 4.3,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 34,    // % da largura total (posição X) - ajustável
+      widthPercent: 4.7,          // % da largura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 37.8,    // % da largura total (posição X) - ajustável
       widthPercent: 4.7,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 41.5,    // % da largura total (posição X) - ajustável
       widthPercent: 4.4,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas flange
     direita1: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 60,    // % da largura total (posição X) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 54.15,    // % da largura total (posição X) - ajustável
       widthPercent: 4.3,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 65,    // % da largura total (posição X) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 57.7,    // % da largura total (posição X) - ajustável
       widthPercent: 4.3,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 65,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 70,    // % da largura total (posição X) - ajustável
+      verticalPercent: 6.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 61.5,    // % da largura total (posição X) - ajustável
       widthPercent: 4.3,          // % da largura total (tamanho) - ajustável
-      heightPercent: 5.2,        // % da altura total (tamanho) - ajustável
+      heightPercent: 2,        // % da altura total (tamanho) - ajustável
     }
   }
 };
@@ -354,7 +354,7 @@ const TANQUE_OLEO_CONFIG = {
     heightPercent: 54,         // % da altura total (tamanho) - ajustável
   },
   mobile: {
-    verticalPercent: 77,       // % da altura total (posição Y) - ajustável
+    verticalPercent: -11,       // % da altura total (posição Y) - ajustável
     horizontalPercent: 32.5,     // % da largura total (posição X) - ajustável
     widthPercent: 35,          // % da largura total (tamanho) - ajustável
     heightPercent: 100,         // % da altura total (tamanho) - ajustável
@@ -379,15 +379,15 @@ const MOTOR_CONFIG = {
   },
   mobile: {
     esquerdo: {
-      verticalPercent: 106,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 29.2,    // % da largura total (posição X) - ajustável
-      widthPercent: 20,         // % da largura total (tamanho) - ajustável
+      verticalPercent: 26,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 35.5,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
       heightPercent: 10,        // % da altura total (tamanho) - ajustável
     },
     direito: {
-      verticalPercent: 106,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 50.8,    // % da largura total (posição X) - ajustável
-      widthPercent: 20,         // % da largura total (tamanho) - ajustável
+      verticalPercent: 26,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 58.5,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
       heightPercent: 10,        // % da altura total (tamanho) - ajustável
     }
   }
@@ -438,41 +438,41 @@ const VALVULA_GAVETA_CONFIG = {
   mobile: {
     // LADO ESQUERDO - 3 válvulas gaveta
     esquerda1: {
-      verticalPercent: 115.2,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 33.5,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 14.2,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 121.5,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 17.5,    // % da largura total (posição X) - ajustável
+      verticalPercent: 36.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 17.4,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 108.5,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 29.5,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 25,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas gaveta
     direita1: {
-      verticalPercent: 115.2,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 33.5,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 79.7,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 121.5,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 76.5,    // % da largura total (posição X) - ajustável
+      verticalPercent: 36.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 76.6,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 108.5,      // % da altura total (posição Y) - ajustável
+      verticalPercent: 29.5,      // % da altura total (posição Y) - ajustável
       horizontalPercent: 68.5,    // % da largura total (posição X) - ajustável
       widthPercent: 6,         // % da largura total (tamanho) - ajustável
-      heightPercent: 6,        // % da altura total (tamanho) - ajustável
+      heightPercent: 3,        // % da altura total (tamanho) - ajustável
     }
   }
 };
@@ -522,41 +522,41 @@ const VALVE_DIRECIONAL_CONFIG = {
   mobile: {
     // LADO ESQUERDO - 3 válvulas direcionais
     esquerda1: {
-      verticalPercent: 90,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 23.4,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 19.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 24.9,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 83.6,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 31.6,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 16.4,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 33.1,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 97.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 31.6,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 23.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 33.1,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas direcionais
     direita1: {
-      verticalPercent: 90,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 67.6,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 19.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 69,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 83.6,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 59.4,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 16.4,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 60.8,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 97.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 59.4,    // % da largura total (posição X) - ajustável
-      widthPercent: 9,         // % da largura total (tamanho) - ajustável
-      heightPercent: 7.3,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 23.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 60.8,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,         // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     }
   }
 };
@@ -579,122 +579,99 @@ const VALVULA_VERTICAL_CONFIG = {
   },
   mobile: {
     esquerda: {
-      verticalPercent: 75,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 25,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
-      heightPercent: 12,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 32.4,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 0.7,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,          // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     },
     direita: {
-      verticalPercent: 75,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 67,    // % da largura total (posição X) - ajustável
-      widthPercent: 8,          // % da largura total (tamanho) - ajustável
-      heightPercent: 12,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 32.4,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 93.3,    // % da largura total (posição X) - ajustável
+      widthPercent: 6,          // % da largura total (tamanho) - ajustável
+      heightPercent: 4,        // % da altura total (tamanho) - ajustável
     }
   }
 };
 
 const Enchimento: React.FC<EnchimentoProps> = () => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  // 🚀 PERFORMANCE: Estados estáveis para evitar flashes visuais
-  const [containerDimensions, setContainerDimensions] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const width = Math.min(window.innerWidth - 32, 1920);
-      return { width, height: 600 };
-    }
-    return { width: 1200, height: 600 }; // Fallback estável
+
+  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
+  const [windowWidth, setWindowWidth] = React.useState(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 1920;
   });
-  
-  const [windowDimensions, setWindowDimensions] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      return { width: window.innerWidth, height: window.innerHeight };
-    }
-    return { width: 1920, height: 1080 }; // Fallback estável
-  });
-  const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
-  // 🚀 PERFORMANCE: Callback otimizado para resize (fora do useLayoutEffect)
-  const updateDimensions = React.useCallback(() => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const newDimensions = { width: rect.width, height: rect.height };
-      
-      setContainerDimensions(prev => {
-        if (Math.abs(prev.width - newDimensions.width) > 10 || 
-            Math.abs(prev.height - newDimensions.height) > 10) {
-          return newDimensions;
-        }
-        return prev;
-      });
-    }
-    
-    const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-    setWindowDimensions(prev => {
-      if (Math.abs(prev.width - newWindowDimensions.width) > 10 || 
-          Math.abs(prev.height - newWindowDimensions.height) > 10) {
-        return newWindowDimensions;
-      }
-      return prev;
-    });
-  }, []);
-
-  // UseLayoutEffect para calcular dimensões ANTES da renderização visual
-  React.useLayoutEffect(() => {
-    const initializeDimensions = () => {
-      if (typeof window !== 'undefined') {
-        const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-        setWindowDimensions(newWindowDimensions);
-        
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({ width: rect.width, height: rect.height });
-        } else {
-          // Fallback: calcular dimensões baseado na janela
-          const width = Math.min(newWindowDimensions.width - 32, 1920);
-          setContainerDimensions({ width, height: 600 });
-        }
-        
-        setIsInitialized(true);
-      }
-    };
-    
-    // Executar imediatamente (sem timeout)
-    initializeDimensions();
-    
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, [updateDimensions]);
-
-  // Detectar se é mobile
-  const isMobile = React.useMemo(() => windowDimensions.width < 1024, [windowDimensions.width]);
-
-  // 🚀 PERFORMANCE: MEMOIZAÇÃO DOS CÁLCULOS DE DIMENSÕES
-  const dimensionCalculations = React.useMemo(() => {
-    const enchimentoAspectRatio = 1348 / 600; // Baseado no container: width="1348" height="600"
-    const maxWidth = Math.min(containerDimensions.width - 32, 1920); // 32px = margem mínima
-    const enchimentoScale = isMobile ? 90 : 100; // 90% mobile, 100% desktop
-    const baseEnchimentoWidth = (maxWidth * enchimentoScale) / 100;
+  // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  const dimensions = React.useMemo(() => {
+    const isMobile = windowWidth < 1024;
+    const enchimentoAspectRatio = 1348 / 600;
+    const containerWidth = Math.min(windowWidth - 32, 1920);
+    const enchimentoScale = isMobile ? 90 : 100;
+    const baseEnchimentoWidth = (containerWidth * enchimentoScale) / 100;
     const baseEnchimentoHeight = baseEnchimentoWidth / enchimentoAspectRatio;
-    const alturaTotal = baseEnchimentoHeight;
+    const maxWidth = Math.max(containerWidth, 300);
+    const alturaTotal = Math.max(baseEnchimentoHeight, 300);
 
     return {
+      isMobile,
       maxWidth,
       baseEnchimentoWidth,
       baseEnchimentoHeight,
-      alturaTotal
+      alturaTotal,
+      shouldRender: maxWidth > 100 && alturaTotal > 100
     };
-  }, [containerDimensions.width, isMobile]);
+  }, [windowWidth]);
 
-  const { maxWidth, alturaTotal } = dimensionCalculations;
+  // Desestruturar para uso
+  const { isMobile, maxWidth, baseEnchimentoWidth, baseEnchimentoHeight, alturaTotal, shouldRender } = dimensions;
+
+  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let resizeTimeout: NodeJS.Timeout;
+
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        setWindowWidth(prev => {
+          // Só atualiza se a diferença for significativa (>50px)
+          if (Math.abs(prev - newWidth) > 50) {
+            return newWidth;
+          }
+          return prev;
+        });
+      }, 150); // Debounce de 150ms
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
   
   // 📡 USAR O SISTEMA PLC EXISTENTE
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
-  
+
   // 🔥 SEM SIMULAÇÃO - USANDO TAGS REAIS DO WEBSOCKET ENCH
-  
+
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA ENCH usando sendCommand
+  // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
+  const hasSubscribedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (connectionStatus.connected) {
+    // Reset ref no mount para garantir novo subscribe
+    hasSubscribedRef.current = false;
+  }, []);
+
+  React.useEffect(() => {
+    if (connectionStatus.connected && !hasSubscribedRef.current) {
+      hasSubscribedRef.current = true;
+
       // Enviar subscribe específico para ENCH via sendCommand
       const subscribeCmd = {
         type: 'SUBSCRIBE',
@@ -703,7 +680,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         categories: ['PROC', 'FAULT', 'EVENT'],
         include_all_faults: true
       };
-      
+
       // Usar sendCommand para enviar subscribe
       sendCommand({
         plc_ip: '',
@@ -712,7 +689,10 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         value: 'SUBSCRIBE',
         data_type: 'STRING'
       });
-      
+
+      if (import.meta.env.DEV) {
+        console.log('📡 [Enchimento] Subscribe ENCH enviado (mount):', subscribeCmd);
+      }
     }
   }, [connectionStatus.connected, sendCommand]);
   
@@ -1037,7 +1017,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         <div
           className="w-full mt-4 mb-4 relative"
           style={{
-            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+            padding: `0 ${Math.max(6, Math.min(16, windowWidth * 0.02))}px`
           }}
         >
           <div
@@ -1164,7 +1144,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           overflow: 'visible'
         }}
       >
-        {isInitialized && containerDimensions.width > 100 && windowDimensions.width > 0 ? (
+        {shouldRender ? (
           <div 
             className="relative w-full flex items-center justify-center"
             style={{
@@ -1174,7 +1154,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             }}
           >
             {/* SISTEMA DE TUBULAÇÕES - BACKGROUND - CONFIGURAÇÃO RESPONSIVA AJUSTÁVEL */}
-            <div 
+            <div
               className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
@@ -1182,7 +1162,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                 left: `${(maxWidth * pipeSystemConfigAtual.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * pipeSystemConfigAtual.widthPercent) / 100}px`,
                 height: `${(alturaTotal * pipeSystemConfigAtual.heightPercent) / 100}px`,
-                zIndex: 1
+                zIndex: -1
               }}
             >
               <PipeSystem 
@@ -1278,7 +1258,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
           {/* 🎯 PISTÃO ESQUERDO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 1 */}
           <div 
-            className="absolute transition-all duration-200 ease-in-out"
+            className="absolute"
             style={{
               // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
               top: `${(alturaTotal * pistaoEsquerdoConfig.verticalPercent) / 100}px`,
@@ -1297,7 +1277,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
           {/* 🎯 PISTÃO DIREITO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 0 */}
           <div 
-            className="absolute transition-all duration-200 ease-in-out"
+            className="absolute"
             style={{
               // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
               top: `${(alturaTotal * pistaoDireitoConfig.verticalPercent) / 100}px`,
@@ -1409,102 +1389,102 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           </div>
 
           {/* 🔧 VÁLVULA ESQUERDA 1 - BIT 18 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaEsquerda1Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaEsquerda1Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaEsquerda1Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaEsquerda1Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaEsquerda1}
               editMode={false}
             />
           </div>
 
           {/* 🔧 VÁLVULA ESQUERDA 2 - BIT 19 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaEsquerda2Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaEsquerda2Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaEsquerda2Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaEsquerda2Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaEsquerda2}
               editMode={false}
             />
           </div>
 
           {/* 🔧 VÁLVULA ESQUERDA 3 - BIT 12 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaEsquerda3Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaEsquerda3Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaEsquerda3Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaEsquerda3Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaEsquerda3}
               editMode={false}
             />
           </div>
 
           {/* 🔧 VÁLVULA DIREITA 1 - BIT 13 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaDireita1Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaDireita1Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaDireita1Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaDireita1Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaDireita1}
               editMode={false}
             />
           </div>
 
           {/* 🔧 VÁLVULA DIREITA 2 - BIT 24 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaDireita2Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaDireita2Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaDireita2Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaDireita2Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaDireita2}
               editMode={false}
             />
           </div>
 
           {/* 🔧 VÁLVULA DIREITA 3 - BIT 23 */}
-          <div 
+          <div
             className="absolute"
             style={{
               top: `${(alturaTotal * valvulaDireita3Config.verticalPercent) / 100}px`,
               left: `${(maxWidth * valvulaDireita3Config.horizontalPercent) / 100}px`,
               width: `${(maxWidth * valvulaDireita3Config.widthPercent) / 100}px`,
               height: `${(alturaTotal * valvulaDireita3Config.heightPercent) / 100}px`,
-              zIndex: 12
+              zIndex: 20
             }}
           >
-            <ValvulaOnOff 
+            <ValvulaOnOff
               websocketBit={valvulaDireita3}
               editMode={false}
             />
@@ -1612,8 +1592,8 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             />
           </div>
 
-          {/* 🛢️ TANQUE OLEO - SVG ESTÁTICO */}
-          <div 
+          {/* 🛢️ TANQUE OLEO - SVG ESTÁTICO - Z-INDEX MENOR PARA FICAR ATRÁS DAS TUBULAÇÕES */}
+          <div
             className="absolute"
             style={{
               // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
@@ -1621,7 +1601,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               left: `${(maxWidth * tanqueOleoConfigAtual.horizontalPercent) / 100}px`,
               width: `${(maxWidth * tanqueOleoConfigAtual.widthPercent) / 100}px`,
               height: `${(alturaTotal * tanqueOleoConfigAtual.heightPercent) / 100}px`,
-              zIndex: 0
+              zIndex: -5
             }}
           >
             <svg
@@ -2223,9 +2203,9 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
           className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
           style={{
-            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
-            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
-            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            padding: `${Math.max(6, Math.min(8, windowWidth * 0.015))}px ${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowWidth * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.1)'
           }}
@@ -2233,16 +2213,16 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           <div 
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
-              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+              width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
             <CogIcon 
               className="text-white"
               style={{ 
-                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+                width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
               }} 
             />
           </div>
@@ -2250,8 +2230,8 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           <div 
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
-              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
             }}
           >
             <ChevronUpIcon className="w-full h-full text-white/80" />

@@ -231,46 +231,44 @@ interface EclusaReguaProps {
 
 const EclusaRegua: React.FC<EclusaReguaProps> = () => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  // 🚀 PERFORMANCE: Estados estáveis para evitar flashes visuais
-  const [containerDimensions, setContainerDimensions] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const width = Math.min(window.innerWidth - 32, 1920);
-      return { width, height: width / 5.7 }; // Aspect ratio da Eclusa
-    }
-    return { width: 1200, height: 210 }; // Fallback estável para Eclusa
-  });
-
-  const [windowDimensions, setWindowDimensions] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      return { width: window.innerWidth, height: window.innerHeight };
-    }
-    return { width: 1920, height: 1080 }; // Fallback estável
-  });
-  const [isInitialized, setIsInitialized] = React.useState(false);
   const [paredeOffsetPercent] = React.useState(-50.5); // Posição ajustada para encaixe perfeito
   const [showTrendDialog, setShowTrendDialog] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
-  // ✅ DETECÇÃO MOBILE ESTÁVEL - INICIALIZAÇÃO CORRETA PARA EVITAR SALTO
-  const [isMobile, setIsMobile] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      return vw < 1024;
-    }
-    return false;
+  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
+  const [windowWidth, setWindowWidth] = React.useState(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 1920;
   });
 
+  // Detectar se é mobile
+  const isMobile = windowWidth < 1024;
+
+  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
   React.useEffect(() => {
-    const checkMobile = () => {
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      setIsMobile(vw < 1024);
+    if (typeof window === 'undefined') return;
+
+    let resizeTimeout: NodeJS.Timeout;
+
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        setWindowWidth(prev => {
+          // Só atualiza se a diferença for significativa (>50px)
+          if (Math.abs(prev - newWidth) > 50) {
+            return newWidth;
+          }
+          return prev;
+        });
+      }, 150); // Debounce de 150ms
     };
 
-    checkMobile();
-    const mediaQuery = window.matchMedia('(max-width: 1023px)');
-    mediaQuery.addListener(checkMobile);
-
-    return () => mediaQuery.removeListener(checkMobile);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const caldeiraScale = 99.4;
@@ -300,8 +298,18 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA ECLUS usando sendCommand
+  // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
+  const hasSubscribedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (connectionStatus.connected) {
+    // Reset ref no mount para garantir novo subscribe
+    hasSubscribedRef.current = false;
+  }, []);
+
+  React.useEffect(() => {
+    if (connectionStatus.connected && !hasSubscribedRef.current) {
+      hasSubscribedRef.current = true;
+
       // Enviar subscribe específico para ECLUS via sendCommand
       const subscribeCmd = {
         type: 'SUBSCRIBE',
@@ -320,6 +328,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
         data_type: 'STRING'
       });
 
+      if (import.meta.env.DEV) {
+        console.log('📡 [Eclusa_Regua] Subscribe ECLUS enviado (mount):', subscribeCmd);
+      }
     }
   }, [connectionStatus.connected, sendCommand]);
 
@@ -426,79 +437,33 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
 
 
-  // UseLayoutEffect para calcular dimensões ANTES da renderização visual
-  React.useLayoutEffect(() => {
-    const initializeDimensions = () => {
-      if (typeof window !== 'undefined') {
-        const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-        setWindowDimensions(newWindowDimensions);
+  // 🚀 MEMOIZAR DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  const dimensions = React.useMemo(() => {
+    const caldeiraAspectRatio = 1168 / 253;
+    const paredeAspectRatio = 1175 / 205;
+    const containerWidth = Math.min(windowWidth - 32, 1920);
+    const maxWidth = Math.max(containerWidth, 300);
 
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({ width: rect.width, height: rect.height });
-        } else {
-          // Fallback: calcular dimensões baseado na janela
-          const width = Math.min(newWindowDimensions.width - 32, 1920);
-          setContainerDimensions({ width, height: width / 5.7 });
-        }
-
-        setIsInitialized(true);
-      }
+    return {
+      caldeiraAspectRatio,
+      paredeAspectRatio,
+      maxWidth,
+      shouldRender: maxWidth > 100
     };
+  }, [windowWidth]);
 
-    // Executar imediatamente (sem timeout)
-    initializeDimensions();
-
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newDimensions = { width: rect.width, height: rect.height };
-
-        setContainerDimensions(prev => {
-          if (Math.abs(prev.width - newDimensions.width) > 10 ||
-            Math.abs(prev.height - newDimensions.height) > 10) {
-            return newDimensions;
-          }
-          return prev;
-        });
-      }
-
-      const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-      setWindowDimensions(prev => {
-        if (Math.abs(prev.width - newWindowDimensions.width) > 10 ||
-          Math.abs(prev.height - newWindowDimensions.height) > 10) {
-          return newWindowDimensions;
-        }
-        return prev;
-      });
-    };
-
-    window.addEventListener('resize', updateDimensions);
-    return () => {
-      window.removeEventListener('resize', updateDimensions);
-    };
-  }, []);
-
-
-  // Cálculo das proporções baseado nos viewBoxes originais
-  const caldeiraAspectRatio = 1168 / 253; // width/height do Caldeira_Eclusa.svg
-  const paredeAspectRatio = 1175 / 205;   // width/height do Parede_Eclusa.svg
-
-  // Calcular dimensões otimizadas para o container disponível
-  const maxWidth = Math.min(containerDimensions.width - 32, 1920); // 32px = margem mínima
-
-  // ✅ DETECÇÃO MOBILE JÁ IMPLEMENTADA ACIMA COM USEEFFECT ESTÁVEL
+  const { caldeiraAspectRatio, paredeAspectRatio, maxWidth, shouldRender } = dimensions;
 
 
   return (
     <div className="w-full h-screen flex flex-col items-center justify-end pb-8 relative">
 
-      {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
+      {/* 📱 PAINEL MOBILE - POSICIONADO NO TOPO (IGUAL OUTRAS PÁGINAS) */}
       {isMobile && (
         <div
-          className="w-full mt-4 mb-4 relative"
+          className="absolute top-0 left-0 right-0 z-20 pt-4"
           style={{
-            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+            padding: `16px ${Math.max(6, Math.min(16, windowWidth * 0.02))}px`
           }}
         >
           <div
@@ -507,16 +472,16 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
             }}
           >
-            {/* Cards horizontais compactos - sempre visíveis */}
+            {/* Cards horizontais compactos - sempre visíveis - PADRONIZADO COM OUTRAS PÁGINAS */}
             <div className="grid grid-cols-3 gap-1.5 mb-2">
               {/* CARD NÍVEIS */}
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
                   <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
                     NÍVEIS
                   </h3>
                 </div>
-                <div className="p-2 space-y-1">
+                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Montante:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
@@ -541,13 +506,13 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               </div>
 
               {/* CARD SISTEMA */}
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
                   <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
                     SISTEMA
                   </h3>
                 </div>
-                <div className="p-2 space-y-1">
+                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Status:</div>
                     <div className={`font-mono font-bold text-[10px] ${statusCaldeira === 'normal' ? 'text-green-600' : statusCaldeira === 'alerta' ? 'text-yellow-600' : 'text-red-600'}`}>
@@ -572,20 +537,26 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               </div>
 
               {/* CARD VÁLVULAS */}
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
                   <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
                     VÁLVULAS
                   </h3>
                 </div>
-                <div className="p-2 space-y-1">
+                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Mont-Cald:</div>
-                    <div className={`w-3 h-3 mx-auto rounded-full ${bitMontanteCaldeira ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <div className="font-mono font-bold text-[10px]">
+                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${bitMontanteCaldeira ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      {bitMontanteCaldeira ? 'ON' : 'OFF'}
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Cald-Jus:</div>
-                    <div className={`w-3 h-3 mx-auto rounded-full ${bitCaldeiraJusante ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <div className="font-mono font-bold text-[10px]">
+                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${bitCaldeiraJusante ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      {bitCaldeiraJusante ? 'ON' : 'OFF'}
+                    </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
@@ -603,13 +574,13 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
       )}
 
       {/* PAINÉIS INFORMATIVOS - ÁREA SUPERIOR COMPLETA - APENAS DESKTOP */}
-      {!isMobile && isInitialized && containerDimensions.width > 100 && (
+      {!isMobile && shouldRender && (
         <div
           className="absolute top-5 z-10"
           style={{
             left: '50%',
             transform: 'translateX(-50%)',
-            width: `${Math.min(containerDimensions.width - (isMobile ? 16 : 32), 1920)}px`,
+            width: `${Math.min(windowWidth - (isMobile ? 16 : 32), 1920)}px`,
           }}
         >
           <div
@@ -1048,7 +1019,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
       >
 
         {/* Container com positioning absoluto para controle total */}
-        {isInitialized && containerDimensions.width > 100 && windowDimensions.width > 0 ? (
+        {shouldRender ? (
           <div
             className="relative w-full flex flex-col items-center"
             style={{
@@ -1120,7 +1091,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Nível Caldeira - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${((maxWidth * caldeiraEclusaConfig.verticalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100) / caldeiraAspectRatio * caldeiraConfig.verticalPercent) / 100}px`,
                 left: `${((maxWidth * caldeiraEclusaConfig.horizontalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100 * caldeiraConfig.horizontalPercent) / 100) - ((maxWidth * caldeiraEclusaConfig.widthPercent) / 200)}px`,
@@ -1137,7 +1108,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Nível Jusante - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * jusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * jusanteConfig.horizontalPercent) / 100}px`,
@@ -1154,7 +1125,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Nível Montante - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * montanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * montanteConfig.horizontalPercent) / 100}px`,
@@ -1171,7 +1142,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Porta Jusante - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * portaJusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * portaJusanteConfig.horizontalPercent) / 100}px`,
@@ -1188,7 +1159,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Porta Montante - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * portaMontanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * portaMontanteConfig.horizontalPercent) / 100}px`,
@@ -1205,7 +1176,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Semáforo 1 - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * semaforo1Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo1Config.horizontalPercent) / 100}px`,
@@ -1223,7 +1194,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Semáforo 2 - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * semaforo2Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo2Config.horizontalPercent) / 100}px`,
@@ -1241,7 +1212,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Semáforo 3 - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * semaforo3Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo3Config.horizontalPercent) / 100}px`,
@@ -1259,7 +1230,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Semáforo 4 - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * semaforo4Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo4Config.horizontalPercent) / 100}px`,
@@ -1277,7 +1248,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Base Porta Jusante SVG */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * basePortaJusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * basePortaJusanteConfig.horizontalPercent) / 100}px`,
@@ -1304,7 +1275,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
             {/* Componente Tubulação e Válvulas - Dados reais do PLC */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 top: `${(maxWidth * tubulacaoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * tubulacaoConfig.horizontalPercent) / 100}px`,
@@ -1362,9 +1333,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
           onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
           className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
           style={{
-            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
-            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
-            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            padding: `${Math.max(6, Math.min(8, windowWidth * 0.015))}px ${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowWidth * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.1)'
           }}
@@ -1372,16 +1343,16 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
           <div 
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
-              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+              width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
             <CogIcon 
               className="text-white"
               style={{ 
-                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+                width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
               }} 
             />
           </div>
@@ -1389,8 +1360,8 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
           <div 
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
-              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
             }}
           >
             <ChevronUpIcon className="w-full h-full text-white/80" />

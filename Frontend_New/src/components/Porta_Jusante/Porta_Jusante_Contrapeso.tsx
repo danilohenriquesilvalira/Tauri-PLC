@@ -7,33 +7,17 @@ interface ContraPeso60tProps {
 
 const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
   websocketValue = 0,
-
 }) => {
-  const valor = websocketValue;
-
-  // Detectar se é mobile
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+  // Memoizar cálculos para evitar recálculos desnecessários
+  const { posicaoContrapeso, alturaCorda } = React.useMemo(() => {
+    const maxDescida = 350;
+    const posicao = (websocketValue * maxDescida) / 70;
+    const pontoConexaoOriginal = 20;
+    return {
+      posicaoContrapeso: posicao,
+      alturaCorda: pontoConexaoOriginal + posicao
     };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // COMPONENTE 100% ORIGINAL - sem movimento CSS adicional
-  const maxDescida = 350;
-  // Empurrar todo conjunto para baixo no mobile para alongar a corda
-  const extensaoMobile = isMobile ? 0 : 0;
-  const posicaoContrapeso = (valor * maxDescida) / 70 + extensaoMobile;
-
-  // Altura da corda - do topo até o ponto de conexão
-  const pontoConexaoOriginal = 20;
-  const alturaCorda = pontoConexaoOriginal + posicaoContrapeso;
+  }, [websocketValue]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
@@ -46,6 +30,12 @@ const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
+        style={{
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
+        }}
       >
         {/* Contrapeso COM MOVIMENTO INTERNO ORIGINAL */}
         <g transform={`translate(0, ${posicaoContrapeso})`}>

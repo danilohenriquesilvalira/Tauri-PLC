@@ -108,89 +108,81 @@ const MOTOR_CONFIG = {
 
 const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  // 🎯 VALORES INICIAIS ESTÁVEIS - evita re-renders extras no carregamento
-  const [containerDimensions, setContainerDimensions] = React.useState({ width: 1200, height: 600 });
-  const [windowDimensions, setWindowDimensions] = React.useState({ width: 1200, height: 800 });
-  const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
   const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
-  // UseLayoutEffect para calcular dimensões ANTES da renderização visual
-  React.useLayoutEffect(() => {
-    const initializeDimensions = () => {
-      if (typeof window !== 'undefined') {
-        const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-        setWindowDimensions(newWindowDimensions);
+  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
+  const [windowWidth, setWindowWidth] = React.useState(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 1920;
+  });
 
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({ width: rect.width, height: rect.height });
-        } else {
-          // Fallback: calcular dimensões baseado na janela
-          const width = Math.min(newWindowDimensions.width - 32, 1920);
-          setContainerDimensions({ width, height: width / 5.7 });
-        }
+  // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  const dimensions = React.useMemo(() => {
+    const isMobile = windowWidth < 1024;
+    const portaMontanteAspectRatio = 1075 / 1098;
+    const containerWidth = Math.min(windowWidth - 32, 1920);
+    const maxWidth = Math.max(containerWidth, 300);
+    const portaScale = isMobile ? 90 : 55;
+    const basePortaWidth = (maxWidth * portaScale) / 100;
+    const basePortaHeight = basePortaWidth / portaMontanteAspectRatio;
 
-        setIsInitialized(true);
-      }
+    return {
+      isMobile,
+      maxWidth,
+      basePortaWidth,
+      basePortaHeight,
+      alturaTotal: basePortaHeight,
+      shouldRender: maxWidth > 100 && basePortaHeight > 100
     };
+  }, [windowWidth]);
 
-    // Executar imediatamente (sem timeout)
-    initializeDimensions();
+  // Desestruturar para uso
+  const { isMobile, maxWidth, basePortaWidth, basePortaHeight, alturaTotal, shouldRender } = dimensions;
 
-    const updateDimensions = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newDimensions = { width: rect.width, height: rect.height };
+  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-        setContainerDimensions(prev => {
-          if (Math.abs(prev.width - newDimensions.width) > 10 ||
-            Math.abs(prev.height - newDimensions.height) > 10) {
-            return newDimensions;
+    let resizeTimeout: NodeJS.Timeout;
+
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        setWindowWidth(prev => {
+          // Só atualiza se a diferença for significativa (>50px)
+          if (Math.abs(prev - newWidth) > 50) {
+            return newWidth;
           }
           return prev;
         });
-      }
-
-      const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-      setWindowDimensions(prev => {
-        if (Math.abs(prev.width - newWindowDimensions.width) > 10 ||
-          Math.abs(prev.height - newWindowDimensions.height) > 10) {
-          return newWindowDimensions;
-        }
-        return prev;
-      });
+      }, 150); // Debounce de 150ms
     };
 
-    window.addEventListener('resize', updateDimensions);
+    window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('resize', updateDimensions);
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
     };
-  }, []); // Não incluir sidebarOpen para evitar recálculos desnecessários
-
-  // Detectar se é mobile - otimizado para evitar recálculos
-  const isMobile = React.useMemo(() => windowDimensions.width < 1024, [windowDimensions.width]);
-
-  // 🎯 SISTEMA IDÊNTICO AO ECLUSA_REGUA - SEM ESCALA RESPONSIVA
-  const portaMontanteAspectRatio = 1075 / 1098; // Baseado no SVG real: width="1075" height="1098"
-
-  // 📐 EXATAMENTE IGUAL ECLUSA_REGUA - maxWidth direto - MANTER CÁLCULO ORIGINAL
-  const maxWidth = Math.min(containerDimensions.width - 32, 1920); // 32px = margem mínima
-
-  // 🎯 PORTA MONTANTE: maxWidth direto igual caldeira na Eclusa_Regua  
-  const portaScale = isMobile ? 90 : 55; // 90% mobile, 55% desktop
-  const basePortaWidth = (maxWidth * portaScale) / 100;
-  const basePortaHeight = basePortaWidth / portaMontanteAspectRatio;
-
-  // 🎯 ALTURA TOTAL FIXA - igual sistema Eclusa_Regua
-  const alturaTotal = basePortaHeight;
+  }, []);
 
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA MONT usando sendCommand
+  // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
+  const hasSubscribedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (connectionStatus.connected) {
+    // Reset ref no mount para garantir novo subscribe
+    hasSubscribedRef.current = false;
+  }, []);
+
+  React.useEffect(() => {
+    if (connectionStatus.connected && !hasSubscribedRef.current) {
+      hasSubscribedRef.current = true;
+
       // Enviar subscribe específico para MONT via sendCommand
       const subscribeCmd = {
         type: 'SUBSCRIBE',
@@ -210,7 +202,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       });
 
       if (import.meta.env.DEV) {
-        console.log('📡 [PortaMontante] Subscribe MONT enviado:', subscribeCmd);
+        console.log('📡 [PortaMontante] Subscribe MONT enviado (mount):', subscribeCmd);
       }
     }
   }, [connectionStatus.connected, sendCommand]);
@@ -290,14 +282,14 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     const baseCardWidth = maxWidth * 0.18;
 
     // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
-    if (containerDimensions.width > 1920) {
+    if (windowWidth > 1920) {
       // Usar a largura real do container para calcular
-      const expandedMaxWidth = Math.min(containerDimensions.width - 32, 2560); // Máximo 2560px
+      const expandedMaxWidth = Math.min(windowWidth - 32, 2560); // Máximo 2560px
       return expandedMaxWidth * 0.18;
     }
 
     return baseCardWidth;
-  }, [maxWidth, containerDimensions.width]);
+  }, [maxWidth, windowWidth]);
 
   // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
   const cardWidth = () => cardWidthValue;
@@ -327,7 +319,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   }, [cardWidthValue]);
 
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
-  const larguraTotalTela = windowDimensions.width;
+  const larguraTotalTela = windowWidth;
   const espacoUsadoPorComponentes = maxWidth; // Usar maxWidth que mantém o tamanho original
   const espacoSobrandoTotal = Math.max(0, larguraTotalTela - espacoUsadoPorComponentes);
 
@@ -337,12 +329,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   // Performance optimization: Debug logging only in development
   if (import.meta.env.DEV) {
     console.log('🎯 PORTAMONTANTE - CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
-      container_width: containerDimensions.width,
+      container_width: windowWidth,
       maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
       card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
       card_expandido: `${cardWidthValue.toFixed(0)}px`,
       diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
-      usando_expansao: containerDimensions.width > 1920 ? '✅ SIM' : '❌ NÃO',
+      usando_expansao: windowWidth > 1920 ? '✅ SIM' : '❌ NÃO',
       espaco_disponivel_esquerda: espacoDisponivelEsquerda,
       espaco_disponivel_direita: espacoDisponivelDireita
     });
@@ -693,20 +685,20 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
         <div 
           className="w-full mt-4 mb-4 relative"
           style={{
-            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px` // Padding adaptativo universal
+            padding: `0 ${Math.max(6, Math.min(16, windowWidth * 0.02))}px` // Padding adaptativo universal
           }}
         >
           <div 
             className="mx-auto"
             style={{
-              maxWidth: `${Math.min(windowDimensions.width - 12, 1200)}px` // Adaptativo para qualquer tela
+              maxWidth: `${Math.min(windowWidth - 12, 1200)}px` // Adaptativo para qualquer tela
             }}
           >
             {/* Cards responsivos universais */}
             <div 
               className="grid grid-cols-3 mb-2"
               style={{
-                gap: `${Math.max(4, Math.min(8, windowDimensions.width * 0.01))}px` // Gap adaptativo
+                gap: `${Math.max(4, Math.min(8, windowWidth * 0.01))}px` // Gap adaptativo
               }}
             >
               {/* CARD DADOS */}
@@ -714,30 +706,30 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                 <div className="bg-edp-marine text-white px-2 py-1">
                   <h3 
                     className="font-bold uppercase tracking-wide text-center leading-tight"
-                    style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                    style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                   >
                     DADOS
                   </h3>
                 </div>
                 <div 
                   className="space-y-1"
-                  style={{ padding: `${Math.max(4, Math.min(8, windowDimensions.width * 0.004))}px` }}
+                  style={{ padding: `${Math.max(4, Math.min(8, windowWidth * 0.004))}px` }}
                 >
                   <div className="text-center">
                     <div 
                       className="text-gray-600 font-medium uppercase"
-                      style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                      style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                     >
                       Posição:
                     </div>
                     <div 
                       className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px` }}
+                      style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
                     >
                       {(reguaPortaMontante * 12.5 / 100).toFixed(2)} 
                       <span 
                         className="text-gray-500"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowDimensions.width * 0.015))}px` }}
+                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
                         m
                       </span>
@@ -746,18 +738,18 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   <div className="text-center">
                     <div 
                       className="text-gray-600 font-medium uppercase"
-                      style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                      style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                     >
                       Abertura:
                     </div>
                     <div 
                       className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px` }}
+                      style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
                     >
                       {reguaPortaMontante}
                       <span 
                         className="text-gray-500"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowDimensions.width * 0.015))}px` }}
+                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
                         %
                       </span>
@@ -767,18 +759,18 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                     <div className="text-center">
                       <div 
                         className="text-gray-600 font-medium uppercase"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowDimensions.width * 0.015))}px` }}
+                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
                         Dif. E/D:
                       </div>
                       <div 
                         className="font-mono font-bold text-[#212E3E]"
-                        style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                        style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                       >
                         {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} 
                         <span 
                           className="text-gray-500"
-                          style={{ fontSize: `${Math.max(4, Math.min(7, windowDimensions.width * 0.012))}px` }}
+                          style={{ fontSize: `${Math.max(4, Math.min(7, windowWidth * 0.012))}px` }}
                         >
                           mm
                         </span>
@@ -888,7 +880,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               <div className="bg-[#212E3E] text-white px-3 py-2">
                 <h3 
                   className="font-bold uppercase tracking-wide text-center"
-                  style={{ fontSize: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px` }}
+                  style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
                 >
                   PARÂMETROS PORTA MONTANTE
                 </h3>
@@ -896,19 +888,19 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               
               <div 
                 className="max-h-80 overflow-y-auto"
-                style={{ padding: `${Math.max(8, Math.min(16, windowDimensions.width * 0.025))}px` }}
+                style={{ padding: `${Math.max(8, Math.min(16, windowWidth * 0.025))}px` }}
               >
                 <div className="grid grid-cols-1 gap-3">
                   {/* PROGRAMA ABERTURA */}
                   <div className="bg-gray-50 rounded-lg p-3">
                     <h4 
                       className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowDimensions.width * 0.022))}px` }}
+                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
                     >
                       <ArrowUpIcon 
                         style={{ 
-                          width: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`
+                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
                         }} 
                       />
                       PROGRAMA ABERTURA
@@ -917,13 +909,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           Posição Alvo:
                         </span>
                         <span 
                           className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           8.50 m
                         </span>
@@ -931,13 +923,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           RPM Configurado:
                         </span>
                         <span 
                           className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           1450 RPM
                         </span>
@@ -949,12 +941,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   <div className="bg-gray-50 rounded-lg p-3">
                     <h4 
                       className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowDimensions.width * 0.022))}px` }}
+                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
                     >
                       <ArrowDownIcon 
                         style={{ 
-                          width: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`
+                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
                         }} 
                       />
                       PROGRAMA FECHAMENTO
@@ -963,13 +955,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           Posição Alvo:
                         </span>
                         <span 
                           className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           0.00 m
                         </span>
@@ -977,13 +969,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           RPM Configurado:
                         </span>
                         <span 
                           className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           1200 RPM
                         </span>
@@ -995,12 +987,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   <div className="bg-gray-50 rounded-lg p-3">
                     <h4 
                       className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowDimensions.width * 0.022))}px` }}
+                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
                     >
                       <EyeIcon 
                         style={{ 
-                          width: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowDimensions.width * 0.03))}px`
+                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
                         }} 
                       />
                       LASER MONTANTE
@@ -1009,13 +1001,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           Área Protegida:
                         </span>
                         <span 
                           className="font-mono font-bold text-green-600"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           LIVRE
                         </span>
@@ -1023,13 +1015,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       <div className="flex justify-between">
                         <span 
                           className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowDimensions.width * 0.018))}px` }}
+                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                         >
                           Leitura Cota:
                         </span>
                         <span 
                           className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowDimensions.width * 0.02))}px` }}
+                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                         >
                           {(reguaPortaMontante * 12.5 / 100 + 125.5).toFixed(2)} m
                         </span>
@@ -1051,9 +1043,9 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
           className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
           style={{
-            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
-            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
-            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            padding: `${Math.max(6, Math.min(8, windowWidth * 0.015))}px ${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowWidth * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.1)'
           }}
@@ -1061,16 +1053,16 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           <div 
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
-              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+              width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
             <CogIcon 
               className="text-white"
               style={{ 
-                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+                width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
               }} 
             />
           </div>
@@ -1078,8 +1070,8 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           <div 
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
-              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
             }}
           >
             <ChevronUpIcon className="w-full h-full text-white/80" />
@@ -1332,7 +1324,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
         }}
       >
 
-        {isInitialized && containerDimensions.width > 100 && windowDimensions.width > 0 ? (
+        {shouldRender ? (
           <div
             className="relative w-full flex flex-col items-center justify-center"
             style={{
@@ -1368,14 +1360,15 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
             {/* 🎯 CONTRAPESO DIREITO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 57 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * contrapesoDireitoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
                 height: `${(alturaTotal * contrapesoDireitoConfig.heightPercent) / 100}px`,
-                zIndex: 10
+                zIndex: 10,
+                contain: 'layout'
               }}
             >
               <ContraPeso20t
@@ -1386,14 +1379,15 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
             {/* 🎯 CONTRAPESO ESQUERDO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 58 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
                 height: `${(alturaTotal * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
-                zIndex: 10
+                zIndex: 10,
+                contain: 'layout'
               }}
             >
               <ContraPeso20t
@@ -1404,14 +1398,15 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
             {/* 📏 RÉGUA PORTA MONTANTE - WEBSOCKET ÍNDICE 56 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * reguaConfigAtual.verticalPercent) / 100}px`,
                 left: `${(maxWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * reguaConfigAtual.widthPercent) / 100}px`,
                 height: `${(alturaTotal * reguaConfigAtual.heightPercent) / 100}px`,
-                zIndex: 5
+                zIndex: 5,
+                contain: 'layout'
               }}
             >
               <PortaMontanteRegua
@@ -1422,7 +1417,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
             {/* ⚙️ MOTOR DIREITO - WEBSOCKET ÍNDICE 50 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * motorDireitoConfig.verticalPercent) / 100}px`,
@@ -1441,7 +1436,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
             {/* ⚙️ MOTOR ESQUERDO - WEBSOCKET ÍNDICE 51 - ESPELHADO */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * motorEsquerdoConfig.verticalPercent) / 100}px`,

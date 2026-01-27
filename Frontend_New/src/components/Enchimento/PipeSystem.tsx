@@ -62,15 +62,16 @@ const PipeSystem: React.FC<PipeSystemProps> = ({
 
   // SVG do sistema de tubulações - usando seu SVG original correto
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 1348 423" 
-        fill="none" 
+    <div className="w-full h-full flex items-center justify-center" style={{ background: 'transparent', pointerEvents: 'none' }}>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 1348 423"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-full"
+        style={{ background: 'transparent' }}
       >
         {/* Pipe 2 DIREITA - M23.3 - ENCH_SIN_CIRC_SUBIDA */}
         <path 

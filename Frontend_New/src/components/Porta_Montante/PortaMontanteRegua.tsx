@@ -5,28 +5,35 @@ interface PortaMontanteReguaProps {
   editMode?: boolean;
 }
 
-const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({ 
+const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
   websocketValue = 0,
 }) => {
-  const valor = websocketValue;
-
-  // Movimentação da porta: 0% = fechada (topo), 100% = aberta (embaixo)
-  const maxDescida = 350;
-  const posicaoPorta = (valor * maxDescida) / 100;
-  
-  // Comprimento das linhas laterais
-  const comprimentoLinha = 20 + posicaoPorta;
+  // Memoizar cálculos para evitar recálculos desnecessários
+  const { posicaoPorta, comprimentoLinha } = React.useMemo(() => {
+    const maxDescida = 350;
+    const posicao = (websocketValue * maxDescida) / 100;
+    return {
+      posicaoPorta: posicao,
+      comprimentoLinha: 20 + posicao
+    };
+  }, [websocketValue]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 669 800" 
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 669 800"
         preserveAspectRatio="xMidYMid meet"
-        fill="none" 
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
+        style={{
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
+        }}
       >
         {/* Porta com movimento vertical */}
         <g transform={`translate(0, ${posicaoPorta})`}>
@@ -97,24 +104,24 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
           <path d="M0.00115943 73.1975L0.00115959 69.4302C0.00115963 68.5541 2.88953 67.7656 6.86102 67.7656L668.66 67.7656L668.66 74.7745L6.86102 74.7745C3.25055 74.8621 0.00115938 74.1612 0.00115943 73.1975Z" fill="url(#paint13_linear_3818_557)"/>
           <path d="M0.00115942 40.4553L0.00115959 36.688C0.00115963 35.8119 2.88953 35.0234 6.86102 35.0234L668.66 35.0234L668.66 42.0323L6.86102 42.0323C3.25055 42.1199 0.00115938 41.419 0.00115942 40.4553Z" fill="url(#paint14_linear_3818_557)"/>
         </g>
-        
+
         {/* Linhas laterais - centralizadas nos retângulos pretos */}
-        <rect 
-          width="10" 
+        <rect
+          width="10"
           height={comprimentoLinha}
           x="17.18"
           y="0"
           fill="black"
         />
-        
-        <rect 
-          width="10" 
+
+        <rect
+          width="10"
           height={comprimentoLinha}
           x="646.61"
           y="0"
           fill="black"
         />
-        
+
         <defs>
           <linearGradient id="paint0_linear_3818_557" x1="8.39062" y1="99.9137" x2="109.049" y2="99.9137" gradientUnits="userSpaceOnUse">
             <stop stopColor="white"/>

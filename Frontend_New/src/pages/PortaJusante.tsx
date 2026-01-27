@@ -108,127 +108,81 @@ const MOTOR_CONFIG = {
 
 const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = React.useState({ width: 1200, height: 600 }); // Valores iniciais estáveis
-  const [windowDimensions, setWindowDimensions] = React.useState({ width: 1200, height: 800 }); // Valores iniciais estáveis
-  const [isInitialized, setIsInitialized] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
   const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
-  // ✅ DETECÇÃO MOBILE ESTÁVEL - INICIALIZAÇÃO CORRETA PARA EVITAR SALTO
-  const [isMobile, setIsMobile] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      return vw < 1024;
-    }
-    return false;
+  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
+  const [windowWidth, setWindowWidth] = React.useState(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 1920;
   });
 
-  React.useEffect(() => {
-    const checkMobile = () => {
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      setIsMobile(vw < 1024);
+  // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  const dimensions = React.useMemo(() => {
+    const isMobile = windowWidth < 1024;
+    const portaJusanteAspectRatio = 1075 / 1098;
+    const containerWidth = Math.min(windowWidth - 32, 1920);
+    const maxWidth = Math.max(containerWidth, 300);
+    const portaScale = isMobile ? 85 : 55;
+    const basePortaWidth = Math.max((maxWidth * portaScale) / 100, isMobile ? 300 : 500);
+    const basePortaHeight = Math.max(basePortaWidth / portaJusanteAspectRatio, isMobile ? 250 : 400);
+
+    return {
+      isMobile,
+      maxWidth,
+      basePortaWidth,
+      basePortaHeight,
+      alturaTotal: basePortaHeight,
+      shouldRender: maxWidth > 100 && basePortaHeight > 100
     };
+  }, [windowWidth]);
 
-    checkMobile();
-    const mediaQuery = window.matchMedia('(max-width: 1023px)');
-    mediaQuery.addListener(checkMobile);
+  // Desestruturar para uso
+  const { isMobile, maxWidth, basePortaWidth, basePortaHeight, alturaTotal, shouldRender } = dimensions;
 
-    return () => mediaQuery.removeListener(checkMobile);
-  }, []);
-
-  // ✅ USELAYOUTEFFECT PARA EVITAR SALTO VISUAL - executa ANTES da renderização
-  React.useLayoutEffect(() => {
-    const initializeDimensions = () => {
-      if (typeof window !== 'undefined') {
-        const newWindowDimensions = { width: window.innerWidth, height: window.innerHeight };
-        setWindowDimensions(newWindowDimensions);
-
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({ width: rect.width, height: rect.height });
-        } else {
-          // Fallback: calcular dimensões baseado na janela
-          const width = Math.min(newWindowDimensions.width - 32, 1920);
-          setContainerDimensions({ width, height: width / 5.7 });
-        }
-      }
-    };
-
-    // Inicializar dimensões imediatamente
-    initializeDimensions();
-    setIsInitialized(true);
-  }, []);
-
-  // ✅ USEEFFECT PARA UPDATES POSTERIORES - sem race conditions
+  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
   React.useEffect(() => {
-    const updateDimensions = () => {
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+    if (typeof window === 'undefined') return;
 
-      setWindowDimensions(prev => {
-        // Só atualiza se a diferença for significativa (>50px) para evitar micro-ajustes
-        if (Math.abs(prev.width - vw) > 50 || Math.abs(prev.height - vh) > 50) {
-          return { width: vw, height: vh };
-        }
-        return prev;
-      });
+    let resizeTimeout: NodeJS.Timeout;
 
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const newContainerDimensions = { width: rect.width, height: rect.height };
-
-        setContainerDimensions(prev => {
-          // Só atualiza se a diferença for significativa
-          if (Math.abs(prev.width - newContainerDimensions.width) > 20 ||
-            Math.abs(prev.height - newContainerDimensions.height) > 20) {
-            return newContainerDimensions;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        setWindowWidth(prev => {
+          // Só atualiza se a diferença for significativa (>50px)
+          if (Math.abs(prev - newWidth) > 50) {
+            return newWidth;
           }
           return prev;
         });
-      }
+      }, 150); // Debounce de 150ms
     };
 
-    // Primeira atualização após inicialização
-    updateDimensions();
-
-    // ✅ Debounce no resize para evitar cálculos excessivos
-    let resizeTimeout: NodeJS.Timeout;
-    const debouncedResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(updateDimensions, 150);
-    };
-
-    window.addEventListener('resize', debouncedResize);
-    window.addEventListener('orientationchange', debouncedResize);
-
+    window.addEventListener('resize', handleResize);
     return () => {
       clearTimeout(resizeTimeout);
-      window.removeEventListener('resize', debouncedResize);
-      window.removeEventListener('orientationchange', debouncedResize);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
-
-  // ✅ CÁLCULOS ESTABILIZADOS COM VALORES MÍNIMOS SEGUROS
-  const portaJusanteAspectRatio = 1075 / 1098; // Baseado no SVG real: width="1075" height="1098"
-
-  // ✅ DIMENSÕES SEGURAS - com mínimos garantidos para evitar componentes minúsculos
-  const safeContainerWidth = Math.max(containerDimensions.width, isMobile ? 350 : 800);
-  const maxWidth = Math.min(safeContainerWidth - 32, 1920); // 32px = margem mínima
-
-  // ✅ ESCALAS FIXAS E PREVISÍVEIS
-  const portaScale = isMobile ? 85 : 55; // Escala fixa para evitar recálculos
-  const basePortaWidth = Math.max((maxWidth * portaScale) / 100, isMobile ? 300 : 500); // Mínimos seguros
-  const basePortaHeight = Math.max(basePortaWidth / portaJusanteAspectRatio, isMobile ? 250 : 400);
-
-  // ✅ ALTURA TOTAL COM MÍNIMO GARANTIDO
-  const alturaTotal = basePortaHeight;
 
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA JUS usando sendCommand
+  // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
+  const hasSubscribedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (connectionStatus.connected) {
+    // Reset ref no mount para garantir novo subscribe
+    hasSubscribedRef.current = false;
+  }, []);
+
+  React.useEffect(() => {
+    if (connectionStatus.connected && !hasSubscribedRef.current) {
+      hasSubscribedRef.current = true;
+
       // Enviar subscribe específico para JUS via sendCommand
       const subscribeCmd = {
         type: 'SUBSCRIBE',
@@ -248,7 +202,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       });
 
       if (import.meta.env.DEV) {
-        console.log('📡 [PortaJusante] Subscribe JUS enviado:', subscribeCmd);
+        console.log('📡 [PortaJusante] Subscribe JUS enviado (mount):', subscribeCmd);
       }
     }
   }, [connectionStatus.connected, sendCommand]);
@@ -323,14 +277,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     const baseCardWidth = maxWidth * 0.18;
 
     // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
-    if (containerDimensions.width > 1920) {
+    if (windowWidth > 1920) {
       // Usar a largura real do container para calcular
-      const expandedMaxWidth = Math.min(containerDimensions.width - 32, 2560); // Máximo 2560px
+      const expandedMaxWidth = Math.min(windowWidth - 32, 2560); // Máximo 2560px
       return expandedMaxWidth * 0.18;
     }
 
     return baseCardWidth;
-  }, [maxWidth, containerDimensions.width]);
+  }, [maxWidth, windowWidth]);
 
   // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
   const cardWidth = () => cardWidthValue;
@@ -360,7 +314,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   }, [cardWidthValue]);
 
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
-  const larguraTotalTela = windowDimensions.width;
+  const larguraTotalTela = windowWidth;
   const espacoUsadoPorComponentes = maxWidth; // Usar maxWidth que mantém o tamanho original
   const espacoSobrandoTotal = Math.max(0, larguraTotalTela - espacoUsadoPorComponentes);
 
@@ -370,12 +324,12 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   // Performance optimization: Debug logging only in development
   if (import.meta.env.DEV) {
     console.log('🎯 CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
-      container_width: containerDimensions.width,
+      window_width: windowWidth,
       maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
       card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
       card_expandido: `${cardWidthValue.toFixed(0)}px`,
       diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
-      usando_expansao: containerDimensions.width > 1920 ? '✅ SIM' : '❌ NÃO'
+      usando_expansao: windowWidth > 1920 ? '✅ SIM' : '❌ NÃO'
     });
   }
 
@@ -391,7 +345,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     >
 
       {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - DESKTOP */}
-      {!isMobile && isInitialized && (
+      {!isMobile && shouldRender && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
@@ -556,7 +510,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       )}
 
       {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - DESKTOP */}
-      {!isMobile && isInitialized && (
+      {!isMobile && shouldRender && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
@@ -732,7 +686,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         <div
           className="w-full mt-4 mb-4 relative"
           style={{
-            padding: `0 ${Math.max(6, Math.min(16, windowDimensions.width * 0.02))}px`
+            padding: `0 ${Math.max(6, Math.min(16, windowWidth * 0.02))}px`
           }}
         >
           <div
@@ -860,9 +814,9 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
           className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
           style={{
-            padding: `${Math.max(6, Math.min(8, windowDimensions.width * 0.015))}px ${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
-            fontSize: `${Math.max(8, Math.min(10, windowDimensions.width * 0.02))}px`,
-            borderRadius: `${Math.max(8, Math.min(12, windowDimensions.width * 0.025))}px`,
+            padding: `${Math.max(6, Math.min(8, windowWidth * 0.015))}px ${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
+            fontSize: `${Math.max(8, Math.min(10, windowWidth * 0.02))}px`,
+            borderRadius: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.1)'
           }}
@@ -870,16 +824,16 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           <div 
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
-              width: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              height: `${Math.max(16, Math.min(20, windowDimensions.width * 0.04))}px`,
-              borderRadius: `${Math.max(4, Math.min(6, windowDimensions.width * 0.012))}px`
+              width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              height: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
+              borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
             <CogIcon 
               className="text-white"
               style={{ 
-                width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-                height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+                width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+                height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
               }} 
             />
           </div>
@@ -887,8 +841,8 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           <div 
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
-              width: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`,
-              height: `${Math.max(10, Math.min(12, windowDimensions.width * 0.025))}px`
+              width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
+              height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
             }}
           >
             <ChevronUpIcon className="w-full h-full text-white/80" />
@@ -1141,7 +1095,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
         }}
       >
 
-        {isInitialized && containerDimensions.width > 100 && windowDimensions.width > 0 ? (
+        {shouldRender ? (
           <div
             className="relative w-full flex flex-col items-center justify-center"
             style={{
@@ -1177,14 +1131,15 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* 🎯 CONTRAPESO DIREITO - COM MOVIMENTO PROPORCIONAL */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * contrapesoDireitoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
                 height: `${(alturaTotal * contrapesoDireitoConfig.heightPercent) / 100}px`,
-                zIndex: 10
+                zIndex: 10,
+                contain: 'layout'
               }}
             >
               <ContraPeso60t
@@ -1195,14 +1150,15 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* 🎯 CONTRAPESO ESQUERDO - COM MOVIMENTO PROPORCIONAL */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
                 height: `${(alturaTotal * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
-                zIndex: 10
+                zIndex: 10,
+                contain: 'layout'
               }}
             >
               <ContraPeso60t
@@ -1213,14 +1169,15 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* 📏 RÉGUA PORTA JUSANTE - WEBSOCKET ÍNDICE 39 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * reguaConfigAtual.verticalPercent) / 100}px`,
                 left: `${(maxWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * reguaConfigAtual.widthPercent) / 100}px`,
                 height: `${(alturaTotal * reguaConfigAtual.heightPercent) / 100}px`,
-                zIndex: 5
+                zIndex: 5,
+                contain: 'layout'
               }}
             >
               <PortaJusanteRegua
@@ -1231,7 +1188,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* ⚙️ MOTOR DIREITO - WEBSOCKET ÍNDICE 28 */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * motorDireitoConfig.verticalPercent) / 100}px`,
@@ -1250,7 +1207,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
 
             {/* ⚙️ MOTOR ESQUERDO - WEBSOCKET ÍNDICE 29 - ESPELHADO */}
             <div
-              className="absolute transition-all duration-200 ease-in-out"
+              className="absolute"
               style={{
                 // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
                 top: `${(alturaTotal * motorEsquerdoConfig.verticalPercent) / 100}px`,

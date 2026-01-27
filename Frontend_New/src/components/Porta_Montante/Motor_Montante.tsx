@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 interface MotorMontanteProps {
@@ -8,42 +6,51 @@ interface MotorMontanteProps {
   direction?: 'left' | 'right';
 }
 
-const MotorMontante: React.FC<MotorMontanteProps> = ({ 
+const MotorMontante: React.FC<MotorMontanteProps> = ({
   websocketValue = 0,
   editMode = false,
   direction = 'left'
 }) => {
-  // Detectar se é mobile
-  const isMobile = window.innerWidth < 1024;
+  // Memoizar cores para evitar recálculos
+  const { mainColor, secondaryColor } = React.useMemo(() => {
+    const status = websocketValue as (0 | 1 | 2);
+    let main: string;
+    let secondary: string;
 
-  // Tamanhos diferentes para desktop e mobile
-  const svgWidth = isMobile ? "90" : "82";
-  const svgHeight = isMobile ? "50" : "40";
-  
-  const currentStatus = websocketValue as (0 | 1 | 2);
-
-  const getMainColor = () => {
-    switch (currentStatus) {
-      case 1: return "#2ecc71"; // Verde para operacional
-      case 2: return "#e74c3c"; // Vermelho para falha
-      default: return "#95a5a6"; // Cinza para inativo
+    switch (status) {
+      case 1:
+        main = "#2ecc71";
+        secondary = "#27ae60";
+        break;
+      case 2:
+        main = "#e74c3c";
+        secondary = "#c0392b";
+        break;
+      default:
+        main = "#95a5a6";
+        secondary = "#7f8c8d";
     }
-  };
 
-  const mainColor = getMainColor();
-  const secondaryColor = currentStatus === 1 ? "#27ae60" : (currentStatus === 2 ? "#c0392b" : "#7f8c8d");
-  
+    return { mainColor: main, secondaryColor: secondary };
+  }, [websocketValue]);
+
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <svg 
-        width={svgWidth} 
-        height={svgHeight} 
-        viewBox="0 0 82 40" 
-        fill="none" 
+    <div
+      className="w-full h-full relative"
+      style={{ overflow: 'hidden' }}
+    >
+      {/* SVG com posição absoluta para evitar recálculos de layout */}
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 82 40"
+        preserveAspectRatio="xMidYMin meet"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-        style={{ 
-          transition: 'all 0.5s ease-in-out',
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
           transform: direction === 'right' ? 'scaleX(-1)' : 'none',
           transformOrigin: 'center'
         }}
