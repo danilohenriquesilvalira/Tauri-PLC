@@ -9,6 +9,7 @@ import PortaJusante from './pages/PortaJusante';
 import Enchimento from './pages/Enchimento';
 import WebSocketDebug from './pages/WebSocketDebug';
 import Falhas from './pages/Falhas';
+import SistemaAgua from './pages/SistemaAgua';
 
 const App = () => {
   return (
@@ -62,6 +63,14 @@ const App = () => {
               }
             />
 
+            <Route
+              path="/sistema-agua"
+              element={
+                <Layout>
+                  <SistemaAgua />
+                </Layout>
+              }
+            />
 
             <Route
               path="/falhas"

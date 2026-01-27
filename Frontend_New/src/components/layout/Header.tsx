@@ -48,6 +48,8 @@ export const Header = () => {
       return 'Porta Montante';
     } else if (pathname.includes('enchimento')) {
       return 'Enchimento';
+    } else if (pathname.includes('sistema-agua')) {
+      return 'Sistema de Agua Purificada';
     } else if (pathname.includes('falhas')) {
       return 'Falhas';
     } else {

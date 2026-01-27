@@ -12,7 +12,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
-type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'porta_jusante' | 'porta_montante' | 'falhas';
+type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'porta_jusante' | 'porta_montante' | 'sistema_agua' | 'falhas';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -73,6 +73,8 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       setActiveItem('porta_montante');
     } else if (pathname.includes('enchimento')) {
       setActiveItem('enchimento');
+    } else if (pathname.includes('sistema-agua')) {
+      setActiveItem('sistema_agua');
     } else if (pathname.includes('falhas')) {
       setActiveItem('falhas');
     } else {
@@ -94,10 +96,11 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
   const getIconSrc = (itemId: NavItem): string => {
     const icons = {
       dashboard: '/Logo_Sidebar/Dashboard.svg',
-      porta_jusante: '/Logo_Sidebar/PortaJusante.svg', 
+      porta_jusante: '/Logo_Sidebar/PortaJusante.svg',
       porta_montante: '/Logo_Sidebar/PortaMontante.svg',
       enchimento: '/Logo_Sidebar/Enchimento.svg',
       eclusa: '/Logo_Sidebar/Eclusa_Regua.svg',
+      sistema_agua: '/Logo_Sidebar/SistemaAgua.svg',
       falhas: '/Logo_Sidebar/Falhas.svg'
     };
     return icons[itemId];
@@ -133,6 +136,12 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       label: 'Porta Montante',
       icon: Cog6ToothIcon,
       path: '/porta-montante'
+    },
+    {
+      id: 'sistema_agua' as NavItem,
+      label: 'Agua PW',
+      icon: BeakerIcon,
+      path: '/sistema-agua'
     },
     {
       id: 'falhas' as NavItem,
@@ -266,7 +275,7 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
 
       {/* Mobile Bottom Navigation - VISÍVEL NO MOBILE VIA CSS (lg:hidden) */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-edp-marine border-t border-edp-neutral-darker h-16 flex lg:hidden">
-        <div className="grid grid-cols-6 gap-0 h-full w-full">
+        <div className="grid grid-cols-7 gap-0 h-full w-full">
             {navigationItems.map((item) => {
               const isActive = activeItem === item.id;
               
@@ -282,12 +291,12 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
                     }
                   `}
                 >
-                  <img 
+                  <img
                     src={getIconSrc(item.id)}
                     alt={item.label}
-                    className="w-6 h-6 mb-1 brightness-0 invert"
+                    className="w-5 h-5 mb-0.5 brightness-0 invert"
                   />
-                  <span className="text-[10px] font-edp font-medium text-center leading-tight">
+                  <span className="text-[8px] font-edp font-medium text-center leading-tight truncate w-full px-0.5">
                     {item.label}
                   </span>
                 </button>

@@ -1,0 +1,16 @@
+<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Beaker/Flask base -->
+<path d="M8 3V8L4 22C4 23.5 5 25 7 25H19C21 25 22 23.5 22 22L18 8V3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Top opening -->
+<path d="M6 3H20" stroke="white" stroke-width="2" stroke-linecap="round"/>
+<!-- Water level wavy -->
+<path d="M6 16C7.5 14.5 9 14.5 10.5 16C12 17.5 13.5 17.5 15 16C16.5 14.5 18 14.5 20 16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Water drops/bubbles -->
+<circle cx="10" cy="20" r="1" fill="white"/>
+<circle cx="14" cy="19" r="1.2" fill="white"/>
+<circle cx="12" cy="22" r="0.8" fill="white"/>
+<!-- PW indicator dots (purity) -->
+<circle cx="13" cy="11" r="0.7" fill="white"/>
+<circle cx="11" cy="13" r="0.5" fill="white"/>
+<circle cx="15" cy="13" r="0.5" fill="white"/>
+</svg>
