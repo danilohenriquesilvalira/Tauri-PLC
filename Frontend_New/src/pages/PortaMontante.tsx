@@ -28,15 +28,15 @@ interface PortaMontanteProps {
 const CONTRAPESO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 40.7,    // % da altura total (posição Y)
-      horizontalPercent: 68.65,  // % da largura total (posição X)
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 41,    // % da altura total (posição Y)
+      horizontalPercent: 41.2,  // % da largura total (posição X)
+      widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
-      verticalPercent: 40.7,    // % da altura total (posição Y)
-      horizontalPercent: 23.75,  // % da largura total (posição X)
-      widthPercent: 8,          // % da largura total (tamanho)
+      verticalPercent: 41,    // % da altura total (posição Y)
+      horizontalPercent: -40.5,  // % da largura total (posição X)
+      widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     }
   },
@@ -60,9 +60,9 @@ const CONTRAPESO_CONFIG = {
 const REGUA_CONFIG = {
   desktop: {
     verticalPercent: 20,      // % da altura total (posição Y)
-    horizontalPercent: 20.95,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
-    widthPercent: 58.16,      // % da largura total (tamanho) +34% (57.02 * 1.02)
-    heightPercent: 72.00,     // % da altura total (tamanho) +34% (70.59 * 1.02)
+    horizontalPercent: 0,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
+    widthPercent: 100,      // % da largura total (tamanho) +34% (57.02 * 1.02)
+    heightPercent: 72.2,     // % da altura total (tamanho) +34% (70.59 * 1.02)
   },
   mobile: {
     verticalPercent: 7,      // % da altura total (posição Y)
@@ -77,16 +77,16 @@ const REGUA_CONFIG = {
 const MOTOR_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 3.75,      // % da altura total (posição Y)
-      horizontalPercent: 69.3,    // % da largura total (posição X)
-      widthPercent: 7.4,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 9.2,       // % da altura total (tamanho) - 45% menor
+      verticalPercent: 4.7,      // % da altura total (posição Y)
+      horizontalPercent: 42,    // % da largura total (posição X)
+      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
+      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
     },
     esquerdo: {
-      verticalPercent: 3.9,      // % da altura total (posição Y)
-      horizontalPercent: 23.25,    // % da largura total (posição X)
-      widthPercent: 7.4,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 9.2,       // % da altura total (tamanho) - 45% menor
+      verticalPercent: 4.7,      // % da altura total (posição Y)
+      horizontalPercent: -42,    // % da largura total (posição X)
+      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
+      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
     }
   },
   mobile: {
@@ -117,6 +117,16 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     return 1920;
   });
 
+  // ============================================
+  // SISTEMA DE COORDENADAS UNIFICADO
+  // ============================================
+  // A correção de responsividade usa um ÚNICO sistema de coordenadas
+  // baseado no container central que mantém aspect ratio fixo.
+  // 
+  // IMPORTANTE: Porta Montante usa aspect ratio 1075/1098 (quase quadrado)
+  // Os percentuais de posicionamento foram calibrados para esse ratio!
+  // ============================================
+
   // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
   const dimensions = React.useMemo(() => {
     const isMobile = windowWidth < 1024;
@@ -124,21 +134,21 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     const containerWidth = Math.min(windowWidth - 32, 1920);
     const maxWidth = Math.max(containerWidth, 300);
     const portaScale = isMobile ? 90 : 55;
-    const basePortaWidth = (maxWidth * portaScale) / 100;
-    const basePortaHeight = basePortaWidth / portaMontanteAspectRatio;
+    const baseWidth = (maxWidth * portaScale) / 100;
+    const baseHeight = baseWidth / portaMontanteAspectRatio;
 
     return {
       isMobile,
       maxWidth,
-      basePortaWidth,
-      basePortaHeight,
-      alturaTotal: basePortaHeight,
-      shouldRender: maxWidth > 100 && basePortaHeight > 100
+      baseWidth,
+      baseHeight,
+      alturaTotal: baseHeight,
+      shouldRender: maxWidth > 100 && baseHeight > 100
     };
   }, [windowWidth]);
 
   // Desestruturar para uso
-  const { isMobile, maxWidth, basePortaWidth, basePortaHeight, alturaTotal, shouldRender } = dimensions;
+  const { isMobile, maxWidth, baseWidth, baseHeight, alturaTotal, shouldRender } = dimensions;
 
   // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
   React.useEffect(() => {
@@ -259,7 +269,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       if (!window.lastContrapesoTime) window.lastContrapesoTime = now;
       const interval = now - window.lastContrapesoTime;
       window.lastContrapesoTime = now;
-      
+
       console.log(`🎯 [${interval}ms] MONT Contrapeso D: ${contrapesoDirecto}% | E: ${contrapesoEsquerdo}% | Raw: ${contrapesoDirectoRaw}/${contrapesoEsquerdoRaw}`);
     }
   }, [contrapesoDirecto, contrapesoEsquerdo, contrapesoDirectoRaw, contrapesoEsquerdoRaw]);
@@ -278,44 +288,56 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
   // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
   const cardWidthValue = React.useMemo(() => {
-    // 🎯 MESMO CÁLCULO QUE OS OUTROS COMPONENTES ATÉ 1920px
-    const baseCardWidth = maxWidth * 0.18;
+    // 🎯 CALCULAR ESPAÇO DISPONÍVEL PARA CARDS (esquerda/direita do SVG)
+    const espacoTotalDisponivel = windowWidth - maxWidth;
+    const espacoPorLado = espacoTotalDisponivel / 2;
 
-    // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
-    if (windowWidth > 1920) {
-      // Usar a largura real do container para calcular
-      const expandedMaxWidth = Math.min(windowWidth - 32, 2560); // Máximo 2560px
-      return expandedMaxWidth * 0.18;
-    }
+    // 🎯 PORCENTAGEM DO ESPAÇO DISPONÍVEL - MAIS AGRESSIVA EM TELAS GRANDES
+    // Em telas pequenas: 20-25%, em telas grandes: até 35%
+    const porcentagemEspaco = Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20));
+    const cardBaseadoEspaco = espacoPorLado * porcentagemEspaco;
 
-    return baseCardWidth;
-  }, [maxWidth, windowWidth]);
+    // 🎯 CARD BASEADO NO MAXWIDTH - GARANTE MÍNIMO
+    const cardBaseadoMaxWidth = maxWidth * 0.18;
+
+    // 🎯 USAR O MAIOR VALOR ENTRE OS DOIS CÁLCULOS PARA GARANTIR VISIBILIDADE
+    let finalCardWidth = Math.max(cardBaseadoEspaco, cardBaseadoMaxWidth);
+
+    // 🎯 LIMITES MAIS FLEXÍVEIS PARA TELAS GRANDES
+    const minWidth = isMobile ? 220 : 280;
+    const maxWidthLimit = isMobile ? 350 : Math.max(500, windowWidth * 0.15); // Até 15% da tela em telas grandes
+
+    finalCardWidth = Math.max(finalCardWidth, minWidth);
+    finalCardWidth = Math.min(finalCardWidth, maxWidthLimit);
+
+    return finalCardWidth;
+  }, [maxWidth, windowWidth, isMobile]);
 
   // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
   const cardWidth = () => cardWidthValue;
 
-  // 🎯 SISTEMA RESPONSIVO MEMOIZADO PARA PERFORMANCE
+  // 🎯 SISTEMA RESPONSIVO MELHORADO PARA CARDS AUTO-AJUSTÁVEIS
   const getResponsiveCardFontSize = React.useCallback((baseSize: number, type: 'header' | 'label' | 'value' = 'label') => {
     const cardW = cardWidthValue;
 
-    // Escala baseada na largura do card (300px = escala base 1.0)
-    let scaleFactor = cardW / 300;
-    scaleFactor = Math.max(scaleFactor, 0.7); // Mínimo 70%
-    scaleFactor = Math.min(scaleFactor, 1.4); // Máximo 140%
+    // Escala baseada na largura do card (350px = escala base 1.0 para melhor proporção)
+    let scaleFactor = cardW / 350;
+    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80% - aumentado para evitar fontes muito pequenas
+    scaleFactor = Math.min(scaleFactor, 1.6); // Máximo 160% - aumentado para melhor aproveitamento do espaço
 
-    // Ajustes por tipo
-    if (type === 'header') scaleFactor *= 1.1;
-    else if (type === 'value') scaleFactor *= 1.05;
+    // Ajustes por tipo - mais equilibrados
+    if (type === 'header') scaleFactor *= 1.15; // Aumentado para headers mais visíveis
+    else if (type === 'value') scaleFactor *= 1.1; // Aumentado para valores mais legíveis
 
-    return Math.max(baseSize * scaleFactor, type === 'header' ? 10 : 8);
+    return Math.max(baseSize * scaleFactor, type === 'header' ? 12 : 10); // Mínimos aumentados
   }, [cardWidthValue]);
 
   const getResponsiveCardSpacing = React.useCallback((baseSpacing: number) => {
     const cardW = cardWidthValue;
-    let scaleFactor = cardW / 300; // 300px = escala base 1.0
-    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80%
-    scaleFactor = Math.min(scaleFactor, 1.3); // Máximo 130%
-    return Math.max(baseSpacing * scaleFactor, 4);
+    let scaleFactor = cardW / 350; // 350px = escala base 1.0 para melhor proporção
+    scaleFactor = Math.max(scaleFactor, 0.9); // Mínimo 90% - aumentado para evitar espaçamento muito apertado
+    scaleFactor = Math.min(scaleFactor, 1.5); // Máximo 150% - aumentado para melhor aproveitamento
+    return Math.max(baseSpacing * scaleFactor, 6); // Mínimo aumentado para 6px
   }, [cardWidthValue]);
 
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
@@ -326,15 +348,28 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const espacoDisponivelEsquerda = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
   const espacoDisponivelDireita = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
 
+  // 🎯 PROTEÇÃO CONTRA SOBREPOSIÇÃO - MAIS PERMISSIVA PARA GARANTIR VISIBILIDADE
+  const espacoLateralDisponivel = Math.max(0, (windowWidth - baseWidth) / 2);
+  const cardsCabem = windowWidth >= 1200 ? (espacoLateralDisponivel >= cardWidthValue + 10) : true; // Só verifica espaço em telas grandes
+
   // Performance optimization: Debug logging only in development
   if (import.meta.env.DEV) {
-    console.log('🎯 PORTAMONTANTE - CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
+    console.log('🎯 PORTAMONTANTE - CARDS INTELIGENTES:', {
       container_width: windowWidth,
       maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
+      espaco_lateral_disponivel: `${espacoLateralDisponivel.toFixed(0)}px`,
+      card_width: `${cardWidthValue.toFixed(0)}px`,
+      cards_cabem: cardsCabem ? '✅ SIM' : '❌ NÃO - SOBREPOSIÇÃO!',
+      estrategia_cards: cardsCabem ? 'RENDERIZAR' : 'OCULTAR',
+      porcentagem_usada: `${(Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20)) * 100).toFixed(1)}%`,
+      card_baseado_espaco: `${(((windowWidth - maxWidth) / 2) * Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20))).toFixed(0)}px`,
       card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
-      card_expandido: `${cardWidthValue.toFixed(0)}px`,
-      diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
-      usando_expansao: windowWidth > 1920 ? '✅ SIM' : '❌ NÃO',
+      card_final: `${cardWidthValue.toFixed(0)}px`,
+      estrategia_usada: cardWidthValue > maxWidth * 0.18 ? 'ESPAÇO_DISPONÍVEL' : 'MAX_WIDTH',
+      limites: `min=${isMobile ? 220 : 280}px, max=${isMobile ? 350 : Math.max(500, windowWidth * 0.15).toFixed(0)}px`,
+      font_scale_header: `${(cardWidthValue / 350 * 1.15).toFixed(2)}x`,
+      font_scale_label: `${(cardWidthValue / 350).toFixed(2)}x`,
+      font_scale_value: `${(cardWidthValue / 350 * 1.1).toFixed(2)}x`,
       espaco_disponivel_esquerda: espacoDisponivelEsquerda,
       espaco_disponivel_direita: espacoDisponivelDireita
     });
@@ -344,14 +379,14 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     <div className="w-full h-auto flex flex-col items-center relative">
 
       {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - DESKTOP */}
-      {!isMobile && (
+      {!isMobile && cardsCabem && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
-            top: `${alturaTotal * 0.05}px`,
-            left: `${maxWidth * 0.02}px`,
+            top: `${baseHeight * 0.05}px`,
+            left: `${baseWidth * 0.02}px`,
             width: `${cardWidth()}px`,
-            gap: `${Math.max(6, maxWidth * 0.005)}px`
+            gap: `${Math.max(6, baseWidth * 0.005)}px`
           }}
         >
           {/* DADOS OPERACIONAIS - RESPONSIVIDADE FLUIDA */}
@@ -403,82 +438,82 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   </span>
                 </div>
 
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Diferença E/D:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">mm</span>
+                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">mm</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Contrapeso E:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    {contrapesoEsquerdo}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                    {contrapesoEsquerdo}<span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">%</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Contrapeso D:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    {contrapesoDirecto}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                    {contrapesoDirecto}<span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">%</span>
                   </span>
                 </div>
 
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Vel. Subida:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    {velocidadeSubida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                    {velocidadeSubida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Vel. Descida:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    {velocidadeDescida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                    {velocidadeDescida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
                   </span>
                 </div>
               </div>
@@ -486,7 +521,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           </div>
 
           {/* STATUS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, baseWidth * 0.004)}px` }}>
             <StatusCard
               title="COMANDO EM AUTOMÁTICO"
               variant="automatic"
@@ -509,14 +544,14 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       )}
 
       {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - DESKTOP */}
-      {!isMobile && (
+      {!isMobile && cardsCabem && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
-            top: `${alturaTotal * 0.05}px`,
-            right: `${maxWidth * 0.02}px`,
+            top: `${baseHeight * 0.05}px`,
+            right: `${baseWidth * 0.02}px`,
             width: `${cardWidth()}px`,
-            gap: `${Math.max(6, maxWidth * 0.005)}px`
+            gap: `${Math.max(6, baseWidth * 0.005)}px`
           }}
         >
           {/* MOTORES - RESPONSIVIDADE FLUIDA */}
@@ -682,20 +717,20 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
       {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
       {isMobile && (
-        <div 
+        <div
           className="w-full mt-4 mb-4 relative"
           style={{
             padding: `0 ${Math.max(6, Math.min(16, windowWidth * 0.02))}px` // Padding adaptativo universal
           }}
         >
-          <div 
+          <div
             className="mx-auto"
             style={{
               maxWidth: `${Math.min(windowWidth - 12, 1200)}px` // Adaptativo para qualquer tela
             }}
           >
             {/* Cards responsivos universais */}
-            <div 
+            <div
               className="grid grid-cols-3 mb-2"
               style={{
                 gap: `${Math.max(4, Math.min(8, windowWidth * 0.01))}px` // Gap adaptativo
@@ -704,30 +739,30 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               {/* CARD DADOS */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 
+                  <h3
                     className="font-bold uppercase tracking-wide text-center leading-tight"
                     style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                   >
                     DADOS
                   </h3>
                 </div>
-                <div 
+                <div
                   className="space-y-1"
                   style={{ padding: `${Math.max(4, Math.min(8, windowWidth * 0.004))}px` }}
                 >
                   <div className="text-center">
-                    <div 
+                    <div
                       className="text-gray-600 font-medium uppercase"
                       style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                     >
                       Posição:
                     </div>
-                    <div 
+                    <div
                       className="font-mono font-bold text-[#212E3E]"
                       style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
                     >
-                      {(reguaPortaMontante * 12.5 / 100).toFixed(2)} 
-                      <span 
+                      {(reguaPortaMontante * 12.5 / 100).toFixed(2)}
+                      <span
                         className="text-gray-500"
                         style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
@@ -736,18 +771,18 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                     </div>
                   </div>
                   <div className="text-center">
-                    <div 
+                    <div
                       className="text-gray-600 font-medium uppercase"
                       style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
                     >
                       Abertura:
                     </div>
-                    <div 
+                    <div
                       className="font-mono font-bold text-[#212E3E]"
                       style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
                     >
                       {reguaPortaMontante}
-                      <span 
+                      <span
                         className="text-gray-500"
                         style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
@@ -757,18 +792,18 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div 
+                      <div
                         className="text-gray-600 font-medium uppercase"
                         style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
                       >
                         Dif. E/D:
                       </div>
-                      <div 
+                      <div
                         className="font-mono font-bold text-[#212E3E]"
                         style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
                       >
-                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} 
-                        <span 
+                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)}
+                        <span
                           className="text-gray-500"
                           style={{ fontSize: `${Math.max(4, Math.min(7, windowWidth * 0.012))}px` }}
                         >
@@ -803,7 +838,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="border-t border-gray-200 pt-1">
                     {/* MOTOR ESQUERDO */}
                     <div>
@@ -874,164 +909,164 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               </div>
             </div>
 
-          {/* Modal Parâmetros Mobile */}
-          {menuParametrosOpen && (
-            <div className="mt-4 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-top duration-200">
-              <div className="bg-[#212E3E] text-white px-3 py-2">
-                <h3 
-                  className="font-bold uppercase tracking-wide text-center"
-                  style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
+            {/* Modal Parâmetros Mobile */}
+            {menuParametrosOpen && (
+              <div className="mt-4 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-top duration-200">
+                <div className="bg-[#212E3E] text-white px-3 py-2">
+                  <h3
+                    className="font-bold uppercase tracking-wide text-center"
+                    style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
+                  >
+                    PARÂMETROS PORTA MONTANTE
+                  </h3>
+                </div>
+
+                <div
+                  className="max-h-80 overflow-y-auto"
+                  style={{ padding: `${Math.max(8, Math.min(16, windowWidth * 0.025))}px` }}
                 >
-                  PARÂMETROS PORTA MONTANTE
-                </h3>
-              </div>
-              
-              <div 
-                className="max-h-80 overflow-y-auto"
-                style={{ padding: `${Math.max(8, Math.min(16, windowWidth * 0.025))}px` }}
-              >
-                <div className="grid grid-cols-1 gap-3">
-                  {/* PROGRAMA ABERTURA */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <h4 
-                      className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
-                    >
-                      <ArrowUpIcon 
-                        style={{ 
-                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
-                        }} 
-                      />
-                      PROGRAMA ABERTURA
-                    </h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          Posição Alvo:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          8.50 m
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          RPM Configurado:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          1450 RPM
-                        </span>
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* PROGRAMA ABERTURA */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <h4
+                        className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
+                        style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
+                      >
+                        <ArrowUpIcon
+                          style={{
+                            width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                            height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
+                          }}
+                        />
+                        PROGRAMA ABERTURA
+                      </h4>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            Posição Alvo:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-[#212E3E]"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            8.50 m
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            RPM Configurado:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-[#212E3E]"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            1450 RPM
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* PROGRAMA FECHAMENTO */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <h4 
-                      className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
-                    >
-                      <ArrowDownIcon 
-                        style={{ 
-                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
-                        }} 
-                      />
-                      PROGRAMA FECHAMENTO
-                    </h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          Posição Alvo:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          0.00 m
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          RPM Configurado:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          1200 RPM
-                        </span>
+                    {/* PROGRAMA FECHAMENTO */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <h4
+                        className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
+                        style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
+                      >
+                        <ArrowDownIcon
+                          style={{
+                            width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                            height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
+                          }}
+                        />
+                        PROGRAMA FECHAMENTO
+                      </h4>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            Posição Alvo:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-[#212E3E]"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            0.00 m
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            RPM Configurado:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-[#212E3E]"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            1200 RPM
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* LASER MONTANTE */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <h4 
-                      className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
-                    >
-                      <EyeIcon 
-                        style={{ 
-                          width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
-                          height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
-                        }} 
-                      />
-                      LASER MONTANTE
-                    </h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          Área Protegida:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-green-600"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          LIVRE
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span 
-                          className="text-gray-600 font-medium"
-                          style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                        >
-                          Leitura Cota:
-                        </span>
-                        <span 
-                          className="font-mono font-bold text-[#212E3E]"
-                          style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                        >
-                          {(reguaPortaMontante * 12.5 / 100 + 125.5).toFixed(2)} m
-                        </span>
+                    {/* LASER MONTANTE */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <h4
+                        className="font-bold text-[#212E3E] mb-2 flex items-center gap-2"
+                        style={{ fontSize: `${Math.max(8, Math.min(11, windowWidth * 0.022))}px` }}
+                      >
+                        <EyeIcon
+                          style={{
+                            width: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`,
+                            height: `${Math.max(10, Math.min(14, windowWidth * 0.03))}px`
+                          }}
+                        />
+                        LASER MONTANTE
+                      </h4>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            Área Protegida:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-green-600"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            LIVRE
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span
+                            className="text-gray-600 font-medium"
+                            style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
+                          >
+                            Leitura Cota:
+                          </span>
+                          <span
+                            className="font-mono font-bold text-[#212E3E]"
+                            style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
+                          >
+                            {(reguaPortaMontante * 12.5 / 100 + 125.5).toFixed(2)} m
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           </div>
         </div>
@@ -1050,7 +1085,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             border: '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          <div 
+          <div
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
               width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
@@ -1058,16 +1093,16 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
-            <CogIcon 
+            <CogIcon
               className="text-white"
-              style={{ 
+              style={{
                 width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
                 height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-              }} 
+              }}
             />
           </div>
           <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div 
+          <div
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
               width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
@@ -1328,17 +1363,17 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
           <div
             className="relative w-full flex flex-col items-center justify-center"
             style={{
-              maxWidth: `${maxWidth}px`,
-              height: `${alturaTotal}px`,
-              minHeight: `${alturaTotal}px`
+              maxWidth: `${baseWidth}px`,
+              height: `${baseHeight}px`,
+              minHeight: `${baseHeight}px`
             }}
           >
             {/* SVG Base Porta Montante - CENTRALIZADO */}
             <div
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
               style={{
-                width: `${basePortaWidth}px`,
-                height: `${basePortaHeight}px`,
+                width: `${baseWidth}px`,
+                height: `${baseHeight}px`,
                 zIndex: 1
               }}
             >
@@ -1362,11 +1397,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * contrapesoDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * contrapesoDireitoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * contrapesoDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * contrapesoDireitoConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout'
               }}
@@ -1381,11 +1416,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout'
               }}
@@ -1400,11 +1435,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * reguaConfigAtual.verticalPercent) / 100}px`,
-                left: `${(maxWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * reguaConfigAtual.widthPercent) / 100}px`,
-                height: `${(alturaTotal * reguaConfigAtual.heightPercent) / 100}px`,
+                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * reguaConfigAtual.verticalPercent) / 100}px`,
+                left: `${(baseWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * reguaConfigAtual.widthPercent) / 100}px`,
+                height: `${(baseHeight * reguaConfigAtual.heightPercent) / 100}px`,
                 zIndex: 5,
                 contain: 'layout'
               }}
@@ -1419,11 +1454,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * motorDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * motorDireitoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * motorDireitoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorDireitoConfig.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1438,11 +1473,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * motorEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * motorEsquerdoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorEsquerdoConfig.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >

@@ -21,16 +21,16 @@ interface EnchimentoProps {
 const BASE_PISTAO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 84.9,
-      horizontalPercent: 74.2,
-      widthPercent: 18.872, // 26.96 * 0.7 (redução de 30%)
-      heightPercent: 50.3216, // 71.888 * 0.7 (redução de 30%)
+      verticalPercent: 66,
+      horizontalPercent: 79,
+      widthPercent: 20, // 26.96 * 0.7 (redução de 30%)
+      heightPercent: 46, // 71.888 * 0.7 (redução de 30%)
     },
     esquerdo: {
-      verticalPercent: 84.9,
+      verticalPercent: 66,
       horizontalPercent: 0.9,
-      widthPercent: 18.872, // 26.96 * 0.7 (redução de 30%)
-      heightPercent: 50.3216, // 71.888 * 0.7 (redução de 30%)
+      widthPercent: 20, // 26.96 * 0.7 (redução de 30%)
+      heightPercent: 46, // 71.888 * 0.7 (redução de 30%)
     }
   },
   mobile: {
@@ -53,16 +53,16 @@ const BASE_PISTAO_CONFIG = {
 const PISTAO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 56,
-      horizontalPercent: 68.5,
-      widthPercent: 30.324, // 43.32 * 0.7 (redução de 30%)
-      heightPercent: 75.81, // 108.3 * 0.7 (redução de 30%)
+      verticalPercent: 39,
+      horizontalPercent: 74,
+      widthPercent: 30, // 43.32 * 0.7 (redução de 30%)
+      heightPercent: 70, // 108.3 * 0.7 (redução de 30%)
     },
     esquerdo: {
-      verticalPercent: 56,
-      horizontalPercent: -4.8,
-      widthPercent: 30.324, // 43.32 * 0.7 (redução de 30%)
-      heightPercent: 75.81, // 108.3 * 0.7 (redução de 30%)
+      verticalPercent: 39,
+      horizontalPercent: -4.1,
+      widthPercent: 30, // 43.32 * 0.7 (redução de 30%)
+      heightPercent: 70, // 108.3 * 0.7 (redução de 30%)
     }
   },
   mobile: {
@@ -85,16 +85,16 @@ const PISTAO_CONFIG = {
 const CILINDRO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 14.5,
-      horizontalPercent: 77.8,
-      widthPercent: 11.675794, // 11.914076 * 0.98 (redução adicional de 2%)
-      heightPercent: 58.37899,  // 59.57040 * 0.98 (redução adicional de 2%)
+      verticalPercent: 4.5,
+      horizontalPercent: 83.9,
+      widthPercent: 10, // 11.914076 * 0.98 (redução adicional de 2%)
+      heightPercent: 49,  // 59.57040 * 0.98 (redução adicional de 2%)
     },
     esquerdo: {
-      verticalPercent: 14.5,
-      horizontalPercent: 4.5,
-      widthPercent: 11.675794, // 11.914076 * 0.98 (redução adicional de 2%)
-      heightPercent: 58.37899,  // 59.57040 * 0.98 (redução adicional de 2%)
+      verticalPercent: 4.5,
+      horizontalPercent: 6,
+      widthPercent: 10, // 11.914076 * 0.98 (redução adicional de 2%)
+      heightPercent: 49,  // 59.57040 * 0.98 (redução adicional de 2%)
     }
   },
   mobile: {
@@ -116,10 +116,10 @@ const CILINDRO_CONFIG = {
 // Configuração responsiva do PIPE SYSTEM - para ajustes de posição e altura
 const PIPE_SYSTEM_CONFIG = {
   desktop: {
-    verticalPercent: -2,      // % da altura total (posição Y) - ajustável
+    verticalPercent: -20,      // % da altura total (posição Y) - ajustável
     horizontalPercent: 0,    // % da largura total (posição X) - ajustável  
-    widthPercent: 94,       // % da largura total (tamanho) - ajustável
-    heightPercent: 94,      // % da altura total (tamanho) - ajustável
+    widthPercent: 100,       // % da largura total (tamanho) - ajustável
+    heightPercent: 100,      // % da altura total (tamanho) - ajustável
   },
   mobile: {
     verticalPercent: -25,      // % da altura total (posição Y) - ajustável
@@ -133,16 +133,16 @@ const PIPE_SYSTEM_CONFIG = {
 const SUPORTE_PISTA_CONFIG = {
   desktop: {
     esquerdo: {
-      verticalPercent: 59.7,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: -7.1,    // % da largura total (posição X) - ajustável
-      widthPercent: 35,         // % da largura total (tamanho) - ajustável
-      heightPercent: 23,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 42.3,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: -39,    // % da largura total (posição X) - ajustável
+      widthPercent: 100,         // % da largura total (tamanho) - ajustável
+      heightPercent: 19,        // % da altura total (tamanho) - ajustável
     },
     direito: {
-      verticalPercent: 59.7,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 66.0,    // % da largura total (posição X) - ajustável
-      widthPercent: 35,         // % da largura total (tamanho) - ajustável
-      heightPercent: 23,        // % da altura total (tamanho) - ajustável
+      verticalPercent: 42.3,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 39,    // % da largura total (posição X) - ajustável
+      widthPercent: 100,         // % da largura total (tamanho) - ajustável
+      heightPercent: 19,        // % da altura total (tamanho) - ajustável
     }
   },
   mobile: {
@@ -164,7 +164,7 @@ const SUPORTE_PISTA_CONFIG = {
 // Configuração responsiva do BASE FUNDO ENCHIMENTO - SVG DE FUNDO
 const BASE_FUNDO_ENCHIMENTO_CONFIG = {
   desktop: {
-    verticalPercent: 33,       // % da altura total (posição Y) - ajustável
+    verticalPercent: 16.5,       // % da altura total (posição Y) - ajustável
     horizontalPercent: 0,     // % da largura total (posição X) - ajustável
     widthPercent: 100,        // % da largura total (tamanho) - ajustável
     heightPercent: 100,       // % da altura total (tamanho) - ajustável
@@ -182,39 +182,39 @@ const VALVULA_CONFIG = {
   desktop: {
     // LADO ESQUERDO - 3 válvulas
     esquerda1: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 33.5,     // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 35.6,     // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 36.9,     // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 39.3,     // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 40.4,    // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 43,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas
     direita1: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 52.2,    // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 55.6,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 55.7,    // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 59.3,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 19,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 59.2,    // % da largura total (posição X) - ajustável
+      verticalPercent: 7.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 63,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     }
@@ -266,39 +266,39 @@ const VALVULA_FLANGE_CONFIG = {
   desktop: {
     // LADO ESQUERDO - 3 válvulas flange
     esquerda1: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 33.1,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 35.3,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 36.6,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 39,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 40.1,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 42.7,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas flange
     direita1: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 51.97,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 55.3,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 55.48,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 59.1,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 16.2,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 58.91,    // % da largura total (posição X) - ajustável
+      verticalPercent: 5.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 62.7,    // % da largura total (posição X) - ajustável
       widthPercent: 2,          // % da largura total (tamanho) - ajustável
       heightPercent: 3.5,         // % da altura total (tamanho) - ajustável
     }
@@ -348,10 +348,10 @@ const VALVULA_FLANGE_CONFIG = {
 // Configuração responsiva do TANQUE OLEO - SVG ESTÁTICO
 const TANQUE_OLEO_CONFIG = {
   desktop: {
-    verticalPercent: 41.7,       // % da altura total (posição Y) - ajustável
-    horizontalPercent: 15.2,     // % da largura total (posição X) - ajustável
-    widthPercent: 54,          // % da largura total (tamanho) - ajustável
-    heightPercent: 54,         // % da altura total (tamanho) - ajustável
+    verticalPercent: 27,       // % da altura total (posição Y) - ajustável
+    horizontalPercent: -5.3,     // % da largura total (posição X) - ajustável
+    widthPercent: 100,          // % da largura total (tamanho) - ajustável
+    heightPercent: 46,         // % da altura total (tamanho) - ajustável
   },
   mobile: {
     verticalPercent: -11,       // % da altura total (posição Y) - ajustável
@@ -365,16 +365,16 @@ const TANQUE_OLEO_CONFIG = {
 const MOTOR_CONFIG = {
   desktop: {
     esquerdo: {
-      verticalPercent: 51.5,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 30.7,    // % da largura total (posição X) - ajustável
-      widthPercent: 12,         // % da largura total (tamanho) - ajustável
-      heightPercent: 8,         // % da altura total (tamanho) - ajustável
+      verticalPercent: 35.2,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: -10.8,    // % da largura total (posição X) - ajustável
+      widthPercent: 100,         // % da largura total (tamanho) - ajustável
+      heightPercent: 7,         // % da altura total (tamanho) - ajustável
     },
     direito: {
-      verticalPercent: 51.5,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 51.3,    // % da largura total (posição X) - ajustável
-      widthPercent: 12,         // % da largura total (tamanho) - ajustável
-      heightPercent: 8,         // % da altura total (tamanho) - ajustável
+      verticalPercent: 35.2,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 10.9,    // % da largura total (posição X) - ajustável
+      widthPercent: 100,         // % da largura total (tamanho) - ajustável
+      heightPercent: 7,         // % da altura total (tamanho) - ajustável
     }
   },
   mobile: {
@@ -398,39 +398,39 @@ const VALVULA_GAVETA_CONFIG = {
   desktop: {
     // LADO ESQUERDO - 3 válvulas gaveta
     esquerda1: {
-      verticalPercent: 57,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 15,    // % da largura total (posição X) - ajustável
+      verticalPercent: 39.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 16,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 61.8,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 18,    // % da largura total (posição X) - ajustável
+      verticalPercent: 43.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 19.2,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 51,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 25.5,    // % da largura total (posição X) - ajustável
+      verticalPercent: 34.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 27.5,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas gaveta
     direita1: {
-      verticalPercent: 57,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 76.5,    // % da largura total (posição X) - ajustável
+      verticalPercent: 39.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 81.5,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 61.8,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 73.5,    // % da largura total (posição X) - ajustável
+      verticalPercent: 43.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 78.4,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 51,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 66,    // % da largura total (posição X) - ajustável
+      verticalPercent: 34.5,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 70.4,    // % da largura total (posição X) - ajustável
       widthPercent: 2.5,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,        // % da altura total (tamanho) - ajustável
     }
@@ -482,39 +482,39 @@ const VALVE_DIRECIONAL_CONFIG = {
   desktop: {
     // LADO ESQUERDO - 3 válvulas direcionais
     esquerda1: {
-      verticalPercent: 35.7,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 24.1,    // % da largura total (posição X) - ajustável
+      verticalPercent: 21.6,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 25.8,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     esquerda2: {
-      verticalPercent: 30.3,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 31.9,    // % da largura total (posição X) - ajustável
+      verticalPercent: 17.1,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 34,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     esquerda3: {
-      verticalPercent: 42,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 31.9,    // % da largura total (posição X) - ajustável
+      verticalPercent: 26.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 34,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     // LADO DIREITO - 3 válvulas direcionais
     direita1: {
-      verticalPercent: 35.7,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 65.6,    // % da largura total (posição X) - ajustável
+      verticalPercent: 21.6,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 70,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     direita2: {
-      verticalPercent: 30.3,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 57.94,    // % da largura total (posição X) - ajustável
+      verticalPercent: 17.1,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 61.7,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     direita3: {
-      verticalPercent: 42,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 57.94,    // % da largura total (posição X) - ajustável
+      verticalPercent: 26.9,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 61.7,    // % da largura total (posição X) - ajustável
       widthPercent: 4.2,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     }
@@ -565,14 +565,14 @@ const VALVE_DIRECIONAL_CONFIG = {
 const VALVULA_VERTICAL_CONFIG = {
   desktop: {
     esquerda: {
-      verticalPercent: 55.9,      // % da altura total (posição Y) - ajustável
-      horizontalPercent:2.0,    // % da largura total (posição X) - ajustável
+      verticalPercent: 38.7,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 2.3,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     },
     direita: {
-      verticalPercent: 55.9,      // % da altura total (posição Y) - ajustável
-      horizontalPercent: 89,    // % da largura total (posição X) - ajustável
+      verticalPercent: 38.7,      // % da altura total (posição Y) - ajustável
+      horizontalPercent: 94.8,    // % da largura total (posição X) - ajustável
       widthPercent: 3,          // % da largura total (tamanho) - ajustável
       heightPercent: 8,         // % da altura total (tamanho) - ajustável
     }
@@ -603,29 +603,58 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   });
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
-  // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  // ============================================
+  // SISTEMA DE COORDENADAS UNIFICADO
+  // ============================================
+  // A correção de responsividade usa um ÚNICO sistema de coordenadas
+  // baseado no container central que mantém aspect ratio 16:9 fixo.
+  //
+  // Antes: maxWidth e alturaTotal eram calculados independentemente
+  // Agora: baseWidth e baseHeight mantêm proporção fixa 16:9
+  //
+  // Todos os componentes são posicionados usando:
+  // - Horizontal: baseWidth (não mais maxWidth)
+  // - Vertical: baseHeight (não mais alturaTotal)
+  //
+  // Isso garante que quando a tela redimensiona, AMBOS os eixos
+  // escalam proporcionalmente, mantendo o layout correto.
+  // ============================================
   const dimensions = React.useMemo(() => {
     const isMobile = windowWidth < 1024;
-    const enchimentoAspectRatio = 1348 / 600;
-    const containerWidth = Math.min(windowWidth - 32, 1920);
-    const enchimentoScale = isMobile ? 90 : 100;
-    const baseEnchimentoWidth = (containerWidth * enchimentoScale) / 100;
-    const baseEnchimentoHeight = baseEnchimentoWidth / enchimentoAspectRatio;
-    const maxWidth = Math.max(containerWidth, 300);
-    const alturaTotal = Math.max(baseEnchimentoHeight, 300);
+    const aspectRatio = 16 / 9;
+
+    const availableWidth = windowWidth - 32;
+    const availableHeight = window.innerHeight - 100;
+
+    let baseWidth: number;
+    let baseHeight: number;
+
+    const widthBasedHeight = availableWidth / aspectRatio;
+
+    if (widthBasedHeight <= availableHeight) {
+      baseWidth = Math.min(availableWidth, 1920);
+      baseHeight = baseWidth / aspectRatio;
+    } else {
+      baseHeight = availableHeight;
+      baseWidth = baseHeight * aspectRatio;
+    }
+
+    baseWidth = Math.max(baseWidth, 300);
+    baseHeight = Math.max(baseHeight, 300 / aspectRatio);
+
+    const scale = isMobile ? 0.95 : 0.85;
+    const scaledWidth = baseWidth * scale;
+    const scaledHeight = baseHeight * scale;
 
     return {
       isMobile,
-      maxWidth,
-      baseEnchimentoWidth,
-      baseEnchimentoHeight,
-      alturaTotal,
-      shouldRender: maxWidth > 100 && alturaTotal > 100
+      baseWidth: scaledWidth,
+      baseHeight: scaledHeight,
+      shouldRender: scaledWidth > 100 && scaledHeight > 100
     };
   }, [windowWidth]);
 
-  // Desestruturar para uso
-  const { isMobile, maxWidth, baseEnchimentoWidth, baseEnchimentoHeight, alturaTotal, shouldRender } = dimensions;
+  const { isMobile, baseWidth, baseHeight, shouldRender } = dimensions;
 
   // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
   React.useEffect(() => {
@@ -653,7 +682,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-  
+
   // 📡 USAR O SISTEMA PLC EXISTENTE
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
@@ -695,7 +724,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       }
     }
   }, [connectionStatus.connected, sendCommand]);
-  
+
   // 🚀 PERFORMANCE: MEMOIZAÇÃO COMPLETA DO PROCESSAMENTO WEBSOCKET (60+ TAGS)
   // Processa todas as tags WebSocket uma única vez para evitar re-renders
   const webSocketData = React.useMemo(() => {
@@ -739,19 +768,19 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const tempoFechoEsquerdo = webSocketData?.tempoFechoEsquerdo || 0;
   const posicaoMetrosEsquerdo = webSocketData?.posicaoMetrosEsquerdo || 0;
   const posicaoPorcentagemEsquerdo = webSocketData?.posicaoPorcentagemEsquerdo || 0;
-  
+
   // 🎯 NORMALIZAÇÃO DIRETA DOS PISTÕES (0-100% do WebSocket)
   // WebSocket já envia valores normalizados para controle direto do eixo Y
   const pistaoDireito = React.useMemo(() => {
     // Garantir que o valor está entre 0-100%
     return Math.max(0, Math.min(100, pistaoDireitoRaw));
   }, [pistaoDireitoRaw]);
-  
+
   const pistaoEsquerdo = React.useMemo(() => {
     // Garantir que o valor está entre 0-100%
     return Math.max(0, Math.min(100, pistaoEsquerdoRaw));
   }, [pistaoEsquerdoRaw]);
-  
+
   // 🚀 PERFORMANCE: MEMOIZAÇÃO DAS VÁLVULAS, MOTORES E PIPES
   const valvulasData = React.useMemo(() => {
     if (!plcData?.tags) return null;
@@ -812,7 +841,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const pipe7EsqReal = valvulasData?.pipe7EsqReal || 0;
   const pipe8EsqReal = valvulasData?.pipe8EsqReal || 0;
   const pipe9EsqReal = valvulasData?.pipe9EsqReal || 0;
-  
+
   // 🎯 MAPEAMENTO PIPES LADO DIREITO → BITS SVG
   const bit12 = pipe1Real;     // Pipe 1 DIREITA - ENCH_SIN_AG_SUBID
   const bit9 = pipe2Real;      // Pipe 2 DIREITA - ENCH_SIN_CIRC_SUBIDA  
@@ -834,7 +863,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const bit22 = pipe7EsqReal;  // Pipe 7 ESQUERDA - ENCH_HMI_VD1_VD2_LIG_ESQ (BIT ÚNICO)
   const bit27 = pipe8EsqReal;  // Pipe 8 ESQUERDA - ENCH_EM_SUB_RAP_ESQ (BIT ÚNICO)
   const bit28 = pipe9EsqReal;  // Pipe 9 ESQUERDA - ENCH_OM_VD2_COMP_ESQ (BIT ÚNICO)
-  
+
   // 🚀 PERFORMANCE: MEMOIZAÇÃO DAS VÁLVULAS COMPLEXAS
   const valvulasComplexasData = React.useMemo(() => {
     if (!plcData?.tags) return null;
@@ -913,7 +942,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaDirecionalDireita1 = valvulasComplexasData?.valvulaDirecionalDireita1Real || 0;
   const valvulaDirecionalDireita2 = valvulasComplexasData?.valvulaDirecionalDireita2Real || 0;
   const valvulaDirecionalDireita3 = valvulasComplexasData?.valvulaDirecionalDireita3Real || 0;
-  
+
   // 🚀 PERFORMANCE: MEMOIZAÇÃO DE TODAS AS CONFIGURAÇÕES RESPONSIVAS
   const responsiveConfigs = React.useMemo(() => {
     const baseConfig = isMobile ? BASE_PISTAO_CONFIG.mobile : BASE_PISTAO_CONFIG.desktop;
@@ -928,25 +957,25 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       // Configurações BASE PISTAO
       basePistaoDireitoConfig: baseConfig.direito,
       basePistaoEsquerdoConfig: baseConfig.esquerdo,
-      
+
       // Configurações PISTÃO MÓVEL
       pistaoDireitoConfig: pistaoConfig.direito,
       pistaoEsquerdoConfig: pistaoConfig.esquerdo,
-      
+
       // Configurações CILINDROS
       cilindroDireitoConfig: cilindroConfig.direito,
       cilindroEsquerdoConfig: cilindroConfig.esquerdo,
-      
+
       // Configurações PIPE SYSTEM
       pipeSystemConfig: pipeSystemConfig,
-      
+
       // Configurações SUPORTE PISTA
       suportePistaEsquerdoConfig: suportePistaConfig.esquerdo,
       suportePistaDireitoConfig: suportePistaConfig.direito,
-      
+
       // Configurações BASE FUNDO ENCHIMENTO
       baseFundoEnchimentoConfig: baseFundoEnchimentoConfig,
-      
+
       // Configurações VÁLVULAS
       valvulaEsquerda1Config: valvulaConfig.esquerda1,
       valvulaEsquerda2Config: valvulaConfig.esquerda2,
@@ -1023,7 +1052,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
           <div
             className="mx-auto"
             style={{
-              maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
+              width: `${baseWidth}px` // Usa o mesmo baseWidth responsivo
             }}
           >
             {/* Cards horizontais compactos - sempre visíveis */}
@@ -1120,7 +1149,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                     <div className="text-center">
                       <div className="text-[7px] text-gray-600 font-medium uppercase">Ativas:</div>
                       <div className="font-mono font-bold text-[#212E3E] text-[9px]">
-                        {[valvulaGavetaEsquerda1, valvulaGavetaEsquerda2, valvulaGavetaEsquerda3, 
+                        {[valvulaGavetaEsquerda1, valvulaGavetaEsquerda2, valvulaGavetaEsquerda3,
                           valvulaDirecionalEsquerda1, valvulaDirecionalEsquerda2, valvulaDirecionalEsquerda3,
                           valvulaGavetaDireita1, valvulaGavetaDireita2, valvulaGavetaDireita3
                         ].filter(Boolean).length} <span className="text-gray-500 text-[6px]">/ 9</span>
@@ -1135,7 +1164,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       )}
 
       {/* Container do Sistema de Enchimento */}
-      <div 
+      <div
         ref={containerRef}
         className="w-full max-w-[1920px] flex flex-col items-center relative z-10"
         style={{
@@ -1145,27 +1174,27 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
         }}
       >
         {shouldRender ? (
-          <div 
+          <div
             className="relative w-full flex items-center justify-center"
             style={{
-              maxWidth: `${maxWidth}px`,
-              height: `${alturaTotal}px`,
-              minHeight: `${alturaTotal}px`
+              width: `${baseWidth}px` as any,
+              height: `${baseHeight}px` as any,
+              minHeight: `${baseHeight}px` as any
             }}
           >
             {/* SISTEMA DE TUBULAÇÕES - BACKGROUND - CONFIGURAÇÃO RESPONSIVA AJUSTÁVEL */}
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * pipeSystemConfigAtual.verticalPercent) / 100}px`,
-                left: `${(maxWidth * pipeSystemConfigAtual.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * pipeSystemConfigAtual.widthPercent) / 100}px`,
-                height: `${(alturaTotal * pipeSystemConfigAtual.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * pipeSystemConfigAtual.verticalPercent) / 100}px`,
+                left: `${(baseWidth * pipeSystemConfigAtual.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * pipeSystemConfigAtual.widthPercent) / 100}px`,
+                height: `${(baseHeight * pipeSystemConfigAtual.heightPercent) / 100}px`,
                 zIndex: -1
               }}
             >
-              <PipeSystem 
+              <PipeSystem
                 bit9={bit9}
                 bit11={bit11}
                 bit12={bit12}
@@ -1193,14 +1222,14 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             </div>
 
             {/* 🏗️ BASE FUNDO ENCHIMENTO - SVG DE FUNDO - ATRÁS DOS PISTÕES MAS NA FRENTE DA BASE */}
-            <div 
+            <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * baseFundoEnchimentoConfigAtual.verticalPercent) / 100}px`,
-                left: `${(maxWidth * baseFundoEnchimentoConfigAtual.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * baseFundoEnchimentoConfigAtual.widthPercent) / 100}px`,
-                height: `${(alturaTotal * baseFundoEnchimentoConfigAtual.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * baseFundoEnchimentoConfigAtual.verticalPercent) / 100}px`,
+                left: `${(baseWidth * baseFundoEnchimentoConfigAtual.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * baseFundoEnchimentoConfigAtual.widthPercent) / 100}px`,
+                height: `${(baseHeight * baseFundoEnchimentoConfigAtual.heightPercent) / 100}px`,
                 zIndex: 8
               }}
             >
@@ -1221,966 +1250,966 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             </div>
 
             {/* BASE PISTÃO ESQUERDO */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * basePistaoEsquerdoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * basePistaoEsquerdoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * basePistaoEsquerdoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * basePistaoEsquerdoConfig.heightPercent) / 100}px`,
-              zIndex: 5
-            }}
-          >
-            <BasePistaoEnchimento 
-              side="esquerdo"
-              editMode={false}
-            />
-          </div>
-
-          {/* BASE PISTÃO DIREITO */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * basePistaoDireitoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * basePistaoDireitoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * basePistaoDireitoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * basePistaoDireitoConfig.heightPercent) / 100}px`,
-              zIndex: 5
-            }}
-          >
-            <BasePistaoEnchimento 
-              side="direito"
-              editMode={false}
-            />
-          </div>
-
-          {/* 🎯 PISTÃO ESQUERDO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 1 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * pistaoEsquerdoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * pistaoEsquerdoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * pistaoEsquerdoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * pistaoEsquerdoConfig.heightPercent) / 100}px`,
-              zIndex: 10
-            }}
-          >
-            <PistaoEnchimento 
-              websocketValue={pistaoEsquerdo}
-              side="esquerdo"
-              editMode={false}
-            />
-          </div>
-
-          {/* 🎯 PISTÃO DIREITO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 0 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * pistaoDireitoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * pistaoDireitoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * pistaoDireitoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * pistaoDireitoConfig.heightPercent) / 100}px`,
-              zIndex: 10
-            }}
-          >
-            <PistaoEnchimento 
-              websocketValue={pistaoDireito}
-              side="direito"
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 CILINDRO ESQUERDO - STATUS WORD BIT ÍNDICE 30 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * cilindroEsquerdoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * cilindroEsquerdoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * cilindroEsquerdoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * cilindroEsquerdoConfig.heightPercent) / 100}px`,
-              zIndex: 5
-            }}
-          >
-            <CilindroEnchimento 
-              websocketBit={cilindroEsquerdo}
-              side="esquerdo"
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 CILINDRO DIREITO - STATUS WORD BIT ÍNDICE 29 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * cilindroDireitoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * cilindroDireitoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * cilindroDireitoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * cilindroDireitoConfig.heightPercent) / 100}px`,
-              zIndex: 5
-            }}
-          >
-            <CilindroEnchimento 
-              websocketBit={cilindroDireito}
-              side="direito"
-              editMode={false}
-            />
-          </div>
-
-          {/* 🏗️ SUPORTE PISTA ESQUERDO - SVG ESTÁTICO - Z-INDEX MAIS ALTO */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * suportePistaEsquerdoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * suportePistaEsquerdoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * suportePistaEsquerdoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * suportePistaEsquerdoConfig.heightPercent) / 100}px`,
-              zIndex: 15
-            }}
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 400 200"
-              preserveAspectRatio="xMidYMid meet"
-              className="w-full h-full"
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * basePistaoEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * basePistaoEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * basePistaoEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * basePistaoEsquerdoConfig.heightPercent) / 100}px`,
+                zIndex: 5
+              }}
             >
-              <image
-                href="/Enchimento/SuportePista.svg"
-                width="400"
-                height="200"
-                preserveAspectRatio="xMidYMid meet"
+              <BasePistaoEnchimento
+                side="esquerdo"
+                editMode={false}
               />
-            </svg>
-          </div>
+            </div>
 
-          {/* 🏗️ SUPORTE PISTA DIREITO - SVG ESTÁTICO - Z-INDEX MAIS ALTO */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * suportePistaDireitoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * suportePistaDireitoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * suportePistaDireitoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * suportePistaDireitoConfig.heightPercent) / 100}px`,
-              zIndex: 15
-            }}
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 400 200"
-              preserveAspectRatio="xMidYMid meet"
-              className="w-full h-full"
+            {/* BASE PISTÃO DIREITO */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * basePistaoDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * basePistaoDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * basePistaoDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * basePistaoDireitoConfig.heightPercent) / 100}px`,
+                zIndex: 5
+              }}
             >
-              <image
-                href="/Enchimento/SuportePista.svg"
-                width="400"
-                height="200"
-                preserveAspectRatio="xMidYMid meet"
+              <BasePistaoEnchimento
+                side="direito"
+                editMode={false}
               />
-            </svg>
-          </div>
+            </div>
 
-          {/* 🔧 VÁLVULA ESQUERDA 1 - BIT 18 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaEsquerda1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaEsquerda1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaEsquerda1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaEsquerda1Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaEsquerda1}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA ESQUERDA 2 - BIT 19 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaEsquerda2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaEsquerda2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaEsquerda2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaEsquerda2Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaEsquerda2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA ESQUERDA 3 - BIT 12 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaEsquerda3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaEsquerda3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaEsquerda3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaEsquerda3Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaEsquerda3}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA DIREITA 1 - BIT 13 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDireita1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDireita1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDireita1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDireita1Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaDireita1}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA DIREITA 2 - BIT 24 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDireita2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDireita2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDireita2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDireita2Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaDireita2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA DIREITA 3 - BIT 23 */}
-          <div
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDireita3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDireita3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDireita3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDireita3Config.heightPercent) / 100}px`,
-              zIndex: 20
-            }}
-          >
-            <ValvulaOnOff
-              websocketBit={valvulaDireita3}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE ESQUERDA 1 - BIT 18 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeEsquerda1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeEsquerda1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeEsquerda1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeEsquerda1Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeEsquerda1}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE ESQUERDA 2 - BIT 19 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeEsquerda2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeEsquerda2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeEsquerda2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeEsquerda2Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeEsquerda2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE ESQUERDA 3 - BIT 12 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeEsquerda3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeEsquerda3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeEsquerda3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeEsquerda3Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeEsquerda3}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE DIREITA 1 - BIT 13 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeDireita1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeDireita1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeDireita1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeDireita1Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeDireita1}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE DIREITA 2 - BIT 24 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeDireita2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeDireita2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeDireita2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeDireita2Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeDireita2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🔧 VÁLVULA FLANGE DIREITA 3 - BIT 23 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaFlangeDireita3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaFlangeDireita3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaFlangeDireita3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaFlangeDireita3Config.heightPercent) / 100}px`,
-              zIndex: 11
-            }}
-          >
-            <ValvulaFlange 
-              websocketBit={valvulaFlangeDireita3}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🛢️ TANQUE OLEO - SVG ESTÁTICO - Z-INDEX MENOR PARA FICAR ATRÁS DAS TUBULAÇÕES */}
-          <div
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * tanqueOleoConfigAtual.verticalPercent) / 100}px`,
-              left: `${(maxWidth * tanqueOleoConfigAtual.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * tanqueOleoConfigAtual.widthPercent) / 100}px`,
-              height: `${(alturaTotal * tanqueOleoConfigAtual.heightPercent) / 100}px`,
-              zIndex: -5
-            }}
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 200 150"
-              preserveAspectRatio="xMidYMid meet"
-              className="w-full h-full"
+            {/* 🎯 PISTÃO ESQUERDO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 1 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * pistaoEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * pistaoEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * pistaoEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * pistaoEsquerdoConfig.heightPercent) / 100}px`,
+                zIndex: 10
+              }}
             >
-              <image
-                href="/Enchimento/Tanque_Oleo.svg"
-                width="260"
-                height="165"
-                preserveAspectRatio="xMidYMid meet"
+              <PistaoEnchimento
+                websocketValue={pistaoEsquerdo}
+                side="esquerdo"
+                editMode={false}
               />
-            </svg>
-          </div>
+            </div>
 
-          {/* ⚙️ MOTOR ESQUERDO - INTEIRO 8 - ESPELHADO */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * motorEsquerdoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * motorEsquerdoConfig.heightPercent) / 100}px`,
-              zIndex: 9
-            }}
-          >
-            <MotorEnchimento 
-              websocketValue={bombaMotorEsquerdo}
-              side="esquerdo"
-              editMode={false}
-            />
-          </div>
+            {/* 🎯 PISTÃO DIREITO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 0 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * pistaoDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * pistaoDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * pistaoDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * pistaoDireitoConfig.heightPercent) / 100}px`,
+                zIndex: 10
+              }}
+            >
+              <PistaoEnchimento
+                websocketValue={pistaoDireito}
+                side="direito"
+                editMode={false}
+              />
+            </div>
 
-          {/* ⚙️ MOTOR DIREITO - INTEIRO 9 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * motorDireitoConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * motorDireitoConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * motorDireitoConfig.heightPercent) / 100}px`,
-              zIndex: 9
-            }}
-          >
-            <MotorEnchimento 
-              websocketValue={bombaMotorDireito}
-              side="direito"
-              editMode={false}
-            />
-          </div>
+            {/* 🔧 CILINDRO ESQUERDO - STATUS WORD BIT ÍNDICE 30 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * cilindroEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * cilindroEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * cilindroEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * cilindroEsquerdoConfig.heightPercent) / 100}px`,
+                zIndex: 5
+              }}
+            >
+              <CilindroEnchimento
+                websocketBit={cilindroEsquerdo}
+                side="esquerdo"
+                editMode={false}
+              />
+            </div>
 
-          {/* 🚪 VÁLVULA GAVETA ESQUERDA 1 - BIT 21 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaEsquerda1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaEsquerda1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaEsquerda1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaEsquerda1Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaEsquerda1}
-              editMode={false}
-            />
-          </div>
+            {/* 🔧 CILINDRO DIREITO - STATUS WORD BIT ÍNDICE 29 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * cilindroDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * cilindroDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * cilindroDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * cilindroDireitoConfig.heightPercent) / 100}px`,
+                zIndex: 5
+              }}
+            >
+              <CilindroEnchimento
+                websocketBit={cilindroDireito}
+                side="direito"
+                editMode={false}
+              />
+            </div>
 
-          {/* 🚪 VÁLVULA GAVETA ESQUERDA 2 - BIT 20 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaEsquerda2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaEsquerda2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaEsquerda2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaEsquerda2Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaEsquerda2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🚪 VÁLVULA GAVETA ESQUERDA 3 - BIT 2 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaEsquerda3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaEsquerda3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaEsquerda3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaEsquerda3Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaEsquerda3}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🚪 VÁLVULA GAVETA DIREITA 1 - BIT 26 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaDireita1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaDireita1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaDireita1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaDireita1Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaDireita1}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🚪 VÁLVULA GAVETA DIREITA 2 - BIT 25 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaDireita2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaDireita2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaDireita2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaDireita2Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaDireita2}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🚪 VÁLVULA GAVETA DIREITA 3 - BIT 4 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaGavetaDireita3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaGavetaDireita3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaGavetaDireita3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaGavetaDireita3Config.heightPercent) / 100}px`,
-              zIndex: 7
-            }}
-          >
-            <ValvulaGaveta 
-              websocketBit={valvulaGavetaDireita3}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 1 - BIT 9 - ESPELHADA + ROTACIONADA 90° */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalEsquerda1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalEsquerda1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalEsquerda1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalEsquerda1Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalEsquerda1}
-              mirrored={true}
-              rotation={-90}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 2 - BIT 8 - ESPELHADA */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalEsquerda2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalEsquerda2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalEsquerda2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalEsquerda2Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalEsquerda2}
-              mirrored={true}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 3 - BIT 6 - ESPELHADA */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalEsquerda3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalEsquerda3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalEsquerda3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalEsquerda3Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalEsquerda3}
-              mirrored={true}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL DIREITA 1 - BIT 15 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalDireita1Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalDireita1Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalDireita1Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalDireita1Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalDireita1}
-              rotation={-90}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL DIREITA 2 - BIT 10 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalDireita2Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalDireita2Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalDireita2Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalDireita2Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalDireita2}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↔️ VÁLVULA DIRECIONAL DIREITA 3 - BIT 12 */}
-          <div 
-            className="absolute"
-            style={{
-              top: `${(alturaTotal * valvulaDirecionalDireita3Config.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaDirecionalDireita3Config.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaDirecionalDireita3Config.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaDirecionalDireita3Config.heightPercent) / 100}px`,
-              zIndex: 13
-            }}
-          >
-            <ValveDirecional 
-              websocketBit={valvulaDirecionalDireita3}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↕️ VÁLVULA VERTICAL ESQUERDA - BIT 9 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * valvulaVerticalEsquerdaConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaVerticalEsquerdaConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaVerticalEsquerdaConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaVerticalEsquerdaConfig.heightPercent) / 100}px`,
-              zIndex: 14
-            }}
-          >
-            <ValvulaVertical 
-              websocketBit={valvulaVerticalEsquerda}
-              editMode={false}
-            />
-          </div>
-
-          {/* ↕️ VÁLVULA VERTICAL DIREITA - BIT 11 */}
-          <div 
-            className="absolute"
-            style={{
-              // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: maxWidth horizontal + alturaTotal vertical
-              top: `${(alturaTotal * valvulaVerticalDireitaConfig.verticalPercent) / 100}px`,
-              left: `${(maxWidth * valvulaVerticalDireitaConfig.horizontalPercent) / 100}px`,
-              width: `${(maxWidth * valvulaVerticalDireitaConfig.widthPercent) / 100}px`,
-              height: `${(alturaTotal * valvulaVerticalDireitaConfig.heightPercent) / 100}px`,
-              zIndex: 14
-            }}
-          >
-            <ValvulaVertical 
-              websocketBit={valvulaVerticalDireita}
-              editMode={false}
-            />
-          </div>
-
-          {/* 🎯 CARD PISTÃO DIREITO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
-          {!isMobile && (
-          <div 
-            className="absolute z-50"
-            style={{
-              top: `${alturaTotal * 0.91}px`,
-              left: `${maxWidth * 0.21}px`,
-              width: `${maxWidth * 0.23}px`,
-            }}
-          >
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header Padrão InfoCard */}
-              <div 
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+            {/* 🏗️ SUPORTE PISTA ESQUERDO - SVG ESTÁTICO - Z-INDEX MAIS ALTO */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * suportePistaEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * suportePistaEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * suportePistaEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * suportePistaEsquerdoConfig.heightPercent) / 100}px`,
+                zIndex: 15
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 200"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full"
               >
-                <h3 
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  PISTÃO DIREITO
-                </h3>
-              </div>
-              
-              {/* Conteúdo Padrão InfoCard */}
-              <div style={{ padding: `${Math.max(10, maxWidth * 0.01)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, maxWidth * 0.006)}px` }}>
-                  
-                  {/* Posição Metros */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                <image
+                  href="/Enchimento/SuportePista.svg"
+                  width="400"
+                  height="200"
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              </svg>
+            </div>
+
+            {/* 🏗️ SUPORTE PISTA DIREITO - SVG ESTÁTICO - Z-INDEX MAIS ALTO */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * suportePistaDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * suportePistaDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * suportePistaDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * suportePistaDireitoConfig.heightPercent) / 100}px`,
+                zIndex: 15
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 200"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full"
+              >
+                <image
+                  href="/Enchimento/SuportePista.svg"
+                  width="400"
+                  height="200"
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              </svg>
+            </div>
+
+            {/* 🔧 VÁLVULA ESQUERDA 1 - BIT 18 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaEsquerda1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaEsquerda1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaEsquerda1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaEsquerda1Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaEsquerda1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA ESQUERDA 2 - BIT 19 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaEsquerda2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaEsquerda2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaEsquerda2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaEsquerda2Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaEsquerda2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA ESQUERDA 3 - BIT 12 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaEsquerda3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaEsquerda3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaEsquerda3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaEsquerda3Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaEsquerda3}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA DIREITA 1 - BIT 13 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDireita1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDireita1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDireita1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDireita1Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaDireita1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA DIREITA 2 - BIT 24 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDireita2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDireita2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDireita2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDireita2Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaDireita2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA DIREITA 3 - BIT 23 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDireita3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDireita3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDireita3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDireita3Config.heightPercent) / 100}px`,
+                zIndex: 20
+              }}
+            >
+              <ValvulaOnOff
+                websocketBit={valvulaDireita3}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE ESQUERDA 1 - BIT 18 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeEsquerda1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeEsquerda1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeEsquerda1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeEsquerda1Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeEsquerda1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE ESQUERDA 2 - BIT 19 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeEsquerda2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeEsquerda2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeEsquerda2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeEsquerda2Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeEsquerda2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE ESQUERDA 3 - BIT 12 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeEsquerda3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeEsquerda3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeEsquerda3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeEsquerda3Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeEsquerda3}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE DIREITA 1 - BIT 13 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeDireita1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeDireita1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeDireita1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeDireita1Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeDireita1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE DIREITA 2 - BIT 24 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeDireita2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeDireita2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeDireita2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeDireita2Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeDireita2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🔧 VÁLVULA FLANGE DIREITA 3 - BIT 23 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaFlangeDireita3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaFlangeDireita3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaFlangeDireita3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaFlangeDireita3Config.heightPercent) / 100}px`,
+                zIndex: 11
+              }}
+            >
+              <ValvulaFlange
+                websocketBit={valvulaFlangeDireita3}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🛢️ TANQUE OLEO - SVG ESTÁTICO - Z-INDEX MENOR PARA FICAR ATRÁS DAS TUBULAÇÕES */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * tanqueOleoConfigAtual.verticalPercent) / 100}px`,
+                left: `${(baseWidth * tanqueOleoConfigAtual.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * tanqueOleoConfigAtual.widthPercent) / 100}px`,
+                height: `${(baseHeight * tanqueOleoConfigAtual.heightPercent) / 100}px`,
+                zIndex: -5
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 200 150"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full"
+              >
+                <image
+                  href="/Enchimento/Tanque_Oleo.svg"
+                  width="260"
+                  height="165"
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              </svg>
+            </div>
+
+            {/* ⚙️ MOTOR ESQUERDO - INTEIRO 8 - ESPELHADO */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorEsquerdoConfig.heightPercent) / 100}px`,
+                zIndex: 9
+              }}
+            >
+              <MotorEnchimento
+                websocketValue={bombaMotorEsquerdo}
+                side="esquerdo"
+                editMode={false}
+              />
+            </div>
+
+            {/* ⚙️ MOTOR DIREITO - INTEIRO 9 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorDireitoConfig.heightPercent) / 100}px`,
+                zIndex: 9
+              }}
+            >
+              <MotorEnchimento
+                websocketValue={bombaMotorDireito}
+                side="direito"
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA ESQUERDA 1 - BIT 21 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaEsquerda1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaEsquerda1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaEsquerda1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaEsquerda1Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaEsquerda1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA ESQUERDA 2 - BIT 20 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaEsquerda2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaEsquerda2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaEsquerda2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaEsquerda2Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaEsquerda2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA ESQUERDA 3 - BIT 2 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaEsquerda3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaEsquerda3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaEsquerda3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaEsquerda3Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaEsquerda3}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA DIREITA 1 - BIT 26 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaDireita1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaDireita1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaDireita1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaDireita1Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaDireita1}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA DIREITA 2 - BIT 25 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaDireita2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaDireita2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaDireita2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaDireita2Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaDireita2}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🚪 VÁLVULA GAVETA DIREITA 3 - BIT 4 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaGavetaDireita3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaGavetaDireita3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaGavetaDireita3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaGavetaDireita3Config.heightPercent) / 100}px`,
+                zIndex: 7
+              }}
+            >
+              <ValvulaGaveta
+                websocketBit={valvulaGavetaDireita3}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 1 - BIT 9 - ESPELHADA + ROTACIONADA 90° */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalEsquerda1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalEsquerda1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalEsquerda1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalEsquerda1Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalEsquerda1}
+                mirrored={true}
+                rotation={-90}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 2 - BIT 8 - ESPELHADA */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalEsquerda2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalEsquerda2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalEsquerda2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalEsquerda2Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalEsquerda2}
+                mirrored={true}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL ESQUERDA 3 - BIT 6 - ESPELHADA */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalEsquerda3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalEsquerda3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalEsquerda3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalEsquerda3Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalEsquerda3}
+                mirrored={true}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL DIREITA 1 - BIT 15 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalDireita1Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalDireita1Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalDireita1Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalDireita1Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalDireita1}
+                rotation={-90}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL DIREITA 2 - BIT 10 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalDireita2Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalDireita2Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalDireita2Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalDireita2Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalDireita2}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↔️ VÁLVULA DIRECIONAL DIREITA 3 - BIT 12 */}
+            <div
+              className="absolute"
+              style={{
+                top: `${(baseHeight * valvulaDirecionalDireita3Config.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaDirecionalDireita3Config.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaDirecionalDireita3Config.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaDirecionalDireita3Config.heightPercent) / 100}px`,
+                zIndex: 13
+              }}
+            >
+              <ValveDirecional
+                websocketBit={valvulaDirecionalDireita3}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↕️ VÁLVULA VERTICAL ESQUERDA - BIT 9 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * valvulaVerticalEsquerdaConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaVerticalEsquerdaConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaVerticalEsquerdaConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaVerticalEsquerdaConfig.heightPercent) / 100}px`,
+                zIndex: 14
+              }}
+            >
+              <ValvulaVertical
+                websocketBit={valvulaVerticalEsquerda}
+                editMode={false}
+              />
+            </div>
+
+            {/* ↕️ VÁLVULA VERTICAL DIREITA - BIT 11 */}
+            <div
+              className="absolute"
+              style={{
+                // 📐 SISTEMA IDÊNTICO PORTA JUSANTE: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * valvulaVerticalDireitaConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * valvulaVerticalDireitaConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * valvulaVerticalDireitaConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * valvulaVerticalDireitaConfig.heightPercent) / 100}px`,
+                zIndex: 14
+              }}
+            >
+              <ValvulaVertical
+                websocketBit={valvulaVerticalDireita}
+                editMode={false}
+              />
+            </div>
+
+            {/* 🎯 CARD PISTÃO DIREITO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
+            {!isMobile && (
+              <div
+                className="absolute z-50"
+                style={{
+                  top: `${baseHeight * 0.91}px`,
+                  left: `${baseWidth * 0.21}px`,
+                  width: `${baseWidth * 0.23}px`,
+                }}
+              >
+                <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+                  {/* Header Padrão InfoCard */}
+                  <div
+                    className="bg-edp-marine text-white"
+                    style={{ padding: `${Math.max(6, baseWidth * 0.005)}px ${Math.max(10, baseWidth * 0.008)}px` }}
+                  >
+                    <h3
+                      className="font-bold uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(10, Math.min(14, baseWidth * 0.008))}px` }}
                     >
-                      Posição:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {posicaoMetrosDireito.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m</span>
-                    </span>
+                      PISTÃO DIREITO
+                    </h3>
                   </div>
-                  
-                  {/* Abertura % */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Abertura:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {posicaoPorcentagemDireito.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>%</span>
-                    </span>
-                  </div>
-                  
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-                  
-                  {/* Tempo Abertura */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Abertura:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoAberturaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Tempo Ab. Lenta */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Ab. Lenta:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoAberturaLentaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Tempo Fecho */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Fecho:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoFechoDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-                  
-                  {/* Velocidade */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Velocidade:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {velocidadeDireito.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m/s</span>
-                    </span>
+
+                  {/* Conteúdo Padrão InfoCard */}
+                  <div style={{ padding: `${Math.max(10, baseWidth * 0.01)}px` }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, baseWidth * 0.006)}px` }}>
+
+                      {/* Posição Metros */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Posição:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {posicaoMetrosDireito.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>m</span>
+                        </span>
+                      </div>
+
+                      {/* Abertura % */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Abertura:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {posicaoPorcentagemDireito.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>%</span>
+                        </span>
+                      </div>
+
+                      {/* Separador */}
+                      <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
+
+                      {/* Tempo Abertura */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Abertura:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoAberturaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Tempo Ab. Lenta */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Ab. Lenta:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoAberturaLentaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Tempo Fecho */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Fecho:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoFechoDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Separador */}
+                      <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
+
+                      {/* Velocidade */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Velocidade:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {velocidadeDireito.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>m/s</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-          )}
+            )}
 
-          {/* 🎯 CARD PISTÃO ESQUERDO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
-          {!isMobile && (
-          <div 
-            className="absolute z-50"
-            style={{
-              top: `${alturaTotal * 0.91}px`,
-              left: `${maxWidth * 0.50}px`,
-              width: `${maxWidth * 0.23}px`,
-            }}
-          >
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header Padrão InfoCard */}
-              <div 
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
+            {/* 🎯 CARD PISTÃO ESQUERDO - ESTILO PADRÃO INFOCARD - APENAS DESKTOP */}
+            {!isMobile && (
+              <div
+                className="absolute z-50"
+                style={{
+                  top: `${baseHeight * 0.91}px`,
+                  left: `${baseWidth * 0.50}px`,
+                  width: `${baseWidth * 0.23}px`,
+                }}
               >
-                <h3 
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  PISTÃO ESQUERDO
-                </h3>
-              </div>
-              
-              {/* Conteúdo Padrão InfoCard */}
-              <div style={{ padding: `${Math.max(10, maxWidth * 0.01)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, maxWidth * 0.006)}px` }}>
-                  
-                  {/* Posição Metros */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
+                  {/* Header Padrão InfoCard */}
+                  <div
+                    className="bg-edp-marine text-white"
+                    style={{ padding: `${Math.max(6, baseWidth * 0.005)}px ${Math.max(10, baseWidth * 0.008)}px` }}
+                  >
+                    <h3
+                      className="font-bold uppercase tracking-wide"
+                      style={{ fontSize: `${Math.max(10, Math.min(14, baseWidth * 0.008))}px` }}
                     >
-                      Posição:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {posicaoMetrosEsquerdo.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m</span>
-                    </span>
+                      PISTÃO ESQUERDO
+                    </h3>
                   </div>
-                  
-                  {/* Abertura % */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Abertura:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {posicaoPorcentagemEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>%</span>
-                    </span>
-                  </div>
-                  
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-                  
-                  {/* Tempo Abertura */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Abertura:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoAberturaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Tempo Ab. Lenta */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Ab. Lenta:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoAberturaLentaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Tempo Fecho */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      T. Fecho:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {tempoFechoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>s</span>
-                    </span>
-                  </div>
-                  
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-                  
-                  {/* Velocidade */}
-                  <div className="flex justify-between items-center">
-                    <span 
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Velocidade:
-                    </span>
-                    <span 
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                    >
-                      {velocidadeEsquerdo.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}>m/s</span>
-                    </span>
+
+                  {/* Conteúdo Padrão InfoCard */}
+                  <div style={{ padding: `${Math.max(10, baseWidth * 0.01)}px` }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(8, baseWidth * 0.006)}px` }}>
+
+                      {/* Posição Metros */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Posição:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {posicaoMetrosEsquerdo.toFixed(3)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>m</span>
+                        </span>
+                      </div>
+
+                      {/* Abertura % */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Abertura:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {posicaoPorcentagemEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>%</span>
+                        </span>
+                      </div>
+
+                      {/* Separador */}
+                      <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
+
+                      {/* Tempo Abertura */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Abertura:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoAberturaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Tempo Ab. Lenta */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Ab. Lenta:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoAberturaLentaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Tempo Fecho */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          T. Fecho:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {tempoFechoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
+                        </span>
+                      </div>
+
+                      {/* Separador */}
+                      <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
+
+                      {/* Velocidade */}
+                      <div className="flex justify-between items-center">
+                        <span
+                          className="font-medium text-[#212E3E] uppercase tracking-wide"
+                          style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
+                        >
+                          Velocidade:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-[#212E3E]"
+                          style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
+                        >
+                          {velocidadeEsquerdo.toFixed(4)} <span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>m/s</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
-          )}
-        </div>
         ) : (
           /* Loading otimizado - mantém proporções corretas */
           <div className="w-full flex items-center justify-center">
-            <div 
+            <div
               className="w-full bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-lg animate-pulse"
-              style={{ 
+              style={{
                 height: '600px',
-                maxWidth: '800px',
+                width: '800px',
                 backgroundSize: '200% 100%',
                 animation: 'shimmer 1.5s ease-in-out infinite'
               }}
@@ -2210,7 +2239,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             border: '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          <div 
+          <div
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
               width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
@@ -2218,16 +2247,16 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
-            <CogIcon 
+            <CogIcon
               className="text-white"
-              style={{ 
+              style={{
                 width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
                 height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-              }} 
+              }}
             />
           </div>
           <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div 
+          <div
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
               width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
@@ -2258,17 +2287,17 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-2 md:p-4 overflow-hidden"
           onClick={() => setMenuParametrosOpen(false)}
-          style={{ 
+          style={{
             touchAction: 'none',
             overscrollBehavior: 'contain',
             WebkitOverflowScrolling: 'touch'
           }}
         >
           {/* Dialog Container */}
-          <div 
+          <div
             className="
               bg-white shadow-2xl overflow-hidden flex flex-col
               w-full max-w-[280px] max-h-[75vh] rounded-t-2xl
@@ -2280,7 +2309,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
-            style={{ 
+            style={{
               touchAction: 'pan-y',
               overscrollBehavior: 'contain'
             }}
@@ -2308,9 +2337,9 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             </div>
 
             {/* Conteúdo com scroll */}
-            <div 
-              className="flex-1 overflow-y-auto overscroll-contain" 
-              style={{ 
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain"
+              style={{
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
                 overscrollBehavior: 'contain'
@@ -2318,127 +2347,127 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             >
               <div className="p-1.5 md:p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-4">
-                
-                {/* VELOCIDADE DE ABERTURA */}
-                <Card 
-                  title="VELOCIDADE DE ABERTURA" 
-                  icon={<ArrowUpIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 1 - Velocidade Alta:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.25 m/min</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 1 - Velocidade Baixa:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.05 m/min</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 2 - Velocidade Alta:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.30 m/min</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 2 - Velocidade Baixa:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.08 m/min</span>
-                    </div>
-                  </div>
-                </Card>
 
-                {/* VELOCIDADE DE FECHAMENTO */}
-                <Card 
-                  title="VELOCIDADE DE FECHAMENTO" 
-                  icon={<ArrowDownIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="h-fit"
-                >
-                  <div className="space-y-1 md:space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Velocidade Alta:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.20 m/min</span>
+                  {/* VELOCIDADE DE ABERTURA */}
+                  <Card
+                    title="VELOCIDADE DE ABERTURA"
+                    icon={<ArrowUpIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 1 - Velocidade Alta:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.25 m/min</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 1 - Velocidade Baixa:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.05 m/min</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 2 - Velocidade Alta:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.30 m/min</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Patamar 2 - Velocidade Baixa:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.08 m/min</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Velocidade Baixa:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.03 m/min</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Status Atual:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-green-600">Normal</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium text-[8px] md:text-sm">Tempo Operação:</span>
-                      <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">125 min</span>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
 
-                {/* QUADRO DE POTÊNCIA - Ocupa as duas colunas */}
-                <Card 
-                  title="QUADRO DE POTÊNCIA" 
-                  icon={<BoltIcon className="w-5 h-5" />}
-                  variant="default"
-                  className="md:col-span-2"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4">
-                    {/* L1-L2 */}
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">L1-L2</h4>
-                      <div className="space-y-0.5 md:space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Tensão:</span>
-                          <span className="font-bold text-blue-600 text-[7px] md:text-sm">220V</span>
+                  {/* VELOCIDADE DE FECHAMENTO */}
+                  <Card
+                    title="VELOCIDADE DE FECHAMENTO"
+                    icon={<ArrowDownIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="h-fit"
+                  >
+                    <div className="space-y-1 md:space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Velocidade Alta:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.20 m/min</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Velocidade Baixa:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">0.03 m/min</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Status Atual:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-green-600">Normal</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium text-[8px] md:text-sm">Tempo Operação:</span>
+                        <span className="text-[8px] md:text-lg font-mono font-bold text-gray-900">125 min</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* QUADRO DE POTÊNCIA - Ocupa as duas colunas */}
+                  <Card
+                    title="QUADRO DE POTÊNCIA"
+                    icon={<BoltIcon className="w-5 h-5" />}
+                    variant="default"
+                    className="md:col-span-2"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4">
+                      {/* L1-L2 */}
+                      <div className="text-center">
+                        <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">L1-L2</h4>
+                        <div className="space-y-0.5 md:space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Tensão:</span>
+                            <span className="font-bold text-blue-600 text-[7px] md:text-sm">220V</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Corrente:</span>
+                            <span className="font-bold text-green-600 text-[7px] md:text-sm">5.2A</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Potência:</span>
+                            <span className="font-bold text-orange-600 text-[7px] md:text-sm">1.1kW</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Corrente:</span>
-                          <span className="font-bold text-green-600 text-[7px] md:text-sm">5.2A</span>
+                      </div>
+
+                      {/* Parâmetros Gerais */}
+                      <div className="text-center">
+                        <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">PARÂMETROS GERAIS</h4>
+                        <div className="space-y-0.5 md:space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Potência Total:</span>
+                            <span className="font-bold text-gray-900 text-[7px] md:text-sm">1.15 kW</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Fator de Potência:</span>
+                            <span className="font-bold text-gray-900 text-[7px] md:text-sm">0.85</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Frequência:</span>
+                            <span className="font-bold text-gray-900 text-[7px] md:text-sm">60.0 Hz</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Potência:</span>
-                          <span className="font-bold text-orange-600 text-[7px] md:text-sm">1.1kW</span>
+                      </div>
+
+                      {/* Status Operacional */}
+                      <div className="text-center">
+                        <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">STATUS OPERACIONAL</h4>
+                        <div className="space-y-0.5 md:space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Estado:</span>
+                            <span className="font-bold text-green-600 text-[7px] md:text-sm">Operando</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Temperatura:</span>
+                            <span className="font-bold text-blue-600 text-[7px] md:text-sm">65°C</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 text-[7px] md:text-sm">Vibração:</span>
+                            <span className="font-bold text-green-600 text-[7px] md:text-sm">Normal</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Parâmetros Gerais */}
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">PARÂMETROS GERAIS</h4>
-                      <div className="space-y-0.5 md:space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Potência Total:</span>
-                          <span className="font-bold text-gray-900 text-[7px] md:text-sm">1.15 kW</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Fator de Potência:</span>
-                          <span className="font-bold text-gray-900 text-[7px] md:text-sm">0.85</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Frequência:</span>
-                          <span className="font-bold text-gray-900 text-[7px] md:text-sm">60.0 Hz</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Status Operacional */}
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">STATUS OPERACIONAL</h4>
-                      <div className="space-y-0.5 md:space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Estado:</span>
-                          <span className="font-bold text-green-600 text-[7px] md:text-sm">Operando</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Temperatura:</span>
-                          <span className="font-bold text-blue-600 text-[7px] md:text-sm">65°C</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 text-[7px] md:text-sm">Vibração:</span>
-                          <span className="font-bold text-green-600 text-[7px] md:text-sm">Normal</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
 
                 </div>
               </div>
@@ -2454,7 +2483,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                 >
                   Fechar
                 </button>
-                <button 
+                <button
                   className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
                   style={{ touchAction: 'manipulation' }}
                 >

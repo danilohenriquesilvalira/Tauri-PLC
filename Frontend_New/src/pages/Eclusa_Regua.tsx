@@ -1340,7 +1340,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             border: '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          <div 
+          <div
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
               width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
@@ -1348,16 +1348,16 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
-            <CogIcon 
+            <CogIcon
               className="text-white"
-              style={{ 
+              style={{
                 width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
                 height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-              }} 
+              }}
             />
           </div>
           <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div 
+          <div
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
               width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,

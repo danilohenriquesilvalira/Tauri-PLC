@@ -28,15 +28,15 @@ interface PortaJusanteProps {
 const CONTRAPESO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 37.2,    // % da altura total (posição Y)
-      horizontalPercent: 71.5,  // % da largura total (posição X)
-      widthPercent: 5,          // % da largura total (tamanho)
+      verticalPercent: 42.8,    // % da altura total (posição Y)
+      horizontalPercent: 43.6,  // % da largura total (posição X)
+      widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
-      verticalPercent: 37.2,    // % da altura total (posição Y)
-      horizontalPercent: 23.5,  // % da largura total (posição X)
-      widthPercent: 5,          // % da largura total (tamanho)
+      verticalPercent: 42.8,    // % da altura total (posição Y)
+      horizontalPercent: -43.5,  // % da largura total (posição X)
+      widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     }
   },
@@ -59,9 +59,9 @@ const CONTRAPESO_CONFIG = {
 // 📏 CONFIGURAÇÃO DA RÉGUA PORTA JUSANTE - SEPARADO MOBILE/DESKTOP
 const REGUA_CONFIG = {
   desktop: {
-    verticalPercent: 46,      // % da altura total (posição Y)
-    horizontalPercent: 29,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
-    widthPercent: 42,         // % da largura total (tamanho) - 2% MENOR
+    verticalPercent: 40,      // % da altura total (posição Y)
+    horizontalPercent: 0,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
+    widthPercent: 100,         // % da largura total (tamanho) - 2% MENOR
     heightPercent: 52,        // % da altura total (tamanho) - 2% MENOR
   },
   mobile: {
@@ -77,16 +77,16 @@ const REGUA_CONFIG = {
 const MOTOR_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: -1,      // % da altura total (posição Y)
-      horizontalPercent: 70,    // % da largura total (posição X)
-      widthPercent: 7.4,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 9.2,       // % da altura total (tamanho) - 45% menor
+      verticalPercent: 1,      // % da altura total (posição Y)
+      horizontalPercent: 42.5,    // % da largura total (posição X)
+      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
+      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
     },
     esquerdo: {
-      verticalPercent: -1,      // % da altura total (posição Y)
-      horizontalPercent: 22.6,    // % da largura total (posição X)
-      widthPercent: 7.4,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 9.2,       // % da altura total (tamanho) - 45% menor
+      verticalPercent: 1,      // % da altura total (posição Y)
+      horizontalPercent: -42.5,    // % da largura total (posição X)
+      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
+      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
     }
   },
   mobile: {
@@ -117,30 +117,87 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     return 1920;
   });
 
-  // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  // ============================================
+  // SISTEMA DE COORDENADAS UNIFICADO
+  // ============================================
+  // A correção de responsividade usa um ÚNICO sistema de coordenadas
+  // baseado no container central que mantém aspect ratio fixo.
+  // 
+  // IMPORTANTE: Porta Jusante usa aspect ratio 1075/1098 (quase quadrado)
+  // Os percentuais de posicionamento foram calibrados para esse ratio!
+  // ============================================
+
   const dimensions = React.useMemo(() => {
     const isMobile = windowWidth < 1024;
-    const portaJusanteAspectRatio = 1075 / 1098;
+    // Aspect ratio original da Porta Jusante (1075 x 1098)
+    const aspectRatio = 1075 / 1098;
+
+    // Calcula o espaço disponível - EXPANSÃO TOTAL PARA TELAS GRANDES
+    const availableWidth = windowWidth - 32; // Sem limite de 1920px
+    const availableHeight = window.innerHeight - 100;
+
+    // Determina o tamanho máximo mantendo aspect ratio
+    let baseWidth: number;
+    let baseHeight: number;
+
+    const widthBasedHeight = availableWidth / aspectRatio;
+
+    if (widthBasedHeight <= availableHeight) {
+      baseWidth = availableWidth; // EXPANSÃO TOTAL - usa toda largura disponível
+      baseHeight = baseWidth / aspectRatio;
+    } else {
+      baseHeight = availableHeight;
+      baseWidth = baseHeight * aspectRatio;
+    }
+
+    // Garante valores mínimos
+    baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
+    baseHeight = Math.max(baseHeight, isMobile ? 300 : 500);
+
+    // ESCALA ULTRA-INTELIGENTE: cresce progressivamente com a tela
+    // Em telas pequenas: mínimo 0.55, em telas grandes: até 0.95, em telas ultra-wide: até 1.0
+    let scale: number;
+    if (isMobile) {
+      scale = 0.90;
+    } else {
+      // Base scale: 0.55 para 1920px, crescendo linearmente
+      const baseScale = windowWidth / 1920 * 0.70;
+
+      // Ajuste progressivo: mais agressivo em telas grandes
+      if (windowWidth <= 1920) {
+        scale = Math.max(0.55, baseScale);
+      } else if (windowWidth <= 2560) {
+        // De 1920px a 2560px: de 0.70 até 0.85
+        scale = 0.70 + ((windowWidth - 1920) / (2560 - 1920)) * 0.15;
+      } else if (windowWidth <= 3840) {
+        // De 2560px a 3840px: de 0.85 até 0.95
+        scale = 0.85 + ((windowWidth - 2560) / (3840 - 2560)) * 0.10;
+      } else {
+        // Acima de 3840px: até 0.98 (quase tela cheia)
+        scale = Math.min(0.98, 0.95 + ((windowWidth - 3840) / 1920) * 0.03);
+      }
+    }
+
+    const scaledWidth = baseWidth * scale;
+    const scaledHeight = baseHeight * scale;
+
+    // Adicionar maxWidth igual à PortaMontante
     const containerWidth = Math.min(windowWidth - 32, 1920);
     const maxWidth = Math.max(containerWidth, 300);
-    const portaScale = isMobile ? 85 : 55;
-    const basePortaWidth = Math.max((maxWidth * portaScale) / 100, isMobile ? 300 : 500);
-    const basePortaHeight = Math.max(basePortaWidth / portaJusanteAspectRatio, isMobile ? 250 : 400);
 
     return {
       isMobile,
       maxWidth,
-      basePortaWidth,
-      basePortaHeight,
-      alturaTotal: basePortaHeight,
-      shouldRender: maxWidth > 100 && basePortaHeight > 100
+      baseWidth: scaledWidth,
+      baseHeight: scaledHeight,
+      shouldRender: scaledWidth > 100 && scaledHeight > 100
     };
   }, [windowWidth]);
 
   // Desestruturar para uso
-  const { isMobile, maxWidth, basePortaWidth, basePortaHeight, alturaTotal, shouldRender } = dimensions;
+  const { isMobile, maxWidth, baseWidth, baseHeight, shouldRender } = dimensions;
 
-  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  // 🚀 Listener de resize com debounce - atualizado para detectar mudanças de altura
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -151,13 +208,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       resizeTimeout = setTimeout(() => {
         const newWidth = window.innerWidth;
         setWindowWidth(prev => {
-          // Só atualiza se a diferença for significativa (>50px)
-          if (Math.abs(prev - newWidth) > 50) {
+          // Força re-render em qualquer mudança significativa
+          if (Math.abs(prev - newWidth) > 10) {
             return newWidth;
           }
-          return prev;
+          // Força update mesmo se largura não mudou muito (altura pode ter mudado)
+          return newWidth + 0.001;
         });
-      }, 150); // Debounce de 150ms
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
@@ -271,65 +329,92 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
   const motorEsquerdoConfig = motorConfigAtual.esquerdo;
 
 
-  // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
+  // 🎯 LARGURA INTELIGENTE DOS CARDS - MELHORADA PARA TELAS GRANDES
   const cardWidthValue = React.useMemo(() => {
-    // 🎯 MESMO CÁLCULO QUE OS OUTROS COMPONENTES ATÉ 1920px
-    const baseCardWidth = maxWidth * 0.18;
+    // 🎯 CALCULAR ESPAÇO DISPONÍVEL PARA CARDS (esquerda/direita do SVG)
+    const espacoTotalDisponivel = windowWidth - baseWidth;
+    const espacoPorLado = espacoTotalDisponivel / 2;
 
-    // 🎯 PARA TELAS > 1920px: CONTINUAR CRESCENDO (que o maxWidth não faz)
-    if (windowWidth > 1920) {
-      // Usar a largura real do container para calcular
-      const expandedMaxWidth = Math.min(windowWidth - 32, 2560); // Máximo 2560px
-      return expandedMaxWidth * 0.18;
-    }
+    // 🎯 PORCENTAGEM DO ESPAÇO DISPONÍVEL - MAIS AGRESSIVA EM TELAS GRANDES
+    // Em telas pequenas: 20-25%, em telas grandes: até 35%
+    const porcentagemEspaco = Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20));
+    const cardBaseadoEspaco = espacoPorLado * porcentagemEspaco;
 
-    return baseCardWidth;
-  }, [maxWidth, windowWidth]);
+    // 🎯 CARD BASEADO NO BASEWIDTH - GARANTE MÍNIMO
+    const cardBaseadoBaseWidth = baseWidth * 0.18;
+
+    // 🎯 USAR O MAIOR VALOR ENTRE OS DOIS CÁLCULOS PARA GARANTIR VISIBILIDADE
+    let finalCardWidth = Math.max(cardBaseadoEspaco, cardBaseadoBaseWidth);
+
+    // 🎯 LIMITES MAIS FLEXÍVEIS PARA TELAS GRANDES
+    const minWidth = isMobile ? 220 : 280;
+    const maxWidth = isMobile ? 350 : Math.max(500, windowWidth * 0.15); // Até 15% da tela em telas grandes
+
+    finalCardWidth = Math.max(finalCardWidth, minWidth);
+    finalCardWidth = Math.min(finalCardWidth, maxWidth);
+
+    return finalCardWidth;
+  }, [baseWidth, windowWidth, isMobile]);
 
   // 🎯 FUNÇÃO WRAPPER PARA COMPATIBILIDADE (não quebra código existente)
   const cardWidth = () => cardWidthValue;
 
-  // 🎯 SISTEMA RESPONSIVO MEMOIZADO PARA PERFORMANCE
+  // 🎯 SISTEMA RESPONSIVO MELHORADO PARA CARDS AUTO-AJUSTÁVEIS
   const getResponsiveCardFontSize = React.useCallback((baseSize: number, type: 'header' | 'label' | 'value' = 'label') => {
     const cardW = cardWidthValue;
 
-    // Escala baseada na largura do card (300px = escala base 1.0)
-    let scaleFactor = cardW / 300;
-    scaleFactor = Math.max(scaleFactor, 0.7); // Mínimo 70%
-    scaleFactor = Math.min(scaleFactor, 1.4); // Máximo 140%
+    // Escala baseada na largura do card (350px = escala base 1.0 para melhor proporção)
+    let scaleFactor = cardW / 350;
+    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80% - aumentado para evitar fontes muito pequenas
+    scaleFactor = Math.min(scaleFactor, 1.6); // Máximo 160% - aumentado para melhor aproveitamento do espaço
 
-    // Ajustes por tipo
-    if (type === 'header') scaleFactor *= 1.1;
-    else if (type === 'value') scaleFactor *= 1.05;
+    // Ajustes por tipo - mais equilibrados
+    if (type === 'header') scaleFactor *= 1.15; // Aumentado para headers mais visíveis
+    else if (type === 'value') scaleFactor *= 1.1; // Aumentado para valores mais legíveis
 
-    return Math.max(baseSize * scaleFactor, type === 'header' ? 10 : 8);
+    return Math.max(baseSize * scaleFactor, type === 'header' ? 12 : 10); // Mínimos aumentados
   }, [cardWidthValue]);
 
   const getResponsiveCardSpacing = React.useCallback((baseSpacing: number) => {
     const cardW = cardWidthValue;
-    let scaleFactor = cardW / 300; // 300px = escala base 1.0
-    scaleFactor = Math.max(scaleFactor, 0.8); // Mínimo 80%
-    scaleFactor = Math.min(scaleFactor, 1.3); // Máximo 130%
-    return Math.max(baseSpacing * scaleFactor, 4);
+    let scaleFactor = cardW / 350; // 350px = escala base 1.0 para melhor proporção
+    scaleFactor = Math.max(scaleFactor, 0.9); // Mínimo 90% - aumentado para evitar espaçamento muito apertado
+    scaleFactor = Math.min(scaleFactor, 1.5); // Máximo 150% - aumentado para melhor aproveitamento
+    return Math.max(baseSpacing * scaleFactor, 6); // Mínimo aumentado para 6px
   }, [cardWidthValue]);
 
   // CÁLCULO DO ESPAÇO DISPONÍVEL REAL - SEM CONSIDERAR SIDEBAR
   const larguraTotalTela = windowWidth;
-  const espacoUsadoPorComponentes = maxWidth; // Usar maxWidth que mantém o tamanho original
+  const espacoUsadoPorComponentes = baseWidth; // Usar baseWidth que mantém o tamanho original
   const espacoSobrandoTotal = Math.max(0, larguraTotalTela - espacoUsadoPorComponentes);
 
   const espacoDisponivelEsquerda = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
   const espacoDisponivelDireita = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
 
+  // 🎯 PROTEÇÃO CONTRA SOBREPOSIÇÃO - MAIS PERMISSIVA PARA GARANTIR VISIBILIDADE
+  const espacoLateralDisponivel = Math.max(0, (windowWidth - baseWidth) / 2);
+  const cardsCabem = windowWidth >= 1200 ? (espacoLateralDisponivel >= cardWidthValue + 10) : true; // Só verifica espaço em telas grandes
+
   // Performance optimization: Debug logging only in development
   if (import.meta.env.DEV) {
-    console.log('🎯 CARDS SEGUINDO SISTEMA DOS COMPONENTES:', {
+    console.log('🎯 EXPANSÃO TOTAL - PORTA JUSANTE:', {
       window_width: windowWidth,
-      maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
-      card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
-      card_expandido: `${cardWidthValue.toFixed(0)}px`,
-      diferenca: `+${(cardWidthValue - (maxWidth * 0.18)).toFixed(0)}px`,
-      usando_expansao: windowWidth > 1920 ? '✅ SIM' : '❌ NÃO'
+      baseWidth_final: `${baseWidth.toFixed(0)}px`,
+      espaco_lateral_disponivel: `${espacoLateralDisponivel.toFixed(0)}px`,
+      card_width: `${cardWidthValue.toFixed(0)}px`,
+      cards_cabem: cardsCabem ? '✅ SIM' : '❌ NÃO - SOBREPOSIÇÃO!',
+      estrategia_cards: cardsCabem ? 'RENDERIZAR' : 'OCULTAR',
+      espaco_disponivel_total: `${(windowWidth - baseWidth).toFixed(0)}px`,
+      espaco_por_lado: `${((windowWidth - baseWidth) / 2).toFixed(0)}px`,
+      porcentagem_usada: `${(Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20)) * 100).toFixed(1)}%`,
+      card_baseado_espaco: `${(((windowWidth - baseWidth) / 2) * Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20))).toFixed(0)}px`,
+      card_baseado_baseWidth: `${(baseWidth * 0.18).toFixed(0)}px`,
+      card_final: `${cardWidthValue.toFixed(0)}px`,
+      estrategia_usada: cardWidthValue > baseWidth * 0.18 ? 'ESPAÇO_DISPONÍVEL' : 'BASE_WIDTH',
+      limites: `min=${isMobile ? 220 : 280}px, max=${isMobile ? 350 : Math.max(500, windowWidth * 0.15).toFixed(0)}px`,
+      font_scale_header: `${(cardWidthValue / 350 * 1.15).toFixed(2)}x`,
+      font_scale_label: `${(cardWidthValue / 350).toFixed(2)}x`,
+      font_scale_value: `${(cardWidthValue / 350 * 1.1).toFixed(2)}x`
     });
   }
 
@@ -345,14 +430,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
     >
 
       {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - DESKTOP */}
-      {!isMobile && shouldRender && (
+      {!isMobile && shouldRender && cardsCabem && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
-            top: `${alturaTotal * 0.05}px`,
-            left: `${maxWidth * 0.02}px`,
+            top: `${baseHeight * 0.05}px`,
+            left: `${baseWidth * 0.02}px`,
             width: `${cardWidth()}px`,
-            gap: `${Math.max(6, maxWidth * 0.005)}px`
+            gap: `${Math.max(6, baseWidth * 0.005)}px`
           }}
         >
           {/* DADOS OPERACIONAIS - RESPONSIVIDADE FLUIDA */}
@@ -364,7 +449,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             >
               <h3
                 className="font-bold uppercase tracking-wide leading-tight"
-                style={{ fontSize: `${getResponsiveCardFontSize(12, 'header')}px` }}
+                style={{ fontSize: '12px' }}
               >
                 DADOS OPERACIONAIS
               </h3>
@@ -377,109 +462,109 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
-                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Posição Porta:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {(reguaPortaJusante * 12.5 / 100).toFixed(2)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m</span>
+                    {(reguaPortaJusante * 12.5 / 100).toFixed(2)} <span style={{ fontSize: '8px' }} className="text-gray-500">m</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
-                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Abertura:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {reguaPortaJusante}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
+                    {reguaPortaJusante}<span style={{ fontSize: '8px' }} className="text-gray-500">%</span>
                   </span>
                 </div>
 
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Diferença E/D:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">mm</span>
+                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: '8px' }} className="text-gray-500">mm</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Contrapeso E:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {contrapesoEsquerdo}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                    {contrapesoEsquerdo}<span style={{ fontSize: '8px' }} className="text-gray-500">%</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Contrapeso D:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {contrapesoDirecto}<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">%</span>
+                    {contrapesoDirecto}<span style={{ fontSize: '8px' }} className="text-gray-500">%</span>
                   </span>
                 </div>
 
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
+                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: '9px' }}
                   >
                     Velocidade:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: '14px' }}
                   >
-                    {(Math.random() * 0.5 + 0.1).toFixed(2)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                    {(Math.random() * 0.5 + 0.1).toFixed(2)} <span style={{ fontSize: '8px' }} className="text-gray-500">m/s</span>
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span
                     className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
+                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
                   >
                     Velocidade Nominal:
                   </span>
                   <span
                     className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
+                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
                   >
-                    0.25 <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
+                    0.25 <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
                   </span>
                 </div>
               </div>
@@ -487,7 +572,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           </div>
 
           {/* STATUS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, baseWidth * 0.004)}px` }}>
             <StatusCard
               title="COMANDO EM AUTOMÁTICO"
               variant="automatic"
@@ -510,14 +595,14 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       )}
 
       {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - DESKTOP */}
-      {!isMobile && shouldRender && (
+      {!isMobile && shouldRender && cardsCabem && (
         <div
           className="absolute z-50 flex flex-col"
           style={{
-            top: `${alturaTotal * 0.05}px`,
-            right: `${maxWidth * 0.02}px`,
+            top: `${baseHeight * 0.05}px`,
+            right: `${baseWidth * 0.02}px`,
             width: `${cardWidth()}px`,
-            gap: `${Math.max(6, maxWidth * 0.005)}px`
+            gap: `${Math.max(6, baseWidth * 0.005)}px`
           }}
         >
           {/* MOTORES - RESPONSIVIDADE FLUIDA */}
@@ -692,7 +777,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           <div
             className="mx-auto"
             style={{
-              maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
+              maxWidth: `${baseWidth}px` // Usa o mesmo baseWidth responsivo
             }}
           >
             {/* Cards horizontais compactos - sempre visíveis */}
@@ -821,7 +906,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             border: '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          <div 
+          <div
             className="bg-white/20 rounded p-0.5 flex items-center justify-center"
             style={{
               width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
@@ -829,16 +914,16 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
             }}
           >
-            <CogIcon 
+            <CogIcon
               className="text-white"
-              style={{ 
+              style={{
                 width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
                 height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-              }} 
+              }}
             />
           </div>
           <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div 
+          <div
             className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
             style={{
               width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
@@ -1084,14 +1169,15 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       )}
 
 
-      {/* Container do SVG - SISTEMA ORIGINAL INALTERADO */}
+      {/* Container do SVG - EXPANSÃO TOTAL PARA TELAS GRANDES */}
       <div
         ref={containerRef}
-        className="w-full max-w-[1920px] flex flex-col items-center relative z-10"
+        className="w-full flex flex-col items-center relative z-10"
         style={{
           height: 'auto',
           minHeight: '50vh',
-          overflow: 'visible'
+          overflow: 'visible',
+          // REMOVIDO: maxWidth: '1920px' - permite expansão total
         }}
       >
 
@@ -1099,17 +1185,18 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
           <div
             className="relative w-full flex flex-col items-center justify-center"
             style={{
-              maxWidth: `${maxWidth}px`,
-              height: `${alturaTotal}px`,
-              minHeight: `${alturaTotal}px`
+              maxWidth: `${baseWidth}px`,
+              height: `${baseHeight}px`,
+              minHeight: `${baseHeight}px`
             }}
           >
-            {/* SVG Base Porta Jusante - CENTRALIZADO */}
+            {/* SVG Base Porta Jusante - POSICIONAMENTO AJUSTÁVEL */}
             <div
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
               style={{
-                width: `${basePortaWidth}px`,
-                height: `${basePortaHeight}px`,
+                // 🔍 TAMANHO: agora usa apenas baseWidth/baseHeight (sem multiplicador extra)
+                width: `${baseWidth}px`,
+                height: `${baseHeight}px`,
                 zIndex: 1
               }}
             >
@@ -1133,11 +1220,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * contrapesoDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * contrapesoDireitoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * contrapesoDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * contrapesoDireitoConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout'
               }}
@@ -1152,11 +1239,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout'
               }}
@@ -1171,11 +1258,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * reguaConfigAtual.verticalPercent) / 100}px`,
-                left: `${(maxWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * reguaConfigAtual.widthPercent) / 100}px`,
-                height: `${(alturaTotal * reguaConfigAtual.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * reguaConfigAtual.verticalPercent) / 100}px`,
+                left: `${(baseWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * reguaConfigAtual.widthPercent) / 100}px`,
+                height: `${(baseHeight * reguaConfigAtual.heightPercent) / 100}px`,
                 zIndex: 5,
                 contain: 'layout'
               }}
@@ -1190,11 +1277,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * motorDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * motorDireitoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * motorDireitoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorDireitoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorDireitoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorDireitoConfig.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1209,11 +1296,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
             <div
               className="absolute"
               style={{
-                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: maxWidth horizontal + alturaTotal vertical
-                top: `${(alturaTotal * motorEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(maxWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(maxWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(alturaTotal * motorEsquerdoConfig.heightPercent) / 100}px`,
+                // 📐 SISTEMA IDÊNTICO ECLUSA_REGUA: baseWidth horizontal + baseHeight vertical
+                top: `${(baseHeight * motorEsquerdoConfig.verticalPercent) / 100}px`,
+                left: `${(baseWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
+                width: `${(baseWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
+                height: `${(baseHeight * motorEsquerdoConfig.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1229,10 +1316,10 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
-                  top: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
-                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
+                  top: `${isMobile ? (baseHeight * 4) / 100 : (baseHeight * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
+                  left: `${isMobile ? (baseWidth * 35) / 100 : (baseWidth * 42) / 100}px`, // Mobile: centralizado
+                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  height: `${isMobile ? (baseHeight * 2.5) / 100 : (baseHeight * 6) / 100}px` // Mobile: bem menor
                 }}
               >
                 <div className={`bg-green-600 border border-green-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
@@ -1249,10 +1336,10 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
-                  bottom: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
-                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
+                  bottom: `${isMobile ? (baseHeight * 4) / 100 : (baseHeight * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
+                  left: `${isMobile ? (baseWidth * 35) / 100 : (baseWidth * 42) / 100}px`, // Mobile: centralizado
+                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  height: `${isMobile ? (baseHeight * 2.5) / 100 : (baseHeight * 6) / 100}px` // Mobile: bem menor
                 }}
               >
                 <div className={`bg-yellow-600 border border-yellow-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
@@ -1274,7 +1361,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
               className="w-full bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-lg animate-pulse"
               style={{
                 height: '600px',
-                maxWidth: '800px',
+                width: '800px',
                 backgroundSize: '200% 100%',
                 animation: 'shimmer 1.5s ease-in-out infinite'
               }}

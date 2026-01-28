@@ -11,7 +11,7 @@ const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
   // Memoizar cálculos para evitar recálculos desnecessários
   const { posicaoContrapeso, alturaCorda } = React.useMemo(() => {
     const maxDescida = 350;
-    const posicao = (websocketValue * maxDescida) / 70;
+    const posicao = (websocketValue * maxDescida) / 100;
     const pontoConexaoOriginal = 20;
     return {
       posicaoContrapeso: posicao,
