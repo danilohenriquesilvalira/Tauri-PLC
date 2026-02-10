@@ -12,7 +12,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
-type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'porta_jusante' | 'porta_montante' | 'sistema_agua' | 'falhas';
+type NavItem = 'dashboard' | 'eclusa' | 'enchimento' | 'esvaziamento' | 'porta_jusante' | 'porta_montante' | 'falhas';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -34,7 +34,7 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
 
   // Detectar se é mobile - OTIMIZADO COM DEBOUNCE (só para resize)
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     // Verificação inicial IMEDIATA (sem debounce)
     const initialCheck = window.innerWidth < 1024;
@@ -73,8 +73,8 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       setActiveItem('porta_montante');
     } else if (pathname.includes('enchimento')) {
       setActiveItem('enchimento');
-    } else if (pathname.includes('sistema-agua')) {
-      setActiveItem('sistema_agua');
+    } else if (pathname.includes('esvaziamento')) {
+      setActiveItem('esvaziamento');
     } else if (pathname.includes('falhas')) {
       setActiveItem('falhas');
     } else {
@@ -99,8 +99,8 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       porta_jusante: '/Logo_Sidebar/PortaJusante.svg',
       porta_montante: '/Logo_Sidebar/PortaMontante.svg',
       enchimento: '/Logo_Sidebar/Enchimento.svg',
+      esvaziamento: '/Logo_Sidebar/Enchimento.svg', // Usando mesmo ícone do enchimento por enquanto
       eclusa: '/Logo_Sidebar/Eclusa_Regua.svg',
-      sistema_agua: '/Logo_Sidebar/SistemaAgua.svg',
       falhas: '/Logo_Sidebar/Falhas.svg'
     };
     return icons[itemId];
@@ -126,6 +126,12 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       path: '/enchimento'
     },
     {
+      id: 'esvaziamento' as NavItem,
+      label: 'Esvaziamento',
+      icon: BeakerIcon,
+      path: '/esvaziamento'
+    },
+    {
       id: 'porta_jusante' as NavItem,
       label: 'Porta Jusante',
       icon: AdjustmentsHorizontalIcon,
@@ -136,12 +142,6 @@ export const Sidebar = ({ isOpen, onToggle, onClose }: SidebarProps) => {
       label: 'Porta Montante',
       icon: Cog6ToothIcon,
       path: '/porta-montante'
-    },
-    {
-      id: 'sistema_agua' as NavItem,
-      label: 'Agua PW',
-      icon: BeakerIcon,
-      path: '/sistema-agua'
     },
     {
       id: 'falhas' as NavItem,

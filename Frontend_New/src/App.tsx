@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { PLCProvider } from './contexts/PLCContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Layout } from './components/layout';
@@ -9,9 +10,34 @@ import PortaJusante from './pages/PortaJusante';
 import Enchimento from './pages/Enchimento';
 import WebSocketDebug from './pages/WebSocketDebug';
 import Falhas from './pages/Falhas';
-import SistemaAgua from './pages/SistemaAgua';
 
 const App = () => {
+  // 🔒 PREVENIR ZOOM MANUAL - Aplicação HMI com responsividade automática
+  useEffect(() => {
+    const preventZoom = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    const preventZoomWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+
+    // Prevenir pinch-to-zoom
+    document.addEventListener('touchmove', preventZoom, { passive: false });
+    
+    // Prevenir zoom via Ctrl+Scroll
+    document.addEventListener('wheel', preventZoomWheel, { passive: false });
+
+    return () => {
+      document.removeEventListener('touchmove', preventZoom);
+      document.removeEventListener('wheel', preventZoomWheel);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <ThemeProvider>
@@ -59,15 +85,6 @@ const App = () => {
               element={
                 <Layout>
                   <Enchimento />
-                </Layout>
-              }
-            />
-
-            <Route
-              path="/sistema-agua"
-              element={
-                <Layout>
-                  <SistemaAgua />
                 </Layout>
               }
             />

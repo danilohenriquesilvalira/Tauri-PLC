@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 
 interface NivelMontanteProps {
   nivel?: number;
@@ -18,17 +18,11 @@ export default function NivelMontante({
   componentWidth,
   componentHeight
 }: NivelMontanteProps) {
-  const [nivelAtual, setNivelAtual] = useState<number | null>(null);
-  const [isManualControl] = useState(false);
-
-  useEffect(() => {
-    if (websocketValue !== null && !isManualControl) {
-      setNivelAtual(websocketValue);
-    }
-  }, [websocketValue, isManualControl]);
-
-  // Sempre renderiza agora (para funcionar no HMIEditor)
-  const displayNivel = nivelAtual ?? websocketValue ?? nivel;
+  // Calcula nível diretamente do websocketValue - SEM useState para evitar re-renders desnecessários
+  const displayNivel = React.useMemo(() => {
+    if (websocketValue !== null) return websocketValue;
+    return nivel;
+  }, [websocketValue, nivel]);
 
   return (
     <div className="w-full h-full">        
@@ -50,7 +44,7 @@ export default function NivelMontante({
         </defs>
         <path
           d="M223.559 136.5H0V0.5H180H184.689H296V44H252L231.5 131H224L223.559 136.5Z"
-          fill={isManualControl ? "#FF6B00" : "#1E00FF"}
+          fill="#1E00FF"
           clipPath="url(#nivelMontanteClip)"
           style={{ transition: 'all 0.5s ease-in-out' }}
         />

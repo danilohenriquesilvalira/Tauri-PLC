@@ -621,28 +621,55 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   // ============================================
   const dimensions = React.useMemo(() => {
     const isMobile = windowWidth < 1024;
+    // Aspect ratio do Enchimento (16:9)
     const aspectRatio = 16 / 9;
 
-    const availableWidth = windowWidth - 32;
+    // Calcula o espaço disponível - EXPANSÃO TOTAL PARA TELAS GRANDES
+    const availableWidth = windowWidth - 32; // Sem limite de 1920px
     const availableHeight = window.innerHeight - 100;
 
+    // Determina o tamanho máximo mantendo aspect ratio
     let baseWidth: number;
     let baseHeight: number;
 
     const widthBasedHeight = availableWidth / aspectRatio;
 
     if (widthBasedHeight <= availableHeight) {
-      baseWidth = Math.min(availableWidth, 1920);
+      baseWidth = availableWidth; // EXPANSÃO TOTAL - usa toda largura disponível
       baseHeight = baseWidth / aspectRatio;
     } else {
       baseHeight = availableHeight;
       baseWidth = baseHeight * aspectRatio;
     }
 
-    baseWidth = Math.max(baseWidth, 300);
-    baseHeight = Math.max(baseHeight, 300 / aspectRatio);
+    // Garante valores mínimos
+    baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
+    baseHeight = Math.max(baseHeight, isMobile ? 300 : 500 / aspectRatio);
 
-    const scale = isMobile ? 0.95 : 0.85;
+    // ESCALA ULTRA-INTELIGENTE: cresce progressivamente com a tela
+    // Em telas pequenas: mínimo 0.55, em telas grandes: até 0.95, em telas ultra-wide: até 1.0
+    let scale: number;
+    if (isMobile) {
+      scale = 0.90;
+    } else {
+      // Base scale: 0.55 para 1920px, crescendo linearmente
+      const baseScale = windowWidth / 1920 * 0.70;
+
+      // Ajuste progressivo: mais agressivo em telas grandes
+      if (windowWidth <= 1920) {
+        scale = Math.max(0.55, baseScale);
+      } else if (windowWidth <= 2560) {
+        // De 1920px a 2560px: de 0.70 até 0.85
+        scale = 0.70 + ((windowWidth - 1920) / (2560 - 1920)) * 0.15;
+      } else if (windowWidth <= 3840) {
+        // De 2560px a 3840px: de 0.85 até 0.95
+        scale = 0.85 + ((windowWidth - 2560) / (3840 - 2560)) * 0.10;
+      } else {
+        // Acima de 3840px: até 0.98 (quase tela cheia)
+        scale = Math.min(0.98, 0.95 + ((windowWidth - 3840) / 1920) * 0.03);
+      }
+    }
+
     const scaledWidth = baseWidth * scale;
     const scaledHeight = baseHeight * scale;
 
@@ -656,11 +683,11 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
   const { isMobile, baseWidth, baseHeight, shouldRender } = dimensions;
 
-  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  // � SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    let resizeTimeout: NodeJS.Timeout;
+    let resizeTimeout: ReturnType<typeof setTimeout>;
 
     const handleResize = () => {
       clearTimeout(resizeTimeout);
@@ -1937,7 +1964,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               <div
                 className="absolute z-50"
                 style={{
-                  top: `${baseHeight * 0.91}px`,
+                  top: `${baseHeight * 0.72}px`,
                   left: `${baseWidth * 0.21}px`,
                   width: `${baseWidth * 0.23}px`,
                 }}
@@ -2072,7 +2099,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               <div
                 className="absolute z-50"
                 style={{
-                  top: `${baseHeight * 0.91}px`,
+                  top: `${baseHeight * 0.72}px`,
                   left: `${baseWidth * 0.50}px`,
                   width: `${baseWidth * 0.23}px`,
                 }}
@@ -2288,7 +2315,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (
         <div
-          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-2 md:p-4 overflow-hidden"
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden"
           onClick={() => setMenuParametrosOpen(false)}
           style={{
             touchAction: 'none',
@@ -2296,15 +2323,17 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* Dialog Container */}
+          {/* Dialog Container - 100% responsivo e ajustável */}
           <div
             className="
               bg-white shadow-2xl overflow-hidden flex flex-col
-              w-full max-w-[280px] max-h-[75vh] rounded-t-2xl
+              w-full h-[85vh] rounded-t-3xl
               animate-in slide-in-from-bottom duration-300
-              md:max-w-2xl md:max-h-[80vh] md:rounded-2xl
+              sm:w-[95vw] sm:h-[90vh] sm:rounded-2xl
+              md:w-[85vw] md:max-w-3xl md:h-[85vh] md:max-h-[800px] md:rounded-2xl
               md:animate-in md:fade-in md:zoom-in
-              lg:max-w-4xl
+              lg:max-w-4xl lg:h-[80vh]
+              xl:max-w-5xl
             "
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}

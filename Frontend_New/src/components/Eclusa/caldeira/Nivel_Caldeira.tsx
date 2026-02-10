@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 
 interface NivelCaldeiraProps {
   nivel?: number;
@@ -18,23 +18,11 @@ export default function NivelCaldeira({
   componentWidth,
   componentHeight
 }: NivelCaldeiraProps) {
-  const [nivelAtual, setNivelAtual] = useState<number | null>(null);
-  const [isManualControl] = useState(false);
-
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('🏭 CALDEIRA - websocketValue recebido:', websocketValue, 'isManualControl:', isManualControl);
-    }
-    if (websocketValue !== null && !isManualControl) {
-      setNivelAtual(websocketValue);
-      if (import.meta.env.DEV) {
-        console.log('🏭 CALDEIRA - nivelAtual atualizado para:', websocketValue);
-      }
-    }
-  }, [websocketValue, isManualControl]);
-
-  // Sempre renderiza agora (para funcionar no HMIEditor)
-  const displayNivel = nivelAtual ?? websocketValue ?? nivel;
+  // Calcula nível diretamente do websocketValue - SEM useState para evitar re-renders desnecessários
+  const displayNivel = React.useMemo(() => {
+    if (websocketValue !== null) return websocketValue;
+    return nivel;
+  }, [websocketValue, nivel]);
 
   return (
     <div className="w-full h-full">        
@@ -56,7 +44,7 @@ export default function NivelCaldeira({
         </defs>
         <path
           d="M0 83.5134V0.0134258H16H25L686.5 0V157.013H674.5H673H633.5H632.5H11.5L3 144.513V88.5134L0 83.5134Z"
-          fill={isManualControl ? "#FF6B00" : "#1E00FF"}
+          fill="#1E00FF"
           clipPath="url(#nivelCaldeiraClip)"
           style={{ transition: 'all 0.5s ease-in-out' }}
         />

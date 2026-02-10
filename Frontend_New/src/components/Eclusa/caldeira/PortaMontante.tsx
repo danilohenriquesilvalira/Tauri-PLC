@@ -1,5 +1,5 @@
 // components/Eclusa/PortaMontante.tsx - COMPONENTE PORTA MONTANTE COM WEBSOCKET E MOVIMENTO VERTICAL
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 interface PortaMontanteProps {
   editMode?: boolean;
@@ -14,20 +14,12 @@ export default function PortaMontante({
   width,
   height
 }: PortaMontanteProps) {
-  const [abertura, setAbertura] = useState<number | null>(null);
-
-  // Atualiza abertura via WebSocket usando dados do sistema PLC
-  useEffect(() => {
-    if (websocketValue !== null && !editMode) {
-      // Converte valor da porta para porcentagem de abertura (0-100)
-      const aberturaPercentual = Math.max(0, Math.min(100, websocketValue));
-      setAbertura(aberturaPercentual);
-      console.log(`🚪 PORTA MONTANTE: ${websocketValue} -> ${aberturaPercentual}%`);
-    }
+  // Calcula abertura diretamente do websocketValue - SEM useState para evitar animação no primeiro render
+  const displayAbertura = React.useMemo(() => {
+    if (websocketValue === null || editMode) return 0;
+    // Converte valor da porta para porcentagem de abertura (0-100)
+    return Math.max(0, Math.min(100, websocketValue));
   }, [websocketValue, editMode]);
-
-  // Usa a abertura real do WebSocket ou valor padrão
-  const displayAbertura = (abertura ?? websocketValue ?? 0);
 
   return (
     <div className="w-full h-full"
@@ -42,7 +34,7 @@ export default function PortaMontante({
           <div
             className="w-full h-full"
             style={{
-              transform: `translateY(${(displayAbertura / 100) * 20}px)`, // Movimento vertical suave
+              transform: `translateY(${(displayAbertura / 100) * 90}px)`, // Movimento vertical ampliado
               transition: 'transform 0.8s ease-in-out', // Animação suave
             }}
           >

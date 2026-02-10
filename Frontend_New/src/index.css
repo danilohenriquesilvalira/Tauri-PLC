@@ -24,6 +24,11 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   letter-spacing: -0.011em;
+  
+  /* 🔒 BLOQUEAR ZOOM MANUAL - Aplicação HMI responsiva automática */
+  touch-action: pan-x pan-y;
+  -ms-touch-action: pan-x pan-y;
+  
   /* Suporte para safe areas do iOS */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);

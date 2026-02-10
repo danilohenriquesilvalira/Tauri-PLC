@@ -1,5 +1,5 @@
 // components/Eclusa/PortaJusante.tsx - COMPONENTE PORTA JUSANTE COM WEBSOCKET
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 interface PortaJusanteProps {
   editMode?: boolean;
@@ -14,19 +14,12 @@ export default function PortaJusante({
   width,
   height
 }: PortaJusanteProps) {
-  const [abertura, setAbertura] = useState<number | null>(null);
-
-  // Atualiza abertura via WebSocket usando dados do sistema PLC
-  useEffect(() => {
-    if (websocketValue !== null && !editMode) {
-      // Converte valor da porta para porcentagem de abertura (0-100)
-      const aberturaPercentual = Math.max(0, Math.min(100, websocketValue));
-      setAbertura(aberturaPercentual);
-    }
+  // Calcula abertura diretamente do websocketValue - SEM useState para evitar animação no primeiro render
+  const displayAbertura = React.useMemo(() => {
+    if (websocketValue === null || editMode) return 0;
+    // Converte valor da porta para porcentagem de abertura (0-100)
+    return Math.max(0, Math.min(100, websocketValue));
   }, [websocketValue, editMode]);
-
-  // Usa a abertura real do WebSocket ou valor padrão
-  const displayAbertura = (abertura ?? websocketValue ?? 0);
 
   return (
     <div className="w-full h-full"

@@ -132,6 +132,25 @@ const mockAnalyticsData = {
 };
 
 const Dashboard: React.FC<DashboardProps> = () => {
+  const [windowWidth, setWindowWidth] = React.useState(() => typeof window !== 'undefined' ? window.innerWidth : 1920);
+
+  const isMobile = windowWidth < 1024;
+
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let resizeTimeout: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => setWindowWidth(window.innerWidth), 150);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
   // Estado para controle da página atual
   const [currentPage, setCurrentPage] = React.useState('overview');
   
@@ -540,25 +559,25 @@ const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col p-4 lg:p-6">
       
       {/* Navegação por Abas + Filtros */}
-      <div className="flex-shrink-0 mb-6">
+      <div className="flex-shrink-0 mb-4 lg:mb-6">
         <div className="border-b border-gray-200">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             {/* Abas */}
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex space-x-4 lg:space-x-8 overflow-x-auto">
               {pages.map((page) => (
                 <button
                   key={page.id}
                   onClick={() => setCurrentPage(page.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
+                  className={`py-3 lg:py-4 px-1 border-b-2 font-medium text-xs lg:text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${
                     currentPage === page.id
                       ? 'border-[#28FF52] text-[#212E3E]'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <page.icon className="w-5 h-5" />
+                  <page.icon className="w-4 h-4 lg:w-5 lg:h-5" />
                   {page.name}
                 </button>
               ))}
@@ -566,14 +585,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
             {/* Filtros Modernos - só aparecem na página de análise */}
             {currentPage === 'details' && (
-              <div className="flex items-center gap-6 pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 lg:gap-6 pb-3 lg:pb-4">
                 {/* Filtro por Equipamento */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-700 font-mulish min-w-[80px]">Equipamento</span>
+                <div className="flex items-center gap-2 lg:gap-3 w-full sm:w-auto">
+                  <span className="text-xs lg:text-sm font-semibold text-gray-700 font-mulish min-w-[70px] lg:min-w-[80px]">Equipamento</span>
                   <select
                     value={selectedEquipamento}
                     onChange={(e) => setSelectedEquipamento(e.target.value)}
-                    className="text-sm border-0 bg-gray-50 rounded-xl px-4 py-2.5 focus:bg-white focus:ring-2 focus:ring-[#212E3E] transition-all font-mulish min-w-[140px] shadow-sm"
+                    className="text-xs lg:text-sm border-0 bg-gray-50 rounded-xl px-3 lg:px-4 py-2 lg:py-2.5 focus:bg-white focus:ring-2 focus:ring-[#212E3E] transition-all font-mulish flex-1 sm:flex-initial sm:min-w-[140px] shadow-sm"
                   >
                     {equipamentos.map((eq) => (
                       <option key={eq} value={eq}>
@@ -584,12 +603,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </div>
 
                 {/* Filtro por Categoria */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-700 font-mulish min-w-[70px]">Categoria</span>
+                <div className="flex items-center gap-2 lg:gap-3 w-full sm:w-auto">
+                  <span className="text-xs lg:text-sm font-semibold text-gray-700 font-mulish min-w-[60px] lg:min-w-[70px]">Categoria</span>
                   <select
                     value={selectedCategoria}
                     onChange={(e) => setSelectedCategoria(e.target.value)}
-                    className="text-sm border-0 bg-gray-50 rounded-xl px-4 py-2.5 focus:bg-white focus:ring-2 focus:ring-[#212E3E] transition-all font-mulish min-w-[140px] shadow-sm"
+                    className="text-xs lg:text-sm border-0 bg-gray-50 rounded-xl px-3 lg:px-4 py-2 lg:py-2.5 focus:bg-white focus:ring-2 focus:ring-[#212E3E] transition-all font-mulish flex-1 sm:flex-initial sm:min-w-[140px] shadow-sm"
                   >
                     {categorias.map((cat) => (
                       <option key={cat} value={cat}>
@@ -601,7 +620,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
                 {/* Indicador de filtros ativos */}
                 {(selectedEquipamento !== 'todos' || selectedCategoria !== 'todas') && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#212E3E] rounded-lg">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#212E3E] rounded-lg w-full sm:w-auto justify-between sm:justify-start">
                     <span className="text-xs font-medium text-white font-mulish">Filtros ativos</span>
                     <button 
                       onClick={() => {
@@ -622,77 +641,90 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
       {/* Container principal com scroll */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
+        <div className="h-full overflow-y-auto pr-2"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#CBD5E0 transparent'
+          }}
+        >
           {currentPage === 'overview' ? (
             // PÁGINA 1: VISÃO GERAL - KPIs + Gráficos Principais + Gauges
-            <div className="space-y-6">
+            <div className="space-y-4 lg:space-y-6 pb-4">
 
               {/* KPIs Principais - Cards EDP Organizados */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 py-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 py-2">
                 
                 {/* Falhas Ativas */}
-                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-4 hover:shadow-xl hover:-translate-y-1 ">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-3 lg:p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  style={{ contain: 'layout' }}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.falhasAtivas}</div>
-                      <div className="text-sm text-gray-600 font-mulish">Falhas Ativas</div>
+                      <div className="text-2xl lg:text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.falhasAtivas}</div>
+                      <div className="text-xs lg:text-sm text-gray-600 font-mulish">Falhas Ativas</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">CRÍTICO</span>
+                      <span className="text-[10px] lg:text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">CRÍTICO</span>
                       <div className="flex items-center text-red-600">
                         <ArrowTrendingUpIcon className="w-3 h-3 mr-1" />
-                        <span className="text-xs font-medium">+12%</span>
+                        <span className="text-[10px] lg:text-xs font-medium">+12%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Resolvidas Hoje */}
-                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-4 hover:shadow-xl hover:-translate-y-1 ">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-3 lg:p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  style={{ contain: 'layout' }}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.falhasResolvidasHoje}</div>
-                      <div className="text-sm text-gray-600 font-mulish">Resolvidas Hoje</div>
+                      <div className="text-2xl lg:text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.falhasResolvidasHoje}</div>
+                      <div className="text-xs lg:text-sm text-gray-600 font-mulish">Resolvidas Hoje</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">ÓTIMO</span>
+                      <span className="text-[10px] lg:text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">ÓTIMO</span>
                       <div className="flex items-center text-green-600">
                         <ArrowTrendingDownIcon className="w-3 h-3 mr-1" />
-                        <span className="text-xs font-medium">-8%</span>
+                        <span className="text-[10px] lg:text-xs font-medium">-8%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* MTTR */}
-                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-4 hover:shadow-xl hover:-translate-y-1 ">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-3 lg:p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  style={{ contain: 'layout' }}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.mttr}<span className="text-lg text-gray-500">min</span></div>
-                      <div className="text-sm text-gray-600 font-mulish">Tempo Médio Reparo</div>
+                      <div className="text-2xl lg:text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.mttr}<span className="text-base lg:text-lg text-gray-500">min</span></div>
+                      <div className="text-xs lg:text-sm text-gray-600 font-mulish">Tempo Médio Reparo</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium">MTTR</span>
+                      <span className="text-[10px] lg:text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium">MTTR</span>
                       <div className="flex items-center text-green-600">
                         <ArrowTrendingDownIcon className="w-3 h-3 mr-1" />
-                        <span className="text-xs font-medium">-5min</span>
+                        <span className="text-[10px] lg:text-xs font-medium">-5min</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Disponibilidade */}
-                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-4 hover:shadow-xl hover:-translate-y-1 ">
+                <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg p-3 lg:p-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  style={{ contain: 'layout' }}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.disponibilidade}<span className="text-lg text-gray-500">%</span></div>
-                      <div className="text-sm text-gray-600 font-mulish">Disponibilidade</div>
+                      <div className="text-2xl lg:text-3xl font-bold text-gray-900 font-mulish">{mockAnalyticsData.kpis.disponibilidade}<span className="text-base lg:text-lg text-gray-500">%</span></div>
+                      <div className="text-xs lg:text-sm text-gray-600 font-mulish">Disponibilidade</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">SLA</span>
+                      <span className="text-[10px] lg:text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">SLA</span>
                       <div className="flex items-center text-green-600">
                         <ArrowTrendingUpIcon className="w-3 h-3 mr-1" />
-                        <span className="text-xs font-medium">+0.3%</span>
+                        <span className="text-[10px] lg:text-xs font-medium">+0.3%</span>
                       </div>
                     </div>
                   </div>
@@ -701,90 +733,108 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </div>
 
               {/* Gráficos Principais */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 lg:gap-6">
                 
                 {/* Gráfico de Tendências 24h */}
-                <TrendChart 
-                  data={mockAnalyticsData.tendencias24h} 
-                  title="Tendências nas Últimas 24h" 
-                />
+                <div style={{ contain: 'layout', willChange: 'transform' }}>
+                  <TrendChart 
+                    data={mockAnalyticsData.tendencias24h} 
+                    title="Tendências nas Últimas 24h" 
+                  />
+                </div>
 
                 {/* Gráfico de Severidades */}
-                <DonutChart 
-                  data={mockAnalyticsData.severidades} 
-                  title="Distribuição por Severidade" 
-                />
+                <div style={{ contain: 'layout', willChange: 'transform' }}>
+                  <DonutChart 
+                    data={mockAnalyticsData.severidades} 
+                    title="Distribuição por Severidade" 
+                  />
+                </div>
 
               </div>
 
               {/* Segunda Linha de Gráficos */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 lg:gap-6">
                 
                 {/* Equipamentos com Mais Falhas */}
-                <ModernBarChart 
-                  data={mockAnalyticsData.topEquipamentos} 
-                  title="Equipamentos com Mais Falhas" 
-                />
+                <div style={{ contain: 'layout', willChange: 'transform' }}>
+                  <ModernBarChart 
+                    data={mockAnalyticsData.topEquipamentos} 
+                    title="Equipamentos com Mais Falhas" 
+                  />
+                </div>
 
                 {/* Indicadores de Performance Modernos */}
-                <ModernPerformanceChart title="Indicadores de Performance" />
+                <div style={{ contain: 'layout', willChange: 'transform' }}>
+                  <ModernPerformanceChart title="Indicadores de Performance" />
+                </div>
 
               </div>
 
             </div>
           ) : (
             // PÁGINA 2: ANÁLISE DETALHADA - Tabela Moderna
-            <div className="space-y-6">
+            <div className="space-y-4 lg:space-y-6 pb-4">
 
               {/* Stats Rápidos */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl p-4 shadow-lg drop-shadow-lg text-center">
-                  <div className="text-3xl font-bold text-gray-900 font-mulish">{falhasFiltradas.length}</div>
-                  <div className="text-sm text-gray-600 font-mulish">Total</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4">
+                <div className="bg-white rounded-xl p-3 lg:p-4 shadow-lg drop-shadow-lg text-center transition-all duration-300 hover:shadow-xl"
+                  style={{ contain: 'layout' }}
+                >
+                  <div className="text-2xl lg:text-3xl font-bold text-gray-900 font-mulish">{falhasFiltradas.length}</div>
+                  <div className="text-xs lg:text-sm text-gray-600 font-mulish">Total</div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-lg drop-shadow-lg text-center">
-                  <div className="text-3xl font-bold text-red-600 font-mulish">{falhasFiltradas.filter(f => f.severidade === 'CRITICAL').length}</div>
-                  <div className="text-sm text-gray-600 font-mulish">Críticas</div>
+                <div className="bg-white rounded-xl p-3 lg:p-4 shadow-lg drop-shadow-lg text-center transition-all duration-300 hover:shadow-xl"
+                  style={{ contain: 'layout' }}
+                >
+                  <div className="text-2xl lg:text-3xl font-bold text-red-600 font-mulish">{falhasFiltradas.filter(f => f.severidade === 'CRITICAL').length}</div>
+                  <div className="text-xs lg:text-sm text-gray-600 font-mulish">Críticas</div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-lg drop-shadow-lg text-center">
-                  <div className="text-3xl font-bold text-yellow-600 font-mulish">{falhasFiltradas.filter(f => f.status === 'EM_INVESTIGACAO').length}</div>
-                  <div className="text-sm text-gray-600 font-mulish">Investigação</div>
+                <div className="bg-white rounded-xl p-3 lg:p-4 shadow-lg drop-shadow-lg text-center transition-all duration-300 hover:shadow-xl"
+                  style={{ contain: 'layout' }}
+                >
+                  <div className="text-2xl lg:text-3xl font-bold text-yellow-600 font-mulish">{falhasFiltradas.filter(f => f.status === 'EM_INVESTIGACAO').length}</div>
+                  <div className="text-xs lg:text-sm text-gray-600 font-mulish">Investigação</div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-lg drop-shadow-lg text-center">
-                  <div className="text-3xl font-bold text-blue-600 font-mulish">{falhasFiltradas.filter(f => f.status === 'MONITORANDO').length}</div>
-                  <div className="text-sm text-gray-600 font-mulish">Monitorando</div>
+                <div className="bg-white rounded-xl p-3 lg:p-4 shadow-lg drop-shadow-lg text-center transition-all duration-300 hover:shadow-xl"
+                  style={{ contain: 'layout' }}
+                >
+                  <div className="text-2xl lg:text-3xl font-bold text-blue-600 font-mulish">{falhasFiltradas.filter(f => f.status === 'MONITORANDO').length}</div>
+                  <div className="text-xs lg:text-sm text-gray-600 font-mulish">Monitorando</div>
                 </div>
               </div>
 
               {/* Tabela Moderna de Falhas */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-lg drop-shadow-lg overflow-hidden"
+                style={{ contain: 'layout' }}
+              >
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">ID</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Equipamento</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Severidade</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Título</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Descrição</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Tempo</th>
-                        <th className="text-left p-4 bg-gray-50 text-sm font-semibold text-gray-700 font-mulish">Status</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish">ID</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish">Equipamento</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish">Severidade</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish hidden md:table-cell">Título</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish hidden lg:table-cell">Descrição</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish">Tempo</th>
+                        <th className="text-left p-2 lg:p-4 bg-gray-50 text-xs lg:text-sm font-semibold text-gray-700 font-mulish">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {falhasFiltradas.map((falha, index) => (
                         <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
-                          <td className="p-4">
-                            <div className="text-sm font-bold text-[#212E3E] font-mulish">{falha.id}</div>
+                          <td className="p-2 lg:p-4">
+                            <div className="text-xs lg:text-sm font-bold text-[#212E3E] font-mulish">{falha.id}</div>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2 lg:p-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-[#212E3E] rounded-full"></div>
-                              <span className="text-sm font-medium text-gray-900 font-mulish">{falha.equipamento}</span>
+                              <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 bg-[#212E3E] rounded-full"></div>
+                              <span className="text-xs lg:text-sm font-medium text-gray-900 font-mulish">{falha.equipamento}</span>
                             </div>
                           </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          <td className="p-2 lg:p-4">
+                            <span className={`px-2 lg:px-3 py-0.5 lg:py-1 rounded-full text-[10px] lg:text-xs font-bold ${
                               falha.severidade === 'CRITICAL' ? 'bg-red-100 text-red-800' :
                               falha.severidade === 'HIGH' ? 'bg-orange-100 text-orange-800' :
                               falha.severidade === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
@@ -793,24 +843,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
                               {falha.severidade}
                             </span>
                           </td>
-                          <td className="p-4">
-                            <div className="text-sm font-medium text-gray-900 font-mulish max-w-xs">{falha.titulo}</div>
+                          <td className="p-2 lg:p-4 hidden md:table-cell">
+                            <div className="text-xs lg:text-sm font-medium text-gray-900 font-mulish max-w-xs line-clamp-2">{falha.titulo}</div>
                           </td>
-                          <td className="p-4">
-                            <div className="text-sm text-gray-600 font-mulish max-w-md">{falha.descricao}</div>
+                          <td className="p-2 lg:p-4 hidden lg:table-cell">
+                            <div className="text-xs lg:text-sm text-gray-600 font-mulish max-w-md line-clamp-2">{falha.descricao}</div>
                           </td>
-                          <td className="p-4">
-                            <div className="text-sm font-medium text-gray-700 font-mulish">{falha.tempo}</div>
+                          <td className="p-2 lg:p-4">
+                            <div className="text-xs lg:text-sm font-medium text-gray-700 font-mulish">{falha.tempo}</div>
                           </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          <td className="p-2 lg:p-4">
+                            <span className={`px-2 lg:px-3 py-0.5 lg:py-1 rounded-full text-[10px] lg:text-xs font-bold whitespace-nowrap ${
                               falha.status === 'ATIVA' ? 'bg-red-100 text-red-800' :
                               falha.status === 'EM_INVESTIGACAO' ? 'bg-yellow-100 text-yellow-800' :
                               falha.status === 'MONITORANDO' ? 'bg-blue-100 text-blue-800' :
                               falha.status === 'PENDENTE' ? 'bg-gray-100 text-gray-800' :
                               'bg-orange-100 text-orange-800'
                             }`}>
-                              {falha.status === 'EM_INVESTIGACAO' ? 'INVESTIGANDO' : falha.status}
+                              {falha.status === 'EM_INVESTIGACAO' ? 'INVESTIG.' : falha.status}
                             </span>
                           </td>
                         </tr>
@@ -820,15 +870,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </div>
                 
                 {/* Footer da tabela */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                  <div className="text-sm text-gray-600 font-mulish">
+                <div className="px-3 lg:px-6 py-3 lg:py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs lg:text-sm text-gray-600 font-mulish text-center sm:text-left">
                     Mostrando {falhasFiltradas.length} falhas de {mockAnalyticsData.falhasDetalhadas.length} total
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-mulish">
+                    <button className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs lg:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-mulish">
                       Anterior
                     </button>
-                    <button className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-mulish">
+                    <button className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs lg:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-mulish">
                       Próximo
                     </button>
                   </div>

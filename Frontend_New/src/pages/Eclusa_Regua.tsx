@@ -14,23 +14,19 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   WrenchScrewdriverIcon,
-  UserIcon,
-  ExclamationTriangleIcon,
-  ClipboardDocumentListIcon,
   ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import { Card } from '../components/ui/Card';
-import { InfoCard } from '../components/ui/InfoCard';
 import { StatusCard } from '../components/ui/StatusCard';
 
 // 🎯 CONFIGURAÇÕES DOS COMPONENTES DE NÍVEL - Separação Desktop/Mobile
 const NIVEL_CONFIG = {
   caldeira: {
     desktop: {
-      verticalPercent: 44.9,  // % da altura da caldeira (posição Y)
+      verticalPercent: 37.3,  // % da altura da caldeira (posição Y)
       horizontalPercent: 25.3, // % da largura da caldeira (posição X)
-      widthPercent: 64.6,     // % da largura da caldeira (tamanho)
-      heightPercent: 62,    // % da altura da caldeira (tamanho)
+      widthPercent: 58.8,     // % da largura da caldeira (tamanho)
+      heightPercent: 54.4,    // % da altura da caldeira (tamanho)
     },
     mobile: {
       verticalPercent: 38.5,  // Ajuste para mobile
@@ -41,10 +37,10 @@ const NIVEL_CONFIG = {
   },
   jusante: {
     desktop: {
-      verticalPercent: 44.9,  // Posicionado na parte inferior
-      horizontalPercent: 88.0, // Lado direito
-      widthPercent: 12.0,     // Largura ajustada
-      heightPercent: 6.5      // Altura ajustada
+      verticalPercent: 35.9,  // Posicionado na parte inferior
+      horizontalPercent: 77, // Lado direito
+      widthPercent: 16,     // Largura ajustada
+      heightPercent: 4      // Altura ajustada
     },
     mobile: {
       verticalPercent: 42.0,
@@ -55,10 +51,10 @@ const NIVEL_CONFIG = {
   },
   montante: {
     desktop: {
-      verticalPercent: 38.1,  // Posicionado na parte superior esquerda
-      horizontalPercent: 0.0, // Lado esquerdo
+      verticalPercent: 28,  // Posicionado na parte superior esquerda
+      horizontalPercent: -7, // Lado esquerdo
       widthPercent: 25.4,     // Largura ajustada
-      heightPercent: 11.0,    // Altura ajustada
+      heightPercent: 10,    // Altura ajustada
     },
     mobile: {
       verticalPercent: 28.0,
@@ -73,8 +69,8 @@ const NIVEL_CONFIG = {
 const PORTA_CONFIG = {
   jusante: {
     desktop: {
-      verticalPercent: 38.2,    // % da altura total (posição Y)
-      horizontalPercent: 79.5,  // % da largura total (posição X)
+      verticalPercent: 27.1,    // % da altura total (posição Y)
+      horizontalPercent: 72.6,  // % da largura total (posição X)
       widthPercent: 5,          // % da largura total (tamanho)
       heightPercent: 16,        // % da altura total (tamanho)
     },
@@ -87,8 +83,8 @@ const PORTA_CONFIG = {
   },
   montante: {
     desktop: {
-      verticalPercent: 36.8,  // % da altura total (posição Y)
-      horizontalPercent: 25.5, // % da largura total (posição X)
+      verticalPercent: 21.6,  // % da altura total (posição Y)
+      horizontalPercent: 18.3, // % da largura total (posição X)
       widthPercent: 1.5,      // % da largura total (tamanho)
       heightPercent: 18,      // % da altura total (tamanho)
     },
@@ -105,8 +101,8 @@ const PORTA_CONFIG = {
 const SEMAFORO_CONFIG = {
   semaforo1: {
     desktop: {
-      verticalPercent: 32.0,  // Parte superior
-      horizontalPercent: 22.0, // Esquerda
+      verticalPercent: 22.0,  // Parte superior
+      horizontalPercent: 10, // Esquerda
       widthPercent: 3.5,        // Tamanho ajustado
       heightPercent: 4.0,      // Altura ajustada
     },
@@ -119,8 +115,8 @@ const SEMAFORO_CONFIG = {
   },
   semaforo2: {
     desktop: {
-      verticalPercent: 32.9,  // Ligeiramente abaixo
-      horizontalPercent: 38.0, // Centro-esquerda
+      verticalPercent: 22.8,  // Ligeiramente abaixo
+      horizontalPercent: 30, // Centro-esquerda
       widthPercent: 3.5,        // Tamanho ajustado
       heightPercent: 4.0,      // Altura ajustada
     },
@@ -133,8 +129,8 @@ const SEMAFORO_CONFIG = {
   },
   semaforo3: {
     desktop: {
-      verticalPercent: 32.9,  // Mesmo nível do 2
-      horizontalPercent: 65.0, // Centro-direita
+      verticalPercent: 22.8,  // Mesmo nível do 2
+      horizontalPercent: 50, // Centro-direita
       widthPercent: 3.5,        // Tamanho ajustado
       heightPercent: 4.0,      // Altura ajustada
     },
@@ -147,8 +143,8 @@ const SEMAFORO_CONFIG = {
   },
   semaforo4: {
     desktop: {
-      verticalPercent: 32.5,  // Parte superior
-      horizontalPercent: 85.0, // Direita
+      verticalPercent: 22.4,  // Parte superior
+      horizontalPercent: 80.0, // Direita
       widthPercent: 3.5,        // Tamanho ajustado
       heightPercent: 4.0,      // Altura ajustada
     },
@@ -164,10 +160,10 @@ const SEMAFORO_CONFIG = {
 // 🏗️ CONFIGURAÇÃO DA BASE PORTA JUSANTE - Separação Desktop/Mobile
 const BASE_PORTA_JUSANTE_CONFIG = {
   desktop: {
-    verticalPercent: 36.8,    // Posicionado no meio-inferior
-    horizontalPercent: 64.3,  // Centro horizontal
+    verticalPercent: 26.8,    // Posicionado no meio-inferior
+    horizontalPercent: 57.2,  // Centro horizontal
     widthPercent: 40,       // Largura reduzida
-    heightPercent: 14.6,      // Altura reduzida
+    heightPercent: 13.4,      // Altura reduzida
   },
   mobile: {
     verticalPercent: 37.0,
@@ -180,8 +176,8 @@ const BASE_PORTA_JUSANTE_CONFIG = {
 // 🔧 CONFIGURAÇÃO DA TUBULAÇÃO E VÁLVULAS - Separação Desktop/Mobile
 const TUBULACAO_CONFIG = {
   desktop: {
-    verticalPercent: 45.8,    // Parte inferior
-    horizontalPercent: 5,   // Margem esquerda
+    verticalPercent: 34.7,    // Parte inferior
+    horizontalPercent: 0,   // Margem esquerda
     widthPercent: 90,       // Largura total
     heightPercent: 15,      // Altura ajustada
   },
@@ -196,15 +192,15 @@ const TUBULACAO_CONFIG = {
 // 🏢 CONFIGURAÇÃO DA CALDEIRA_ECLUSA.SVG (SVG Principal) - Separação Desktop/Mobile
 const CALDEIRA_ECLUSA_CONFIG = {
   desktop: {
-    verticalPercent: 30.0,    // Posição vertical baseada no maxWidth (30% da largura)
-    horizontalPercent: 50.0,  // Centro horizontal
+    verticalPercent: 20,    // Posição vertical baseada no maxWidth (30% da largura)
+    horizontalPercent: 43,  // Centro horizontal
     widthPercent: 100,         // 85% da largura disponível
     heightPercent: 100,       // Altura calculada pelo aspect ratio
   },
   mobile: {
-    verticalPercent: 35.0,    // Posição vertical ajustada para mobile
+    verticalPercent:90,    // Posição vertical ajustada para mobile
     horizontalPercent: 50.0,  // Centro horizontal
-    widthPercent: 95,         // 95% da largura no mobile
+    widthPercent: 97.2,         // 95% da largura no mobile
     heightPercent: 100,       // Altura calculada pelo aspect ratio
   }
 };
@@ -212,17 +208,24 @@ const CALDEIRA_ECLUSA_CONFIG = {
 // 🧱 CONFIGURAÇÃO DA PAREDE_ECLUSA.SVG (SVG Principal) - Separação Desktop/Mobile  
 const PAREDE_ECLUSA_CONFIG = {
   desktop: {
-    verticalPercent: 41.1,    // Posição abaixo da caldeira (45% da largura)
-    horizontalPercent: 50.0,  // Centro horizontal
+    verticalPercent: 30,    // Posição abaixo da caldeira (45% da largura)
+    horizontalPercent: 43,  // Centro horizontal
     widthPercent: 100.60,         // 90% da largura disponível
     heightPercent: 100.0,       // Altura calculada pelo aspect ratio
   },
   mobile: {
-    verticalPercent: 50.0,    // Posição ajustada para mobile
+    verticalPercent: 100,    // Posição ajustada para mobile
     horizontalPercent: 50.0,  // Centro horizontal
     widthPercent: 98,         // 98% da largura no mobile
     heightPercent: 100,       // Altura calculada pelo aspect ratio
   }
+};
+
+// 🟢 RETÂNGULO HORIZONTAL SIMPLES
+const RETANGULO = {
+  y: 0,           // Posição vertical (% da altura)
+  largura: 100,     // Largura (% da largura total)
+  altura: 28        // Altura (% da altura total)
 };
 
 interface EclusaReguaProps {
@@ -235,35 +238,21 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
   const [showTrendDialog, setShowTrendDialog] = React.useState(false);
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
 
-  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
   const [windowWidth, setWindowWidth] = React.useState(() => {
     if (typeof window !== 'undefined') return window.innerWidth;
     return 1920;
   });
 
-  // Detectar se é mobile
   const isMobile = windowWidth < 1024;
 
-  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  // � LISTENER COMPLETO: Detecta resize E zoom com visualViewport
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    let resizeTimeout: NodeJS.Timeout;
-
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        const newWidth = window.innerWidth;
-        setWindowWidth(prev => {
-          // Só atualiza se a diferença for significativa (>50px)
-          if (Math.abs(prev - newWidth) > 50) {
-            return newWidth;
-          }
-          return prev;
-        });
-      }, 150); // Debounce de 150ms
+      resizeTimeout = setTimeout(() => setWindowWidth(window.innerWidth), 150);
     };
-
     window.addEventListener('resize', handleResize);
     return () => {
       clearTimeout(resizeTimeout);
@@ -368,9 +357,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
 
 
-  // Extrair dados das portas do PLC (do sistema existente)
-  const portaJusanteValue = plcData?.ints?.[42] || 0;   // MOVIMENTO_PORTA_JUSANTE_CALDEIRA (índice 42)
-  const portaMontanteValue = plcData?.ints?.[57] || 0; // MOVIMENTAR_PORTA_MONTANTE_CALDEIRA (índice 57)
+  // 🎯 PORTAS - TAGS REAIS DO WEBSOCKET ECLUS (data type REAL - 0 a 100)
+  const portaJusanteValue = parseFloat(plcData?.tags?.['ECLUS_PORTA_JUSANTE_MOV'] || '0');
+  const portaMontanteValue = parseFloat(plcData?.tags?.['ECLUS_PORTA_MONT_MOV'] || '0');
 
   // Extrair dados dos semáforos do PLC (bit_data.status_bits)
   const statusBits = plcData?.bit_data?.status_bits || [];
@@ -437,26 +426,53 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
 
 
-  // 🚀 MEMOIZAR DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
+  // 🚀 MEMOIZAR DIMENSÕES - SISTEMA PROGRESSIVO PADRONIZADO (igual PortaJusante/Montante/Enchimento)
   const dimensions = React.useMemo(() => {
+    // 📏 Aspect Ratios dos SVGs
     const caldeiraAspectRatio = 1168 / 253;
     const paredeAspectRatio = 1175 / 205;
-    const containerWidth = Math.min(windowWidth - 32, 1920);
-    const maxWidth = Math.max(containerWidth, 300);
+    
+    // 🎯 CÁLCULO PROGRESSIVO DE ESCALA (padrão das outras páginas)
+    let scale: number;
+    
+    if (isMobile) {
+      scale = 0.90;
+    } else {
+      if (windowWidth <= 1920) {
+        // Ajuste: escala mínima maior (0.65 ao invés de 0.55) para não diminuir tanto
+        scale = Math.max(0.65, (windowWidth / 1920) * 0.75);
+      } else if (windowWidth <= 2560) {
+        scale = 0.75 + ((windowWidth - 1920) / 640) * 0.15;
+      } else if (windowWidth <= 3840) {
+        scale = 0.90 + ((windowWidth - 2560) / 1280) * 0.08;
+      } else {
+        scale = Math.min(0.98, 0.98 + ((windowWidth - 3840) / 1920) * 0.00);
+      }
+    }
+    
+    // 📐 Cálculo de largura disponível e dimensões
+    const sidebarWidth = 64;
+    const availableWidth = windowWidth - sidebarWidth;
+    const baseWidth = availableWidth * scale;
+    const maxWidth = baseWidth;
 
     return {
       caldeiraAspectRatio,
       paredeAspectRatio,
       maxWidth,
+      baseWidth,
+      scale,
       shouldRender: maxWidth > 100
     };
-  }, [windowWidth]);
+  }, [windowWidth, isMobile]);
 
   const { caldeiraAspectRatio, paredeAspectRatio, maxWidth, shouldRender } = dimensions;
 
+  // Altura base para os cards (70% da largura como no container principal)
+  const baseHeight = maxWidth * 0.7;
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-end pb-8 relative">
+    <div className="w-full h-screen flex flex-col items-center justify-start pt-4 relative overflow-hidden">
 
       {/* 📱 PAINEL MOBILE - POSICIONADO NO TOPO (IGUAL OUTRAS PÁGINAS) */}
       {isMobile && (
@@ -573,441 +589,6 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
         </div>
       )}
 
-      {/* PAINÉIS INFORMATIVOS - ÁREA SUPERIOR COMPLETA - APENAS DESKTOP */}
-      {!isMobile && shouldRender && (
-        <div
-          className="absolute top-5 z-10"
-          style={{
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: `${Math.min(windowWidth - (isMobile ? 16 : 32), 1920)}px`,
-          }}
-        >
-          <div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full"
-            style={{ gap: `${Math.max(8, maxWidth * 0.008)}px` }}
-          >
-
-            {/* 1º CARD - INFORMAÇÕES OPERACIONAIS */}
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header Padrão InfoCard */}
-              <div
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-              >
-                <h3
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  INFORMAÇÕES OPERACIONAIS
-                </h3>
-              </div>
-
-              {/* Conteúdo */}
-              <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
-
-                  {/* Operador */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide flex items-center"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px`, gap: `${Math.max(2, maxWidth * 0.002)}px` }}
-                    >
-                      <UserIcon style={{ width: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, height: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }} />
-                      Operador:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-[#212E3E] bg-white border border-gray-200 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      J. SILVA
-                    </span>
-                  </div>
-
-                  {/* Turno */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Turno:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-[#212E3E] bg-white border border-gray-200 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      MANHÃ
-                    </span>
-                  </div>
-
-                  {/* Modo */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Modo:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-green-600 bg-green-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      REMOTO
-                    </span>
-                  </div>
-
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(2, maxWidth * 0.002)}px 0` }}></div>
-
-                  {/* Barcos Hoje */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide flex items-center"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px`, gap: `${Math.max(2, maxWidth * 0.002)}px` }}
-                    >
-                      <ClipboardDocumentListIcon style={{ width: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, height: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }} />
-                      Barcos Hoje:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-[#212E3E] bg-blue-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      12
-                    </span>
-                  </div>
-
-                  {/* Falhas Ativas */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide flex items-center"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px`, gap: `${Math.max(2, maxWidth * 0.002)}px` }}
-                    >
-                      <ExclamationTriangleIcon style={{ width: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, height: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }} />
-                      Falhas Ativas:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-red-600 bg-red-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      0
-                    </span>
-                  </div>
-
-                  {/* Total Falhas */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Total Falhas:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-orange-600 bg-orange-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      3
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 2º CARD - NÍVEIS DA ECLUSA */}
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header */}
-              <div
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-              >
-                <h3
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  NÍVEIS DA ECLUSA
-                </h3>
-              </div>
-
-              {/* Conteúdo */}
-              <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
-
-                  {/* Nível Montante */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Nível Montante:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${Math.abs(diffMontCald) > 0.05 ? 'bg-red-100' : 'bg-white border border-gray-200'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {nivelMontante.toFixed(2)} m
-                    </span>
-                  </div>
-
-                  {/* Nível Caldeira */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Nível Caldeira:
-                    </span>
-                    <span
-                      className="font-mono font-bold bg-white border border-gray-200 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {nivelCaldeira.toFixed(2)} m
-                    </span>
-                  </div>
-
-                  {/* Nível Jusante */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Nível Jusante:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${Math.abs(diffCaldJus) > 0.05 ? 'bg-red-100' : 'bg-white border border-gray-200'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {nivelJusante.toFixed(2)} m
-                    </span>
-                  </div>
-
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(2, maxWidth * 0.002)}px 0` }}></div>
-
-                  {/* Diff. Mont/Cald */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Diff. Mont/Cald:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${Math.abs(diffMontCald) > 0.05 ? 'text-white bg-red-500' : 'text-green-600 bg-green-50'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {diffMontCald.toFixed(3)} m
-                    </span>
-                  </div>
-
-                  {/* Diff. Cald/Jus */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Diff. Cald/Jus:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${Math.abs(diffCaldJus) > 0.05 ? 'text-white bg-red-500' : 'text-green-600 bg-green-50'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {diffCaldJus.toFixed(3)} m
-                    </span>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Status:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded text-white ${statusCaldeira === 'normal' ? 'bg-green-500' : statusCaldeira === 'alerta' ? 'bg-yellow-500' : 'bg-red-500'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {statusCaldeira === 'normal' ? 'NORMAL' : statusCaldeira === 'alerta' ? 'ALERTA' : 'CRÍTICO'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 3º CARD - VELOCIDADES DOS RADARES */}
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header */}
-              <div
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-              >
-                <h3
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  VELOCIDADES RADARES
-                </h3>
-              </div>
-
-              {/* Conteúdo */}
-              <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
-
-                  {/* Radar Montante */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Radar Montante:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${radarMontante > 2.0 ? 'bg-red-100' : 'bg-white border border-gray-200'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {radarMontante.toFixed(2)} m/s
-                    </span>
-                  </div>
-
-                  {/* Radar Caldeira */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Radar Caldeira:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${radarCaldeira > 2.0 ? 'bg-red-100' : 'bg-white border border-gray-200'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {radarCaldeira.toFixed(2)} m/s
-                    </span>
-                  </div>
-
-                  {/* Radar Jusante */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Radar Jusante:
-                    </span>
-                    <span
-                      className={`font-mono font-bold rounded ${radarJusante > 2.0 ? 'bg-red-100' : 'bg-white border border-gray-200'}`}
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      {radarJusante.toFixed(2)} m/s
-                    </span>
-                  </div>
-
-                  {/* Separador */}
-                  <div className="border-t border-gray-300" style={{ margin: `${Math.max(2, maxWidth * 0.002)}px 0` }}></div>
-
-                  {/* Velocidade Máx */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Velocidade Máx:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-white bg-red-500 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      2.00 m/s
-                    </span>
-                  </div>
-
-                  {/* Status Geral */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Status Geral:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-green-600 bg-green-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      OPERACIONAL
-                    </span>
-                  </div>
-
-                  {/* Comunicação */}
-                  <div className="flex justify-between items-center">
-                    <span
-                      className="font-medium text-[#212E3E] uppercase tracking-wide"
-                      style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                    >
-                      Comunicação:
-                    </span>
-                    <span
-                      className="font-mono font-bold text-green-600 bg-green-50 rounded"
-                      style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px`, padding: `${Math.max(2, maxWidth * 0.002)}px ${Math.max(6, maxWidth * 0.005)}px` }}
-                    >
-                      ONLINE
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 4º CARD - STATUS DO SISTEMA */}
-            <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-              {/* Header */}
-              <div
-                className="bg-edp-marine text-white"
-                style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-              >
-                <h3
-                  className="font-bold uppercase tracking-wide"
-                  style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-                >
-                  STATUS DO SISTEMA
-                </h3>
-              </div>
-
-              {/* Conteúdo */}
-              <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, maxWidth * 0.004)}px` }}>
-                  <StatusCard
-                    title="OPERAÇÃO EM AUTOMÁTICO"
-                    variant="automatic"
-                  />
-
-                  <StatusCard
-                    title={statusCaldeira === 'normal' ? "NÍVEIS EQUALIZADOS" : "DESEQUILÍBRIO DE NÍVEIS"}
-                    variant={statusCaldeira === 'normal' ? "success" : statusCaldeira === 'alerta' ? "warning" : "error"}
-                  />
-
-                  <StatusCard
-                    title={bitMontanteCaldeira || bitCaldeiraJusante ? "VÁLVULAS ABERTAS" : "VÁLVULAS FECHADAS"}
-                    variant={bitMontanteCaldeira || bitCaldeiraJusante ? "success" : "warning"}
-                  />
-
-                  <StatusCard
-                    title="EMERGÊNCIA ATIVADA"
-                    variant="error"
-                  />
-
-                  <StatusCard
-                    title="SISTEMA CONECTADO"
-                    variant="success"
-                  />
-
-                  <StatusCard
-                    title="CONTROLE LOCAL LIBERADO"
-                    variant="success"
-                  />
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       <div
         ref={containerRef}
@@ -1027,6 +608,203 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               height: `${maxWidth * 0.7}px` // Altura proporcional ao maxWidth (70% da largura)
             }}
           >
+            
+            {/* 🟢 RETÂNGULO HORIZONTAL COM CARDS DENTRO */}
+            {!isMobile && (
+              <div
+                className="absolute bg-green-500/10 border-2 border-green-500/30"
+                style={{
+                  top: `${(baseHeight * RETANGULO.y) / 100}px`,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: `${(maxWidth * RETANGULO.largura) / 100}px`,
+                  height: `${(baseHeight * RETANGULO.altura) / 100}px`,
+                  zIndex: 200
+                }}
+              >
+                {/* CARDS DENTRO DO RETÂNGULO - RESPONSIVOS */}
+                {(() => {
+                  // Dimensões do retângulo
+                  const larguraRetangulo = (maxWidth * RETANGULO.largura) / 100;
+                  const alturaRetangulo = (baseHeight * RETANGULO.altura) / 100;
+
+                  // Escala baseada na ALTURA do retângulo (mais importante para caber)
+                  // Referência: 150px altura = escala 1.0
+                  const escala = Math.max(0.4, Math.min(2, alturaRetangulo / 150));
+
+                  // Funções de responsividade
+                  const fontSizeCard = (base: number) => Math.max(7, base * escala);
+                  const spacingCard = (base: number) => Math.max(2, base * escala);
+                  const gapCards = Math.max(4, 8 * escala);
+                  const paddingCard = Math.max(3, 6 * escala);
+
+                  return (
+                    <div
+                      className="w-full h-full flex items-stretch justify-center"
+                      style={{ padding: `${paddingCard}px` }}
+                    >
+                      <div
+                        className="grid grid-cols-4 w-full h-full"
+                        style={{ gap: `${gapCards}px` }}
+                      >
+                        {/* 1º CARD - INFORMAÇÕES OPERACIONAIS */}
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col">
+                          <div
+                            className="bg-edp-marine text-white rounded-t-lg flex-shrink-0"
+                            style={{ padding: `${spacingCard(3)}px ${spacingCard(6)}px` }}
+                          >
+                            <h3
+                              className="font-semibold uppercase tracking-wide truncate"
+                              style={{ fontSize: `${fontSizeCard(9)}px` }}
+                            >
+                              INFORMAÇÕES OPERACIONAIS
+                            </h3>
+                          </div>
+                          <div className="flex-1 flex flex-col justify-evenly" style={{ padding: `${spacingCard(4)}px ${spacingCard(6)}px` }}>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Operador:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-[#212E3E]">J. SILVA</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Turno:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-[#212E3E]">MANHÃ</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Modo:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-green-600">REMOTO</span>
+                            </div>
+                            <div className="border-t border-gray-300"></div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Barcos:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-blue-600">12</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Falhas:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-red-600">0</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2º CARD - NÍVEIS DA ECLUSA */}
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col">
+                          <div
+                            className="bg-edp-marine text-white rounded-t-lg flex-shrink-0"
+                            style={{ padding: `${spacingCard(3)}px ${spacingCard(6)}px` }}
+                          >
+                            <h3
+                              className="font-semibold uppercase tracking-wide truncate"
+                              style={{ fontSize: `${fontSizeCard(9)}px` }}
+                            >
+                              NÍVEIS DA ECLUSA
+                            </h3>
+                          </div>
+                          <div className="flex-1 flex flex-col justify-evenly" style={{ padding: `${spacingCard(4)}px ${spacingCard(6)}px` }}>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Montante:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-[#212E3E]">{nivelMontante.toFixed(2)} m</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Caldeira:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-[#212E3E]">{nivelCaldeira.toFixed(2)} m</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Jusante:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-[#212E3E]">{nivelJusante.toFixed(2)} m</span>
+                            </div>
+                            <div className="border-t border-gray-300"></div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Diff:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${Math.abs(diffMontCald) > 0.05 ? 'text-red-600' : 'text-green-600'}`}>{diffMontCald.toFixed(3)} m</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Status:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${statusCaldeira === 'normal' ? 'text-green-600' : statusCaldeira === 'alerta' ? 'text-yellow-600' : 'text-red-600'}`}>{statusCaldeira === 'normal' ? 'NORMAL' : statusCaldeira === 'alerta' ? 'ALERTA' : 'CRÍTICO'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3º CARD - VELOCIDADES DOS RADARES */}
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col">
+                          <div
+                            className="bg-edp-marine text-white rounded-t-lg flex-shrink-0"
+                            style={{ padding: `${spacingCard(3)}px ${spacingCard(6)}px` }}
+                          >
+                            <h3
+                              className="font-semibold uppercase tracking-wide truncate"
+                              style={{ fontSize: `${fontSizeCard(9)}px` }}
+                            >
+                              VELOCIDADES RADARES
+                            </h3>
+                          </div>
+                          <div className="flex-1 flex flex-col justify-evenly" style={{ padding: `${spacingCard(4)}px ${spacingCard(6)}px` }}>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Montante:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${radarMontante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>{radarMontante.toFixed(2)} m/s</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Caldeira:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${radarCaldeira > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>{radarCaldeira.toFixed(2)} m/s</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Jusante:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${radarJusante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>{radarJusante.toFixed(2)} m/s</span>
+                            </div>
+                            <div className="border-t border-gray-300"></div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Máx:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-red-600">2.00 m/s</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Status:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-green-600">OK</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 4º CARD - STATUS DO SISTEMA */}
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col">
+                          <div
+                            className="bg-edp-marine text-white rounded-t-lg flex-shrink-0"
+                            style={{ padding: `${spacingCard(3)}px ${spacingCard(6)}px` }}
+                          >
+                            <h3
+                              className="font-semibold uppercase tracking-wide truncate"
+                              style={{ fontSize: `${fontSizeCard(9)}px` }}
+                            >
+                              STATUS DO SISTEMA
+                            </h3>
+                          </div>
+                          <div className="flex-1 flex flex-col justify-evenly" style={{ padding: `${spacingCard(4)}px ${spacingCard(6)}px` }}>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Operação:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-green-600">AUTO</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Níveis:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${statusCaldeira === 'normal' ? 'text-green-600' : 'text-red-600'}`}>{statusCaldeira === 'normal' ? 'OK' : 'ALERTA'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Válvulas:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className={`font-mono font-semibold ${bitMontanteCaldeira || bitCaldeiraJusante ? 'text-green-600' : 'text-gray-500'}`}>{bitMontanteCaldeira || bitCaldeiraJusante ? 'ABERTAS' : 'FECHADAS'}</span>
+                            </div>
+                            <div className="border-t border-gray-300"></div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Conexão:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-green-600">ONLINE</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: `${fontSizeCard(8)}px` }} className="font-medium text-gray-500">Controle:</span>
+                              <span style={{ fontSize: `${fontSizeCard(9)}px` }} className="font-mono font-semibold text-green-600">LOCAL</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            
             {/* Caldeira - Posição configurada individualmente por device */}
             <div
               className="absolute cursor-pointer"
@@ -1097,7 +875,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${((maxWidth * caldeiraEclusaConfig.horizontalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100 * caldeiraConfig.horizontalPercent) / 100) - ((maxWidth * caldeiraEclusaConfig.widthPercent) / 200)}px`,
                 width: `${((maxWidth * caldeiraEclusaConfig.widthPercent) / 100 * caldeiraConfig.widthPercent) / 100}px`,
                 height: `${(((maxWidth * caldeiraEclusaConfig.widthPercent) / 100) / caldeiraAspectRatio * caldeiraConfig.heightPercent) / 100}px`,
-                zIndex: 10 // Camada intermediária - embaixo das estruturas
+                zIndex: 10,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <NivelCaldeira
@@ -1114,7 +894,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${(maxWidth * jusanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * jusanteConfig.widthPercent) / 100}px`,
                 height: `${(maxWidth * jusanteConfig.heightPercent) / 100}px`,
-                zIndex: 10 // Abaixo das estruturas (Parede: 15, Portas: 18)
+                zIndex: 10,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <NivelJusante
@@ -1131,7 +913,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${(maxWidth * montanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * montanteConfig.widthPercent) / 100}px`,
                 height: `${(maxWidth * montanteConfig.heightPercent) / 100}px`,
-                zIndex: 10 // Abaixo das estruturas (Parede: 15, Portas: 18)
+                zIndex: 10,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <NivelMontante
@@ -1148,7 +932,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${(maxWidth * portaJusanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * portaJusanteConfig.widthPercent) / 100}px`,
                 height: `${(maxWidth * portaJusanteConfig.heightPercent) / 100}px`,
-                zIndex: 18 // Por cima dos níveis (zIndex: 10)
+                zIndex: 18,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <PortaJusante
@@ -1165,7 +951,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${(maxWidth * portaMontanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * portaMontanteConfig.widthPercent) / 100}px`,
                 height: `${(maxWidth * portaMontanteConfig.heightPercent) / 100}px`,
-                zIndex: 18 // Por cima dos níveis (zIndex: 10)
+                zIndex: 18,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <PortaMontante
@@ -1281,7 +1069,9 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 left: `${(maxWidth * tubulacaoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * tubulacaoConfig.widthPercent) / 100}px`,
                 height: `${(maxWidth * tubulacaoConfig.heightPercent) / 100}px`,
-                zIndex: 20 // Mais alto que todos os outros componentes
+                zIndex: 20,
+                contain: 'layout',
+                willChange: 'transform'
               }}
             >
               <TubulacaoValvulas
@@ -1389,7 +1179,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
       {/* MODAL DE PARÂMETROS */}
       {menuParametrosOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-2 md:p-4 overflow-hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 overflow-hidden"
           onClick={() => setMenuParametrosOpen(false)}
           style={{
             touchAction: 'none',
@@ -1397,15 +1187,17 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* Dialog Container */}
+          {/* Dialog Container - 100% responsivo e ajustável */}
           <div
             className="
               bg-white shadow-2xl overflow-hidden flex flex-col
-              w-full max-w-sm max-h-[85vh] rounded-t-2xl
+              w-full h-[85vh] rounded-t-3xl
               animate-in slide-in-from-bottom duration-300
-              md:max-w-2xl md:max-h-[80vh] md:rounded-2xl
+              sm:w-[95vw] sm:h-[90vh] sm:rounded-2xl
+              md:w-[85vw] md:max-w-3xl md:h-[85vh] md:max-h-[800px] md:rounded-2xl
               md:animate-in md:fade-in md:zoom-in
-              lg:max-w-4xl
+              lg:max-w-4xl lg:h-[80vh]
+              xl:max-w-5xl
             "
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}

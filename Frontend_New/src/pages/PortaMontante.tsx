@@ -19,23 +19,48 @@ import {
   ChevronDownIcon
 } from '@heroicons/react/24/outline';
 
+// Declaração global para window.lastContrapesoTime
+declare global {
+  interface Window {
+    lastContrapesoTime?: number;
+  }
+}
+
 
 interface PortaMontanteProps {
   sidebarOpen?: boolean;
 }
 
+// 🟢 CONFIGURAÇÃO DOS RETÂNGULOS DE DEMARCAÇÃO - ÁREAS LATERAIS LIVRES
+// 📍 Posição é FIXA, apenas largura/altura/gap são ajustáveis
+const DEMARCACAO_LATERAL_CONFIG = {
+  desktop: {
+    gap: 20,                     // 📏 Espaçamento entre retângulos e SVG (px)
+    esquerdo: {
+      verticalPercent: 0,        // % da altura (topo = 0)
+      widthPercent: 50,          // % da largura total - comprime se não couber
+      heightPercent: 110,        // % da altura total - AUMENTADO para cards maiores
+    },
+    direito: {
+      verticalPercent: 0,        // % da altura (topo = 0)
+      widthPercent: 50,          // % da largura total - comprime se não couber
+      heightPercent: 110,        // % da altura total - AUMENTADO para cards maiores
+    }
+  }
+};
+
 // 🏗️ CONFIGURAÇÃO DOS CONTRAPESOS E RÉGUA - SEPARADO MOBILE/DESKTOP
 const CONTRAPESO_CONFIG = {
   desktop: {
     direito: {
-      verticalPercent: 41,    // % da altura total (posição Y)
-      horizontalPercent: 41.2,  // % da largura total (posição X)
+      verticalPercent: 40.5,    // % da altura total (posição Y)
+      horizontalPercent: 41.5,  // % da largura total (posição X)
       widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     },
     esquerdo: {
-      verticalPercent: 41,    // % da altura total (posição Y)
-      horizontalPercent: -40.5,  // % da largura total (posição X)
+      verticalPercent: 40.5,    // % da altura total (posição Y)
+      horizontalPercent: -41.1,  // % da largura total (posição X)
       widthPercent: 100,          // % da largura total (tamanho)
       heightPercent: 60,        // % da altura total (tamanho)
     }
@@ -59,10 +84,10 @@ const CONTRAPESO_CONFIG = {
 // 📏 CONFIGURAÇÃO DA RÉGUA PORTA MONTANTE - SEPARADO MOBILE/DESKTOP
 const REGUA_CONFIG = {
   desktop: {
-    verticalPercent: 20,      // % da altura total (posição Y)
+    verticalPercent: 22.8,      // % da altura total (posição Y)
     horizontalPercent: 0,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
     widthPercent: 100,      // % da largura total (tamanho) +34% (57.02 * 1.02)
-    heightPercent: 72.2,     // % da altura total (tamanho) +34% (70.59 * 1.02)
+    heightPercent: 72.3,     // % da altura total (tamanho) +34% (70.59 * 1.02)
   },
   mobile: {
     verticalPercent: 7,      // % da altura total (posição Y)
@@ -108,14 +133,17 @@ const MOTOR_CONFIG = {
 
 const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
-  const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
-  // 🚀 SIMPLIFICADO: Usar apenas window.innerWidth para dimensões
+  // 🎯 LARGURA DO SIDEBAR - Aberto: 256px (w-64), Fechado: 64px (w-16)
+  const sidebarWidth = sidebarOpen ? 256 : 64;
+
   const [windowWidth, setWindowWidth] = React.useState(() => {
     if (typeof window !== 'undefined') return window.innerWidth;
     return 1920;
   });
+  
+  const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
+  const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
 
   // ============================================
   // SISTEMA DE COORDENADAS UNIFICADO
@@ -130,46 +158,93 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   // 🚀 MEMOIZAR TODAS AS DIMENSÕES - EVITA RECÁLCULOS EM CADA RE-RENDER
   const dimensions = React.useMemo(() => {
     const isMobile = windowWidth < 1024;
-    const portaMontanteAspectRatio = 1075 / 1098;
+    // Aspect ratio original da Porta Montante (1075 x 1098)
+    const aspectRatio = 1075 / 1098;
+
+    // Calcula o espaço disponível - EXPANSÃO TOTAL PARA TELAS GRANDES
+    const availableWidth = windowWidth - 32; // Sem limite de 1920px
+    const availableHeight = window.innerHeight - 100;
+
+    // Determina o tamanho máximo mantendo aspect ratio
+    let baseWidth: number;
+    let baseHeight: number;
+
+    const widthBasedHeight = availableWidth / aspectRatio;
+
+    if (widthBasedHeight <= availableHeight) {
+      baseWidth = availableWidth; // EXPANSÃO TOTAL - usa toda largura disponível
+      baseHeight = baseWidth / aspectRatio;
+    } else {
+      baseHeight = availableHeight;
+      baseWidth = baseHeight * aspectRatio;
+    }
+
+    // Garante valores mínimos
+    baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
+    baseHeight = Math.max(baseHeight, isMobile ? 300 : 500);
+
+    // ESCALA ULTRA-INTELIGENTE: cresce progressivamente com a tela
+    // Em telas pequenas: mínimo 0.55, em telas grandes: até 0.95, em telas ultra-wide: até 1.0
+    let scale: number;
+    if (isMobile) {
+      scale = 0.90;
+    } else {
+      // Base scale: 0.55 para 1920px, crescendo linearmente
+      const baseScale = windowWidth / 1920 * 0.70;
+
+      // Ajuste progressivo: mais agressivo em telas grandes
+      if (windowWidth <= 1920) {
+        scale = Math.max(0.55, baseScale);
+      } else if (windowWidth <= 2560) {
+        // De 1920px a 2560px: de 0.70 até 0.85
+        scale = 0.70 + ((windowWidth - 1920) / (2560 - 1920)) * 0.15;
+      } else if (windowWidth <= 3840) {
+        // De 2560px a 3840px: de 0.85 até 0.95
+        scale = 0.85 + ((windowWidth - 2560) / (3840 - 2560)) * 0.10;
+      } else {
+        // Acima de 3840px: até 0.98 (quase tela cheia)
+        scale = Math.min(0.98, 0.95 + ((windowWidth - 3840) / 1920) * 0.03);
+      }
+    }
+
+    const scaledWidth = baseWidth * scale;
+    const scaledHeight = baseHeight * scale;
+
+    // Adicionar maxWidth igual à PortaJusante
     const containerWidth = Math.min(windowWidth - 32, 1920);
     const maxWidth = Math.max(containerWidth, 300);
-    const portaScale = isMobile ? 90 : 55;
-    const baseWidth = (maxWidth * portaScale) / 100;
-    const baseHeight = baseWidth / portaMontanteAspectRatio;
 
     return {
       isMobile,
       maxWidth,
-      baseWidth,
-      baseHeight,
-      alturaTotal: baseHeight,
-      shouldRender: maxWidth > 100 && baseHeight > 100
+      baseWidth: scaledWidth,
+      baseHeight: scaledHeight,
+      alturaTotal: scaledHeight,
+      shouldRender: scaledWidth > 100 && scaledHeight > 100
     };
   }, [windowWidth]);
 
   // Desestruturar para uso
   const { isMobile, maxWidth, baseWidth, baseHeight, alturaTotal, shouldRender } = dimensions;
 
-  // 🚀 SIMPLES: Listener de resize com debounce para evitar re-renders excessivos
+  // 🎯 CÁLCULO DO ESPAÇO DISPONÍVEL PARA RETÂNGULOS LATERAIS
+  const espacoLateral = React.useMemo(() => {
+    // Layout tem padding p-4 (16px) mobile / lg:p-6 (24px) desktop
+    const paddingLayout = isMobile ? 32 : 48;
+    const larguraConteudo = windowWidth - sidebarWidth - paddingLayout;
+    const espacoDisponivel = Math.max(0, (larguraConteudo - baseWidth) / 2);
+    // Margem de segurança
+    return Math.max(0, espacoDisponivel - 16);
+  }, [windowWidth, sidebarWidth, baseWidth, isMobile]);
+
+  // � LISTENER COMPLETO: Detecta resize E zoom com visualViewport
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    let resizeTimeout: NodeJS.Timeout;
-
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleResize = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        const newWidth = window.innerWidth;
-        setWindowWidth(prev => {
-          // Só atualiza se a diferença for significativa (>50px)
-          if (Math.abs(prev - newWidth) > 50) {
-            return newWidth;
-          }
-          return prev;
-        });
-      }, 150); // Debounce de 150ms
+      resizeTimeout = setTimeout(() => setWindowWidth(window.innerWidth), 150);
     };
-
     window.addEventListener('resize', handleResize);
     return () => {
       clearTimeout(resizeTimeout);
@@ -177,7 +252,6 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     };
   }, []);
 
-  // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA MONT usando sendCommand
@@ -348,9 +422,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   const espacoDisponivelEsquerda = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
   const espacoDisponivelDireita = Math.max(0, espacoSobrandoTotal / 2); // Metade do espaço sobrando
 
-  // 🎯 PROTEÇÃO CONTRA SOBREPOSIÇÃO - MAIS PERMISSIVA PARA GARANTIR VISIBILIDADE
+  // 🎯 PROTEÇÃO CONTRA SOBREPOSIÇÃO - CONSIDERA MARGEM LATERAL + SEGURANÇA
   const espacoLateralDisponivel = Math.max(0, (windowWidth - baseWidth) / 2);
-  const cardsCabem = windowWidth >= 1200 ? (espacoLateralDisponivel >= cardWidthValue + 10) : true; // Só verifica espaço em telas grandes
+  const margemLateralCard = baseWidth * 0.02; // Margem left/right do card
+  const margemSeguranca = 30; // Margem de segurança para NUNCA encostar nos SVGs
+  const espacoNecessario = cardWidthValue + margemLateralCard + margemSeguranca;
+  const cardsCabem = windowWidth >= 1200 ? (espacoLateralDisponivel >= espacoNecessario) : true;
 
   // Performance optimization: Debug logging only in development
   if (import.meta.env.DEV) {
@@ -359,363 +436,20 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
       espaco_lateral_disponivel: `${espacoLateralDisponivel.toFixed(0)}px`,
       card_width: `${cardWidthValue.toFixed(0)}px`,
-      cards_cabem: cardsCabem ? '✅ SIM' : '❌ NÃO - SOBREPOSIÇÃO!',
-      estrategia_cards: cardsCabem ? 'RENDERIZAR' : 'OCULTAR',
-      porcentagem_usada: `${(Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20)) * 100).toFixed(1)}%`,
-      card_baseado_espaco: `${(((windowWidth - maxWidth) / 2) * Math.min(0.35, Math.max(0.20, windowWidth / 3840 * 0.15 + 0.20))).toFixed(0)}px`,
-      card_baseado_maxWidth: `${(maxWidth * 0.18).toFixed(0)}px`,
+      margem_lateral_card: `${margemLateralCard.toFixed(0)}px`,
+      margem_seguranca: `${margemSeguranca}px`,
+      espaco_necessario: `${espacoNecessario.toFixed(0)}px`,
+      cards_cabem: cardsCabem ? '✅ SIM - RENDERIZAR' : '❌ NÃO - OCULTAR PARA EVITAR SOBREPOSIÇÃO',
+      calculo: `${espacoLateralDisponivel.toFixed(0)}px >= ${espacoNecessario.toFixed(0)}px ? ${cardsCabem}`,
       card_final: `${cardWidthValue.toFixed(0)}px`,
-      estrategia_usada: cardWidthValue > maxWidth * 0.18 ? 'ESPAÇO_DISPONÍVEL' : 'MAX_WIDTH',
-      limites: `min=${isMobile ? 220 : 280}px, max=${isMobile ? 350 : Math.max(500, windowWidth * 0.15).toFixed(0)}px`,
-      font_scale_header: `${(cardWidthValue / 350 * 1.15).toFixed(2)}x`,
-      font_scale_label: `${(cardWidthValue / 350).toFixed(2)}x`,
-      font_scale_value: `${(cardWidthValue / 350 * 1.1).toFixed(2)}x`,
-      espaco_disponivel_esquerda: espacoDisponivelEsquerda,
-      espaco_disponivel_direita: espacoDisponivelDireita
+      limites: `min=${isMobile ? 220 : 280}px, max=${isMobile ? 350 : Math.max(500, windowWidth * 0.15).toFixed(0)}px`
     });
   }
 
   return (
     <div className="w-full h-auto flex flex-col items-center relative">
 
-      {/* PAINEL INDUSTRIAL ISA-104 - ESQUERDA - DESKTOP */}
-      {!isMobile && cardsCabem && (
-        <div
-          className="absolute z-50 flex flex-col"
-          style={{
-            top: `${baseHeight * 0.05}px`,
-            left: `${baseWidth * 0.02}px`,
-            width: `${cardWidth()}px`,
-            gap: `${Math.max(6, baseWidth * 0.005)}px`
-          }}
-        >
-          {/* DADOS OPERACIONAIS - RESPONSIVIDADE FLUIDA */}
-          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-            {/* Header */}
-            <div
-              className="bg-edp-marine text-white"
-              style={{ padding: `${getResponsiveCardSpacing(8)}px ${getResponsiveCardSpacing(10)}px` }}
-            >
-              <h3
-                className="font-bold uppercase tracking-wide leading-tight"
-                style={{ fontSize: `${getResponsiveCardFontSize(12, 'header')}px` }}
-              >
-                DADOS OPERACIONAIS
-              </h3>
-            </div>
-
-            {/* Conteúdo */}
-            <div style={{ padding: `${getResponsiveCardSpacing(10)}px` }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: `${getResponsiveCardSpacing(6)}px` }}>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
-                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
-                  >
-                    Posição Porta:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
-                  >
-                    {(reguaPortaMontante * 12.5 / 100).toFixed(2)} <span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">m</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide leading-tight"
-                    style={{ fontSize: `${getResponsiveCardFontSize(9, 'label')}px` }}
-                  >
-                    Abertura:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${getResponsiveCardFontSize(14, 'value')}px` }}
-                  >
-                    {reguaPortaMontante}<span style={{ fontSize: `${getResponsiveCardFontSize(8, 'label')}px` }} className="text-gray-500">%</span>
-                  </span>
-                </div>
-
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
-                  >
-                    Diferença E/D:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
-                  >
-                    {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">mm</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
-                  >
-                    Contrapeso E:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
-                  >
-                    {contrapesoEsquerdo}<span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">%</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
-                  >
-                    Contrapeso D:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
-                  >
-                    {contrapesoDirecto}<span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">%</span>
-                  </span>
-                </div>
-
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
-                  >
-                    Vel. Subida:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
-                  >
-                    {velocidadeSubida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}
-                  >
-                    Vel. Descida:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}
-                  >
-                    {velocidadeDescida.toFixed(3)} <span style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }} className="text-gray-500">m/s</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* STATUS OPERACIONAIS - RESPONSIVIDADE INTELIGENTE */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(4, baseWidth * 0.004)}px` }}>
-            <StatusCard
-              title="COMANDO EM AUTOMÁTICO"
-              variant="automatic"
-              containerWidth={cardWidth()}
-            />
-
-            <StatusCard
-              title="IGUALDADE DE NÍVEIS PRESENTE"
-              variant="success"
-              containerWidth={cardWidth()}
-            />
-
-            <StatusCard
-              title="FALTA IGUALDADE DE NÍVEIS"
-              variant="error"
-              containerWidth={cardWidth()}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* PAINEL INDUSTRIAL ISA-104 - DIREITA - DESKTOP */}
-      {!isMobile && cardsCabem && (
-        <div
-          className="absolute z-50 flex flex-col"
-          style={{
-            top: `${baseHeight * 0.05}px`,
-            right: `${baseWidth * 0.02}px`,
-            width: `${cardWidth()}px`,
-            gap: `${Math.max(6, baseWidth * 0.005)}px`
-          }}
-        >
-          {/* MOTORES - RESPONSIVIDADE FLUIDA */}
-          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-            {/* Header */}
-            <div
-              className="bg-edp-marine text-white"
-              style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-            >
-              <h3
-                className="font-bold uppercase tracking-wide"
-                style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-              >
-                MOTORES
-              </h3>
-            </div>
-
-            {/* Conteúdo */}
-            <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-              {/* MOTOR DIREITO */}
-              <div style={{ marginBottom: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div className="flex justify-between items-center" style={{ marginBottom: `${Math.max(4, maxWidth * 0.004)}px` }}>
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    MOTOR DIREITO
-                  </span>
-                  <div className={`rounded-full ${animMotorDireito > 0 ? 'bg-green-500' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, maxWidth * 0.006)}px`, height: `${Math.max(8, maxWidth * 0.006)}px` }}></div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    {Math.round(motorDireitoVeloc)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">RPM</span>
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    {(12.5 + Math.random() * 2).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">A</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-
-              {/* MOTOR ESQUERDO */}
-              <div style={{ marginTop: `${Math.max(8, maxWidth * 0.008)}px` }}>
-                <div className="flex justify-between items-center" style={{ marginBottom: `${Math.max(4, maxWidth * 0.004)}px` }}>
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    MOTOR ESQUERDO
-                  </span>
-                  <div className={`rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500' : 'bg-gray-500'}`} style={{ width: `${Math.max(8, maxWidth * 0.006)}px`, height: `${Math.max(8, maxWidth * 0.006)}px` }}></div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    {Math.round(motorEsquerdoVeloc)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">RPM</span>
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    {(12.5 + Math.random() * 2).toFixed(1)} <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">A</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SISTEMA STATUS - RESPONSIVIDADE FLUIDA */}
-          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-sm overflow-hidden">
-            {/* Header */}
-            <div
-              className="bg-edp-marine text-white"
-              style={{ padding: `${Math.max(6, maxWidth * 0.005)}px ${Math.max(10, maxWidth * 0.008)}px` }}
-            >
-              <h3
-                className="font-bold uppercase tracking-wide"
-                style={{ fontSize: `${Math.max(10, Math.min(14, maxWidth * 0.008))}px` }}
-              >
-                SISTEMA
-              </h3>
-            </div>
-
-            {/* Conteúdo */}
-            <div style={{ padding: `${Math.max(8, maxWidth * 0.008)}px` }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: `${Math.max(6, maxWidth * 0.005)}px` }}>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    Pressão:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    2.4 <span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">bar</span>
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    Temperatura:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    24.5<span style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }} className="text-gray-500">°C</span>
-                  </span>
-                </div>
-
-                <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, maxWidth * 0.003)}px 0` }}></div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    Vibração:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    NORMAL
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span
-                    className="font-medium text-[#212E3E] uppercase tracking-wide"
-                    style={{ fontSize: `${Math.max(8, Math.min(11, maxWidth * 0.006))}px` }}
-                  >
-                    Status Geral:
-                  </span>
-                  <span
-                    className="font-mono font-bold text-[#212E3E]"
-                    style={{ fontSize: `${Math.max(12, Math.min(18, maxWidth * 0.011))}px` }}
-                  >
-                    OPERACIONAL
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
+      {/*  PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
       {isMobile && (
         <div
           className="w-full mt-4 mb-4 relative"
@@ -729,86 +463,33 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               maxWidth: `${Math.min(windowWidth - 12, 1200)}px` // Adaptativo para qualquer tela
             }}
           >
-            {/* Cards responsivos universais */}
-            <div
-              className="grid grid-cols-3 mb-2"
-              style={{
-                gap: `${Math.max(4, Math.min(8, windowWidth * 0.01))}px` // Gap adaptativo
-              }}
-            >
+            {/* Cards horizontais compactos - sempre visíveis */}
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
               {/* CARD DADOS */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3
-                    className="font-bold uppercase tracking-wide text-center leading-tight"
-                    style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                  >
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
                     DADOS
                   </h3>
                 </div>
-                <div
-                  className="space-y-1"
-                  style={{ padding: `${Math.max(4, Math.min(8, windowWidth * 0.004))}px` }}
-                >
+                <div className="p-2 space-y-1">
                   <div className="text-center">
-                    <div
-                      className="text-gray-600 font-medium uppercase"
-                      style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                    >
-                      Posição:
-                    </div>
-                    <div
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
-                    >
-                      {(reguaPortaMontante * 12.5 / 100).toFixed(2)}
-                      <span
-                        className="text-gray-500"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
-                      >
-                        m
-                      </span>
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Posição:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {(reguaPortaMontante * 12.5 / 100).toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
                     </div>
                   </div>
                   <div className="text-center">
-                    <div
-                      className="text-gray-600 font-medium uppercase"
-                      style={{ fontSize: `${Math.max(6, Math.min(9, windowWidth * 0.018))}px` }}
-                    >
-                      Abertura:
-                    </div>
-                    <div
-                      className="font-mono font-bold text-[#212E3E]"
-                      style={{ fontSize: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px` }}
-                    >
-                      {reguaPortaMontante}
-                      <span
-                        className="text-gray-500"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
-                      >
-                        %
-                      </span>
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Abertura:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {reguaPortaMontante}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div
-                        className="text-gray-600 font-medium uppercase"
-                        style={{ fontSize: `${Math.max(5, Math.min(8, windowWidth * 0.015))}px` }}
-                      >
-                        Dif. E/D:
-                      </div>
-                      <div
-                        className="font-mono font-bold text-[#212E3E]"
-                        style={{ fontSize: `${Math.max(7, Math.min(10, windowWidth * 0.02))}px` }}
-                      >
-                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)}
-                        <span
-                          className="text-gray-500"
-                          style={{ fontSize: `${Math.max(4, Math.min(7, windowWidth * 0.012))}px` }}
-                        >
-                          mm
-                        </span>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Dif. E/D:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500 text-[6px]">mm</span>
                       </div>
                     </div>
                   </div>
@@ -827,11 +508,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[7px] text-gray-600 font-medium uppercase">M. DIREITO</span>
-                      <div className={`w-1.5 h-1.5 rounded-full ${animMotorDireito > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                      <div className={`w-1.5 h-1.5 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                        {Math.round(motorDireitoVeloc)} <span className="text-gray-500 text-[6px]">RPM</span>
+                        {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
                       </span>
                       <span className="font-mono font-bold text-[#212E3E] text-[8px]">
                         {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
@@ -844,33 +525,15 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[7px] text-gray-600 font-medium uppercase">M. ESQUERDO</span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        <div className={`w-1.5 h-1.5 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {Math.round(motorEsquerdoVeloc)} <span className="text-gray-500 text-[6px]">RPM</span>
+                          {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
                         </span>
                         <span className="font-mono font-bold text-[#212E3E] text-[8px]">
                           {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
                         </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-1">
-                    {/* VELOCIDADES DE MOVIMENTO */}
-                    <div className="grid grid-cols-2 gap-1">
-                      <div className="text-center">
-                        <div className="text-[7px] text-gray-600 font-medium uppercase">V. SUBIR:</div>
-                        <div className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {(velocidadeSubida || 2.5).toFixed(1)} <span className="text-gray-500 text-[6px]">m/min</span>
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[7px] text-gray-600 font-medium uppercase">V. DESCER:</div>
-                        <div className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {(velocidadeDescida || 2.8).toFixed(1)} <span className="text-gray-500 text-[6px]">m/min</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -899,9 +562,9 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Dif. E/D:</div>
-                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
-                        {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500 text-[6px]">mm</span>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
+                      <div className="font-mono font-bold text-green-600 text-[8px]">
+                        OPER.
                       </div>
                     </div>
                   </div>
@@ -1132,7 +795,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       {/* DIALOG PARÂMETROS - RESPONSIVO */}
       {menuParametrosOpen && (
         <div
-          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-2 md:p-4"
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4"
           onClick={() => setMenuParametrosOpen(false)}
           style={{
             touchAction: 'none',
@@ -1140,15 +803,17 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* Dialog Container */}
+          {/* Dialog Container - 100% responsivo e ajustável */}
           <div
             className="
               bg-white shadow-2xl overflow-hidden flex flex-col
-              w-full max-w-[280px] max-h-[75vh] rounded-t-2xl
+              w-full h-[85vh] rounded-t-3xl
               animate-in slide-in-from-bottom duration-300
-              md:max-w-2xl md:max-h-[80vh] md:rounded-2xl
+              sm:w-[95vw] sm:h-[90vh] sm:rounded-2xl
+              md:w-[85vw] md:max-w-3xl md:h-[85vh] md:max-h-[800px] md:rounded-2xl
               md:animate-in md:fade-in md:zoom-in
-              lg:max-w-4xl
+              lg:max-w-4xl lg:h-[80vh]
+              xl:max-w-5xl
             "
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
@@ -1360,14 +1025,230 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       >
 
         {shouldRender ? (
-          <div
-            className="relative w-full flex flex-col items-center justify-center"
-            style={{
-              maxWidth: `${baseWidth}px`,
-              height: `${baseHeight}px`,
-              minHeight: `${baseHeight}px`
-            }}
-          >
+          <>
+            <div
+              className="relative w-full flex flex-col items-center justify-center"
+              style={{
+                maxWidth: `${baseWidth}px`,
+                height: `${baseHeight}px`,
+                minHeight: `${baseHeight}px`,
+                border: '1px solid red' // 🔴 Demarcação da área dos SVGs
+              }}
+            >
+            
+            {/* 🟢 PAINEL ESQUERDO - DENTRO DO RETÂNGULO VERDE */}
+            {!isMobile && espacoLateral > 50 && (() => {
+              const configEsq = DEMARCACAO_LATERAL_CONFIG.desktop.esquerdo;
+              const gap = DEMARCACAO_LATERAL_CONFIG.desktop.gap;
+
+              const larguraDesejada = (baseWidth * configEsq.widthPercent) / 100;
+              const larguraFinal = Math.min(larguraDesejada, espacoLateral - gap);
+              const posicaoFixa = -larguraFinal - gap;
+
+              if (larguraFinal <= 50) return null;
+
+              // Escala suave para responsividade - FONTES MAIORES
+              const escala = Math.min(1.15, larguraFinal / 260);
+              const fontSize = (base: number) => Math.max(9, base * escala * 1.1);
+              const spacing = (base: number) => Math.max(5, base * escala);
+
+              return (
+                <div
+                  className="absolute flex flex-col overflow-hidden"
+                  style={{
+                    top: `${(baseHeight * configEsq.verticalPercent) / 100}px`,
+                    left: `${posicaoFixa}px`,
+                    width: `${larguraFinal}px`,
+                    height: `${(baseHeight * configEsq.heightPercent) / 100}px`,
+                    backgroundColor: 'rgba(34, 197, 94, 0.05)',
+                    border: '2px dashed rgba(34, 197, 94, 0.3)',
+                    borderRadius: '8px',
+                    zIndex: 200,
+                    padding: `${spacing(10)}px`
+                  }}
+                >
+                  {/* DADOS OPERACIONAIS */}
+                  <div className="bg-white/95 border border-gray-200/60 rounded-lg shadow-sm overflow-hidden" style={{ flexShrink: 0, marginBottom: `${spacing(8)}px` }}>
+                    <div className="bg-edp-marine text-white" style={{ padding: `${spacing(6)}px ${spacing(8)}px` }}>
+                      <h3 className="font-bold uppercase tracking-wide" style={{ fontSize: `${fontSize(11)}px` }}>
+                        DADOS OPERACIONAIS
+                      </h3>
+                    </div>
+                    <div style={{ padding: `${spacing(8)}px` }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: `${spacing(5)}px` }}>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Posição:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            {(reguaPortaMontante * 12.5 / 100).toFixed(2)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>m</span>
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Abertura:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            {reguaPortaMontante}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Dif. E/D:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>mm</span>
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. E:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            {contrapesoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. D:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            {contrapesoDirecto}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* STATUS CARDS - ESTILO ORIGINAL EDP */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: `${spacing(6)}px`, flexShrink: 0 }}>
+                    <StatusCard
+                      title="COMANDO EM AUTOMÁTICO"
+                      variant="automatic"
+                      containerWidth={larguraFinal}
+                    />
+                    <StatusCard
+                      title="IGUALDADE DE NÍVEIS PRESENTE"
+                      variant="success"
+                      containerWidth={larguraFinal}
+                    />
+                    <StatusCard
+                      title="FALTA IGUALDADE DE NÍVEIS"
+                      variant="error"
+                      containerWidth={larguraFinal}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 🟢 PAINEL DIREITO - DENTRO DO RETÂNGULO VERDE */}
+            {!isMobile && espacoLateral > 50 && (() => {
+              const configDir = DEMARCACAO_LATERAL_CONFIG.desktop.direito;
+              const gap = DEMARCACAO_LATERAL_CONFIG.desktop.gap;
+
+              const posicaoFixa = baseWidth + gap;
+              const larguraDesejada = (baseWidth * configDir.widthPercent) / 100;
+              const larguraFinal = Math.min(larguraDesejada, espacoLateral - gap);
+
+              if (larguraFinal <= 50) return null;
+
+              // Escala suave para responsividade - FONTES MAIORES
+              const escala = Math.min(1.15, larguraFinal / 260);
+              const fontSize = (base: number) => Math.max(9, base * escala * 1.1);
+              const spacing = (base: number) => Math.max(5, base * escala);
+
+              return (
+                <div
+                  className="absolute flex flex-col overflow-hidden"
+                  style={{
+                    top: `${(baseHeight * configDir.verticalPercent) / 100}px`,
+                    left: `${posicaoFixa}px`,
+                    width: `${larguraFinal}px`,
+                    height: `${(baseHeight * configDir.heightPercent) / 100}px`,
+                    backgroundColor: 'rgba(34, 197, 94, 0.05)',
+                    border: '2px dashed rgba(34, 197, 94, 0.3)',
+                    borderRadius: '8px',
+                    zIndex: 200,
+                    padding: `${spacing(10)}px`
+                  }}
+                >
+                  {/* MOTORES */}
+                  <div className="bg-white/95 border border-gray-200/60 rounded-lg shadow-sm overflow-hidden" style={{ flexShrink: 0, marginBottom: `${spacing(8)}px` }}>
+                    <div className="bg-edp-marine text-white" style={{ padding: `${spacing(6)}px ${spacing(8)}px` }}>
+                      <h3 className="font-bold uppercase tracking-wide" style={{ fontSize: `${fontSize(11)}px` }}>
+                        MOTORES
+                      </h3>
+                    </div>
+                    <div style={{ padding: `${spacing(8)}px` }}>
+                      {/* Motor Direito */}
+                      <div style={{ marginBottom: `${spacing(6)}px` }}>
+                        <div className="flex justify-between items-center" style={{ marginBottom: `${spacing(3)}px` }}>
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>M. DIREITO</span>
+                          <div className={`rounded-full ${animMotorDireito > 0 ? 'bg-green-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
+                            {Math.round(motorDireitoVeloc)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                          </span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
+                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 my-1"></div>
+
+                      {/* Motor Esquerdo */}
+                      <div>
+                        <div className="flex justify-between items-center" style={{ marginBottom: `${spacing(3)}px` }}>
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>M. ESQUERDO</span>
+                          <div className={`rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
+                            {Math.round(motorEsquerdoVeloc)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                          </span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
+                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SISTEMA STATUS */}
+                  <div className="bg-white/95 border border-gray-200/60 rounded-lg shadow-sm overflow-hidden" style={{ flexShrink: 0 }}>
+                    <div className="bg-edp-marine text-white" style={{ padding: `${spacing(6)}px ${spacing(8)}px` }}>
+                      <h3 className="font-bold uppercase tracking-wide" style={{ fontSize: `${fontSize(11)}px` }}>
+                        SISTEMA
+                      </h3>
+                    </div>
+                    <div style={{ padding: `${spacing(8)}px` }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: `${spacing(5)}px` }}>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Pressão:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            2.4 <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>bar</span>
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Temperatura:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            24.5<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>°C</span>
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Vibração:</span>
+                          <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
+                            NORMAL
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Status:</span>
+                          <span className="font-mono font-bold text-green-600" style={{ fontSize: `${fontSize(13)}px` }}>
+                            OK
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* SVG Base Porta Montante - CENTRALIZADO */}
             <div
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
@@ -1488,14 +1369,15 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               />
             </div>
 
-            {/* 🚪 INDICADOR STATUS PORTA - RESPONSIVO MOBILE/DESKTOP */}
+            {/* 🚪 INDICADOR STATUS PORTA - RESPONSIVO MOBILE/DESKTOP - CENTRALIZADO COM SVG */}
             {reguaPortaMontante >= 95 && (
               <div
                 className="absolute flex items-center justify-center z-20"
                 style={{
                   top: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
-                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  left: `50%`, // Centralizado horizontalmente
+                  transform: 'translateX(-50%)', // Ajuste de centralização
+                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
                   height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
                 }}
               >
@@ -1514,8 +1396,9 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                 className="absolute flex items-center justify-center z-20"
                 style={{
                   bottom: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `${isMobile ? (maxWidth * 35) / 100 : (maxWidth * 42) / 100}px`, // Mobile: centralizado
-                  width: `${isMobile ? (maxWidth * 30) / 100 : (maxWidth * 16) / 100}px`, // Mobile: 30% da largura
+                  left: `50%`, // Centralizado horizontalmente
+                  transform: 'translateX(-50%)', // Ajuste de centralização
+                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
                   height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
                 }}
               >
@@ -1531,6 +1414,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
 
 
           </div>
+          </>
         ) : (
           /* Loading otimizado - mantém proporções corretas */
           <div className="w-full flex items-center justify-center">

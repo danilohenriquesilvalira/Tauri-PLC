@@ -32,7 +32,8 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
           willChange: 'transform',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
-          transformStyle: 'preserve-3d'
+          transformStyle: 'preserve-3d',
+          transform: 'scale(1.01)'
         }}
       >
         {/* Porta com movimento vertical */}

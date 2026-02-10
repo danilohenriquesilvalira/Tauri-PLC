@@ -503,3 +503,138 @@ export function formatarTempo(segundos: number): string {
   const s = Math.floor(segundos % 60);
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
+
+// ============================================
+// STATUS DO PROCESSO - EXPLICAÇÃO DINÂMICA
+// ============================================
+
+export type ProcessoStatus = {
+  etapa: string;
+  descricao: string;
+  detalhe?: string;
+  icone: 'standby' | 'bomba' | 'pressao' | 'osmose' | 'tanque' | 'distribuicao' | 'alarme' | 'falha' | 'cheio';
+  progresso?: number;
+};
+
+export function getProcessoStatus(state: SistemaState): ProcessoStatus {
+  // 1. VERIFICAR FALHAS DE PROTEÇÃO (PRIORIDADE MÁXIMA)
+  const protecoesComFalha: string[] = [];
+  if (!state.protBomba) protecoesComFalha.push('Bomba');
+  if (!state.protDescalc1) protecoesComFalha.push('Filtro 1');
+  if (!state.protDescalc2) protecoesComFalha.push('Filtro 2');
+  if (!state.protFiltroCarvao) protecoesComFalha.push('Filtro Carvão');
+  if (!state.protRedox) protecoesComFalha.push('Redox');
+  if (!state.protOsmose) protecoesComFalha.push('Osmose');
+  if (!state.protCondutivimetro) protecoesComFalha.push('Condutivímetro');
+
+  if (protecoesComFalha.length > 0) {
+    return {
+      etapa: 'FALHA DE PROTEÇÃO',
+      descricao: `Proteção térmica disparada: ${protecoesComFalha.join(', ')}`,
+      detalhe: 'Sistema bloqueado. Verifique o equipamento e reative a proteção.',
+      icone: 'falha'
+    };
+  }
+
+  // 2. VERIFICAR ALARMES ATIVOS
+  const alarmesAtivos: string[] = [];
+  if (state.alarmeDescalc1) alarmesAtivos.push('Filtro 1');
+  if (state.alarmeDescalc2) alarmesAtivos.push('Filtro 2');
+  if (state.alarmeFiltroCarvao) alarmesAtivos.push('Filtro Carvão');
+  if (state.alarmeRedox) alarmesAtivos.push('Redox fora da faixa');
+  if (state.alarmeOsmose) alarmesAtivos.push('Sistema Osmose');
+  if (state.alarmeCondutivimetro) alarmesAtivos.push('Condutividade alta');
+
+  if (alarmesAtivos.length > 0) {
+    return {
+      etapa: 'ALARME ATIVO',
+      descricao: `Alarme: ${alarmesAtivos.join(', ')}`,
+      detalhe: 'Sistema em modo de proteção. Verifique os parâmetros.',
+      icone: 'alarme'
+    };
+  }
+
+  // 3. VERIFICAR NÍVEL DE ENTRADA BAIXO
+  if (state.nivelEntrada <= state.parametros.nivelBaixoEntrada) {
+    return {
+      etapa: 'NÍVEL BAIXO',
+      descricao: 'Depósito de entrada com nível crítico',
+      detalhe: `Nível atual: ${state.nivelEntrada.toFixed(0)}%. Aguardando reposição.`,
+      icone: 'standby',
+      progresso: state.nivelEntrada
+    };
+  }
+
+  // 4. TANQUE FINAL CHEIO
+  if (state.boiaDeposito && state.nivelTanqueFinal >= state.parametros.nivelBoiaDesliga) {
+    return {
+      etapa: 'TANQUE CHEIO',
+      descricao: 'Tanque final atingiu capacidade máxima',
+      detalhe: `Nível: ${state.nivelTanqueFinal.toFixed(0)}%. Distribuindo para consumo.`,
+      icone: 'cheio',
+      progresso: 100
+    };
+  }
+
+  // 5. BOMBA DESLIGADA - STANDBY
+  if (!state.bombaRecirculacao) {
+    if (state.nivelTanqueFinal > state.parametros.nivelBoiaLiga) {
+      return {
+        etapa: 'STANDBY',
+        descricao: 'Sistema em espera',
+        detalhe: `Tanque com ${state.nivelTanqueFinal.toFixed(0)}%. Aguardando necessidade de reposição.`,
+        icone: 'standby',
+        progresso: state.nivelTanqueFinal
+      };
+    }
+    return {
+      etapa: 'AGUARDANDO',
+      descricao: 'Preparando para iniciar ciclo',
+      detalhe: 'Verificando condições para acionamento da bomba.',
+      icone: 'standby'
+    };
+  }
+
+  // 6. BOMBA LIGADA - PRESSURIZANDO
+  if (state.bombaRecirculacao && !state.pressostatoBomba) {
+    const progressoPressao = (state.pressaoLinha / state.parametros.pressaoMinima) * 100;
+    return {
+      etapa: 'PRESSURIZANDO',
+      descricao: 'Bomba acionada, pressurizando linha',
+      detalhe: `Pressão: ${state.pressaoLinha.toFixed(1)} bar (mínimo: ${state.parametros.pressaoMinima} bar)`,
+      icone: 'pressao',
+      progresso: Math.min(100, progressoPressao)
+    };
+  }
+
+  // 7. PRESSÃO OK, OSMOSE INICIANDO
+  if (state.bombaRecirculacao && state.pressostatoBomba && !state.comandoOsmose) {
+    return {
+      etapa: 'VERIFICANDO REDOX',
+      descricao: 'Pressão OK, verificando qualidade da água',
+      detalhe: `Redox: ${state.redox.toFixed(0)} mV - Analisando parâmetros para osmose.`,
+      icone: 'osmose'
+    };
+  }
+
+  // 8. OSMOSE OPERANDO - PRODUZINDO ÁGUA
+  if (state.comandoOsmose) {
+    const eficiencia = Math.min(100, ((state.pressaoLinha - state.parametros.pressaoMinima) /
+      (state.parametros.pressaoNominal - state.parametros.pressaoMinima)) * 100);
+
+    return {
+      etapa: 'PRODUZINDO',
+      descricao: 'Sistema de osmose reversa em operação',
+      detalhe: `Eficiência: ${eficiencia.toFixed(0)}% | Pressão: ${state.pressaoLinha.toFixed(1)} bar | Tanque: ${state.nivelTanqueFinal.toFixed(0)}%`,
+      icone: 'osmose',
+      progresso: state.nivelTanqueFinal
+    };
+  }
+
+  // DEFAULT
+  return {
+    etapa: 'OPERANDO',
+    descricao: 'Sistema em operação normal',
+    icone: 'standby'
+  };
+}

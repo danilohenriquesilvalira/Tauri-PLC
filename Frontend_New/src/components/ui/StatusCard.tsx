@@ -4,72 +4,55 @@ interface StatusCardProps {
   title: string;
   variant: 'automatic' | 'success' | 'warning' | 'error';
   className?: string;
-  containerWidth?: number; // Para responsividade inteligente
+  containerWidth?: number;
 }
 
 export const StatusCard: React.FC<StatusCardProps> = ({
   title,
   variant,
   className = '',
-  containerWidth = 300 // Default width
+  containerWidth = 250
 }) => {
-  // Estilos baseados no padrão EDP - cores suaves e delicadas
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'automatic':
-        return 'bg-gray-200 border-gray-300 text-edp-marine'; // Cinza suave como cards de usuários
-      case 'success':
-        return 'bg-gray-200 border-gray-300 text-edp-marine';
-      case 'warning':
-        return 'bg-gray-200 border-gray-300 text-edp-marine';
-      case 'error':
-        return 'bg-gray-200 border-gray-300 text-edp-marine';
-      default:
-        return 'bg-gray-200 border-gray-300 text-edp-marine';
-    }
-  };
+  // Cor de fundo baseada no variant
+  const bgColor = {
+    automatic: 'bg-gray-100',
+    success: 'bg-emerald-50',
+    warning: 'bg-amber-50',
+    error: 'bg-red-50'
+  }[variant];
 
-  // 🎯 RESPONSIVIDADE INTELIGENTE - baseada na largura do container
-  const getResponsivePadding = () => {
-    // 🎯 PADDING MAIS AGRESSIVO para cards pequenos
-    if (containerWidth < 180) return 'px-1.5 py-1'; // Muito pequeno
-    if (containerWidth < 220) return 'px-2 py-1.5'; // Pequeno
-    if (containerWidth < 260) return 'px-2.5 py-2'; // Médio
-    if (containerWidth < 300) return 'px-3 py-2'; // Médio+
-    return 'px-4 py-2.5'; // Grande
-  };
+  const borderColor = {
+    automatic: 'border-gray-300',
+    success: 'border-emerald-300',
+    warning: 'border-amber-300',
+    error: 'border-red-300'
+  }[variant];
 
-  // 🎯 SISTEMA DINÂMICO INTELIGENTE - Calcula exatamente como os outros cards
-  const getDynamicFontSize = () => {
-    // Escala baseada na largura do container (280px = escala base 1.0)
-    let scaleFactor = containerWidth / 280;
-    scaleFactor = Math.max(scaleFactor, 0.65); // Mínimo 65%
-    scaleFactor = Math.min(scaleFactor, 1.2); // Máximo 120%
-    
-    const baseFontSize = 13; // Tamanho base em px
-    return Math.max(baseFontSize * scaleFactor, 9); // Mínimo 9px
-  };
+  const textColor = {
+    automatic: 'text-gray-700',
+    success: 'text-emerald-700',
+    warning: 'text-amber-700',
+    error: 'text-red-700'
+  }[variant];
 
-  const styles = getVariantStyles();
-  const responsivePadding = getResponsivePadding();
-  const dynamicFontSize = getDynamicFontSize();
-
-  // Performance optimization: Remove debug logging in production
-  React.useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log(`🎯 StatusCard "${title}": containerWidth=${containerWidth}px, fontSize=${dynamicFontSize.toFixed(1)}px`);
-    }
-  }, [containerWidth, dynamicFontSize, title]);
+  // Escala baseada no containerWidth
+  const scale = Math.max(0.6, Math.min(1.4, containerWidth / 250));
+  const fontSize = Math.max(9, Math.min(15, 11 * scale));
+  const paddingY = Math.max(6, Math.min(12, 8 * scale));
+  const paddingX = Math.max(8, Math.min(16, 12 * scale));
 
   return (
-    <div className={`${styles} border rounded-xl shadow-sm backdrop-blur-sm ${responsivePadding} ${className}`}>
-      <div className="text-center">
-        <div 
-          className="font-edp font-bold uppercase tracking-wide leading-tight"
-          style={{ fontSize: `${dynamicFontSize}px` }}
-        >
-          {title}
-        </div>
+    <div
+      className={`${bgColor} ${borderColor} ${textColor} border rounded-lg shadow-sm ${className}`}
+      style={{
+        padding: `${paddingY}px ${paddingX}px`,
+      }}
+    >
+      <div
+        className="font-semibold uppercase tracking-wide text-center leading-snug"
+        style={{ fontSize: `${fontSize}px` }}
+      >
+        {title}
       </div>
     </div>
   );
