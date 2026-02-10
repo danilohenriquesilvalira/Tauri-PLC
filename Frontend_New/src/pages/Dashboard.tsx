@@ -559,7 +559,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col p-4 lg:p-6">
+    <div className="w-full h-full flex flex-col p-4 lg:p-6 max-w-[1800px] mx-auto">
       
       {/* Navegação por Abas + Filtros */}
       <div className="flex-shrink-0 mb-4 lg:mb-6">

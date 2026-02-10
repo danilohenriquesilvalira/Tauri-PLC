@@ -39,12 +39,12 @@ const DEMARCACAO_LATERAL_CONFIG = {
     esquerdo: {
       verticalPercent: 0,        // % da altura (topo = 0)
       widthPercent: 50,          // % da largura total - comprime se não couber
-      heightPercent: 110,        // % da altura total - AUMENTADO para cards maiores
+      heightPercent: 100,        // % da altura total - AJUSTADO para alinhar com vermelho
     },
     direito: {
       verticalPercent: 0,        // % da altura (topo = 0)
       widthPercent: 50,          // % da largura total - comprime se não couber
-      heightPercent: 110,        // % da altura total - AUMENTADO para cards maiores
+      heightPercent: 100,        // % da altura total - AJUSTADO para alinhar com vermelho
     }
   }
 };
@@ -190,7 +190,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       scale = 0.90;
     } else {
       // Base scale: 0.55 para 1920px, crescendo linearmente
-      const baseScale = windowWidth / 1920 * 0.70;
+      const baseScale = windowWidth / 1920 * 1.0;
 
       // Ajuste progressivo: mais agressivo em telas grandes
       if (windowWidth <= 1920) {
@@ -1378,12 +1378,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   left: `50%`, // Centralizado horizontalmente
                   transform: 'translateX(-50%)', // Ajuste de centralização
                   width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
+                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 3) / 100}px` // REDUZIDO para 3%
                 }}
               >
-                <div className={`bg-green-600 border border-green-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
+                <div className={`bg-green-600 border border-green-500 rounded-md w-full h-full flex items-center justify-center ${isMobile ? 'p-1' : 'p-1'}`}>
                   <div className="text-center">
-                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
+                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-[10px]'}`}>
                       PORTA ABERTA
                     </div>
                   </div>
@@ -1399,10 +1399,10 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                   left: `50%`, // Centralizado horizontalmente
                   transform: 'translateX(-50%)', // Ajuste de centralização
                   width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 6) / 100}px` // Mobile: bem menor
+                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 3) / 100}px` // REDUZIDO para 3%
                 }}
               >
-                <div className={`bg-yellow-600 border border-yellow-500 rounded-md w-full ${isMobile ? 'p-1.5' : 'p-3'}`}>
+                <div className={`bg-yellow-600 border border-yellow-500 rounded-md w-full h-full flex items-center justify-center ${isMobile ? 'p-1' : 'p-1'}`}>
                   <div className="text-center">
                     <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                       PORTA FECHADA

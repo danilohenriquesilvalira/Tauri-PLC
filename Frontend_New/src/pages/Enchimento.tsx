@@ -644,16 +644,16 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
 
     // Garante valores mínimos
     baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
-    baseHeight = Math.max(baseHeight, isMobile ? 300 : 500 / aspectRatio);
+    baseHeight = Math.max(baseHeight, (isMobile ? 300 : 500) / aspectRatio);
 
     // ESCALA ULTRA-INTELIGENTE: cresce progressivamente com a tela
     // Em telas pequenas: mínimo 0.55, em telas grandes: até 0.95, em telas ultra-wide: até 1.0
     let scale: number;
     if (isMobile) {
-      scale = 0.90;
+      scale = 0.95;
     } else {
       // Base scale: 0.55 para 1920px, crescendo linearmente
-      const baseScale = windowWidth / 1920 * 0.70;
+      const baseScale = windowWidth / 1920 * 0.85;
 
       // Ajuste progressivo: mais agressivo em telas grandes
       if (windowWidth <= 1920) {
@@ -1066,7 +1066,13 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaVerticalDireitaConfig = valvulaVerticalConfigAtual.direita;
 
   return (
-    <div className="w-full h-auto flex flex-col items-center relative">
+    <div
+      className="w-full h-auto flex flex-col items-center relative"
+      style={{
+        touchAction: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
 
       {/* 📱 PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
       {isMobile && (

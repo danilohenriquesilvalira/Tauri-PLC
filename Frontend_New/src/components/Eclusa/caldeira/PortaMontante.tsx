@@ -21,6 +21,13 @@ export default function PortaMontante({
     return Math.max(0, Math.min(100, websocketValue));
   }, [websocketValue, editMode]);
 
+  // Calcula o movimento proporcional ao height do componente
+  const movimentoVertical = React.useMemo(() => {
+    if (!height) return 0;
+    // 0 = porta embaixo, 100 = porta SOBE (em cima)
+    return ((100 - displayAbertura) / 100) * (height * 0.25);
+  }, [displayAbertura, height]);
+
   return (
     <div className="w-full h-full"
       style={{
@@ -34,7 +41,7 @@ export default function PortaMontante({
           <div
             className="w-full h-full"
             style={{
-              transform: `translateY(${(displayAbertura / 100) * 90}px)`, // Movimento vertical ampliado
+              transform: `translateY(${movimentoVertical}px)`, // Movimento vertical PROPORCIONAL
               transition: 'transform 0.8s ease-in-out', // Animação suave
             }}
           >

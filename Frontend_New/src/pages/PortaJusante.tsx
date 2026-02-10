@@ -180,7 +180,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = ({ sidebarOpen = true }) => {
       scale = 0.90;
     } else {
       // Base scale: 0.55 para 1920px, crescendo linearmente
-      const baseScale = windowWidth / 1920 * 0.70;
+      const baseScale = windowWidth / 1920 * 1.0;
 
       // Ajuste progressivo: mais agressivo em telas grandes
       if (windowWidth <= 1920) {

@@ -20,16 +20,18 @@ import { Card } from '../components/ui/Card';
 import { StatusCard } from '../components/ui/StatusCard';
 
 // 🎯 CONFIGURAÇÕES DOS COMPONENTES DE NÍVEL - Separação Desktop/Mobile
+// ✅ CORRIGIDO: vertical/height agora são % de baseHeight (não maxWidth)
+// Conversão desktop: valor antigo / 0.7. Mobile: mesmo que desktop para posição fixa.
 const NIVEL_CONFIG = {
   caldeira: {
     desktop: {
-      verticalPercent: 37.3,  // % da altura da caldeira (posição Y)
-      horizontalPercent: 25.3, // % da largura da caldeira (posição X)
+      verticalPercent: 37.3,  // % da altura da caldeira (posição Y) - relativo ao SVG caldeira
+      horizontalPercent: 25.4, // % da largura da caldeira (posição X)
       widthPercent: 58.8,     // % da largura da caldeira (tamanho)
       heightPercent: 54.4,    // % da altura da caldeira (tamanho)
     },
     mobile: {
-      verticalPercent: 38.5,  // Ajuste para mobile
+      verticalPercent: 38.5,
       horizontalPercent: 22.0,
       widthPercent: 68.0,
       heightPercent: 58.0,
@@ -37,187 +39,193 @@ const NIVEL_CONFIG = {
   },
   jusante: {
     desktop: {
-      verticalPercent: 35.9,  // Posicionado na parte inferior
-      horizontalPercent: 77, // Lado direito
-      widthPercent: 16,     // Largura ajustada
-      heightPercent: 4      // Altura ajustada
+      verticalPercent: 51.3,  // Convertido: 35.9 / 0.7
+      horizontalPercent: 84,
+      widthPercent: 16,
+      heightPercent: 5.7      // Convertido: 4 / 0.7
     },
     mobile: {
-      verticalPercent: 42.0,
+      verticalPercent: 51.3,  // Mesmo que desktop - posição fixa
       horizontalPercent: 83.0,
       widthPercent: 14.0,
-      heightPercent: 10.0
+      heightPercent: 8.0
     }
   },
   montante: {
     desktop: {
-      verticalPercent: 28,  // Posicionado na parte superior esquerda
-      horizontalPercent: -7, // Lado esquerdo
-      widthPercent: 25.4,     // Largura ajustada
-      heightPercent: 10,    // Altura ajustada
+      verticalPercent: 40.1,  // Convertido: 28 / 0.7
+      horizontalPercent: 0,
+      widthPercent: 25.5,
+      heightPercent: 14.3,    // Convertido: 10 / 0.7
     },
     mobile: {
-      verticalPercent: 28.0,
-      horizontalPercent: 1.0,
-      widthPercent: 22.0,
-      heightPercent: 14.0,
+      verticalPercent: 40.1,  // Mesmo que desktop - posição fixa
+      horizontalPercent: 1.5,
+      widthPercent: 25,
+      heightPercent: 14.3,
     }
   }
 };
 
 // 🚪 CONFIGURAÇÕES DOS COMPONENTES DE PORTA - Separação Desktop/Mobile
+// ✅ CORRIGIDO: vertical/height agora são % de baseHeight
 const PORTA_CONFIG = {
   jusante: {
     desktop: {
-      verticalPercent: 27.1,    // % da altura total (posição Y)
-      horizontalPercent: 72.6,  // % da largura total (posição X)
-      widthPercent: 5,          // % da largura total (tamanho)
-      heightPercent: 16,        // % da altura total (tamanho)
+      verticalPercent: 38.7,    // Convertido: 27.1 / 0.7
+      horizontalPercent: 72.6,
+      widthPercent: 5,
+      heightPercent: 22.9,      // Convertido: 16 / 0.7
     },
     mobile: {
-      verticalPercent: 28.0,
-      horizontalPercent: 76.5,
+      verticalPercent: 0,    // Mesmo que desktop - posição fixa
+      horizontalPercent: 0,
       widthPercent: 10,
-      heightPercent: 18,
+      heightPercent: 22.9,
     }
   },
   montante: {
     desktop: {
-      verticalPercent: 21.6,  // % da altura total (posição Y)
-      horizontalPercent: 18.3, // % da largura total (posição X)
-      widthPercent: 1.5,      // % da largura total (tamanho)
-      heightPercent: 18,      // % da altura total (tamanho)
+      verticalPercent: 31,    // Ajustado para manter posição fixa
+      horizontalPercent: 25.5,
+      widthPercent: 1.5,
+      heightPercent: 25.7,
     },
     mobile: {
-      verticalPercent: 16.0,
-      horizontalPercent: 24.0,
+      verticalPercent: 38.0,    // Mesmo que desktop - posição fixa
+      horizontalPercent: 18.3,
       widthPercent: 2.5,
-      heightPercent: 16,
+      heightPercent: 25.7,
     }
   }
 };
 
 // 🚦 CONFIGURAÇÕES DOS SEMÁFOROS - Separação Desktop/Mobile
+// ✅ CORRIGIDO: vertical/height agora são % de baseHeight
 const SEMAFORO_CONFIG = {
   semaforo1: {
     desktop: {
-      verticalPercent: 22.0,  // Parte superior
-      horizontalPercent: 10, // Esquerda
-      widthPercent: 3.5,        // Tamanho ajustado
-      heightPercent: 4.0,      // Altura ajustada
+      verticalPercent: 31.8,  // Convertido: 22.0 / 0.7
+      horizontalPercent: 15,
+      widthPercent: 3.5,
+      heightPercent: 5.7,     // Convertido: 4.0 / 0.7
     },
     mobile: {
-      verticalPercent: 12.0,
+      verticalPercent: 31.4,  // Mesmo que desktop - posição fixa
       horizontalPercent: 20.0,
       widthPercent: 4.5,
-      heightPercent: 4.0,
+      heightPercent: 5.7,
     }
   },
   semaforo2: {
     desktop: {
-      verticalPercent: 22.8,  // Ligeiramente abaixo
-      horizontalPercent: 30, // Centro-esquerda
-      widthPercent: 3.5,        // Tamanho ajustado
-      heightPercent: 4.0,      // Altura ajustada
+      verticalPercent: 32.6,  // Convertido: 22.8 / 0.7
+      horizontalPercent: 30,
+      widthPercent: 3.5,
+      heightPercent: 5.7,
     },
     mobile: {
-      verticalPercent: 14.0,
+      verticalPercent: 32.6,
       horizontalPercent: 36.0,
       widthPercent: 4.5,
-      heightPercent: 4.0,
+      heightPercent: 5.7,
     }
   },
   semaforo3: {
     desktop: {
-      verticalPercent: 22.8,  // Mesmo nível do 2
-      horizontalPercent: 50, // Centro-direita
-      widthPercent: 3.5,        // Tamanho ajustado
-      heightPercent: 4.0,      // Altura ajustada
+      verticalPercent: 32.6,  // Convertido: 22.8 / 0.7
+      horizontalPercent: 50,
+      widthPercent: 3.5,
+      heightPercent: 5.7,
     },
     mobile: {
-      verticalPercent: 14.0,
+      verticalPercent: 32.6,
       horizontalPercent: 63.0,
       widthPercent: 4.5,
-      heightPercent: 4.0,
+      heightPercent: 5.7,
     }
   },
   semaforo4: {
     desktop: {
-      verticalPercent: 22.4,  // Parte superior
-      horizontalPercent: 80.0, // Direita
-      widthPercent: 3.5,        // Tamanho ajustado
-      heightPercent: 4.0,      // Altura ajustada
+      verticalPercent: 32.0,  // Convertido: 22.4 / 0.7
+      horizontalPercent: 80.0,
+      widthPercent: 3.5,
+      heightPercent: 5.7,
     },
     mobile: {
-      verticalPercent: 12.0,
+      verticalPercent: 32.0,
       horizontalPercent: 82.0,
       widthPercent: 4.5,
-      heightPercent: 6.0,
+      heightPercent: 5.7,
     }
   }
 };
 
 // 🏗️ CONFIGURAÇÃO DA BASE PORTA JUSANTE - Separação Desktop/Mobile
+// ✅ CORRIGIDO: vertical/height agora são % de baseHeight
 const BASE_PORTA_JUSANTE_CONFIG = {
   desktop: {
-    verticalPercent: 26.8,    // Posicionado no meio-inferior
-    horizontalPercent: 57.2,  // Centro horizontal
-    widthPercent: 40,       // Largura reduzida
-    heightPercent: 13.4,      // Altura reduzida
+    verticalPercent: 38.3,    // Convertido: 26.8 / 0.7
+    horizontalPercent: 57.2,
+    widthPercent: 40,
+    heightPercent: 19.1,      // Convertido: 13.4 / 0.7
   },
   mobile: {
-    verticalPercent: 37.0,
+    verticalPercent: 38.3,    // Mesmo que desktop - posição fixa
     horizontalPercent: 46.0,
     widthPercent: 55,
-    heightPercent: 22.0,
+    heightPercent: 19.1,
   }
 };
 
 // 🔧 CONFIGURAÇÃO DA TUBULAÇÃO E VÁLVULAS - Separação Desktop/Mobile
+// ✅ CORRIGIDO: vertical/height agora são % de baseHeight
 const TUBULACAO_CONFIG = {
   desktop: {
-    verticalPercent: 34.7,    // Parte inferior
-    horizontalPercent: 0,   // Margem esquerda
-    widthPercent: 90,       // Largura total
-    heightPercent: 15,      // Altura ajustada
+    verticalPercent: 49.6,    // Convertido: 34.7 / 0.7
+    horizontalPercent: 6,
+    widthPercent: 90,
+    heightPercent: 21.4,      // Convertido: 15 / 0.7
   },
   mobile: {
-    verticalPercent: 52.0,
+    verticalPercent: 49.6,    // Mesmo que desktop - posição fixa
     horizontalPercent: 3,
     widthPercent: 94,
-    heightPercent: 18,
+    heightPercent: 21.4,
   }
 };
 
 // 🏢 CONFIGURAÇÃO DA CALDEIRA_ECLUSA.SVG (SVG Principal) - Separação Desktop/Mobile
+// ✅ CORRIGIDO: verticalPercent agora é % de baseHeight (não maxWidth)
 const CALDEIRA_ECLUSA_CONFIG = {
   desktop: {
-    verticalPercent: 20,    // Posição vertical baseada no maxWidth (30% da largura)
-    horizontalPercent: 43,  // Centro horizontal
-    widthPercent: 100,         // 85% da largura disponível
-    heightPercent: 100,       // Altura calculada pelo aspect ratio
+    verticalPercent: 28.6,    // Convertido: 20 / 0.7
+    horizontalPercent: 50,
+    widthPercent: 100,
+    heightPercent: 100,
   },
   mobile: {
-    verticalPercent:90,    // Posição vertical ajustada para mobile
-    horizontalPercent: 50.0,  // Centro horizontal
-    widthPercent: 97.2,         // 95% da largura no mobile
-    heightPercent: 100,       // Altura calculada pelo aspect ratio
+    verticalPercent: 28.6,    // Mesmo que desktop - posição fixa (era 90 - overflow!)
+    horizontalPercent: 50.0,
+    widthPercent: 97.2,
+    heightPercent: 100,
   }
 };
 
-// 🧱 CONFIGURAÇÃO DA PAREDE_ECLUSA.SVG (SVG Principal) - Separação Desktop/Mobile  
+// 🧱 CONFIGURAÇÃO DA PAREDE_ECLUSA.SVG (SVG Principal) - Separação Desktop/Mobile
+// ✅ CORRIGIDO: verticalPercent agora é % de baseHeight
 const PAREDE_ECLUSA_CONFIG = {
   desktop: {
-    verticalPercent: 30,    // Posição abaixo da caldeira (45% da largura)
-    horizontalPercent: 43,  // Centro horizontal
-    widthPercent: 100.60,         // 90% da largura disponível
-    heightPercent: 100.0,       // Altura calculada pelo aspect ratio
+    verticalPercent: 42.9,    // Convertido: 30 / 0.7
+    horizontalPercent: 50,
+    widthPercent: 100.60,
+    heightPercent: 100.0,
   },
   mobile: {
-    verticalPercent: 100,    // Posição ajustada para mobile
-    horizontalPercent: 50.0,  // Centro horizontal
-    widthPercent: 98,         // 98% da largura no mobile
-    heightPercent: 100,       // Altura calculada pelo aspect ratio
+    verticalPercent: 42.9,    // Mesmo que desktop - posição fixa (era 100 - overflow!)
+    horizontalPercent: 50.0,
+    widthPercent: 98,
+    heightPercent: 100,
   }
 };
 
@@ -426,60 +434,87 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
 
 
 
-  // 🚀 MEMOIZAR DIMENSÕES - SISTEMA PROGRESSIVO PADRONIZADO (igual PortaJusante/Montante/Enchimento)
+  // 🚀 MEMOIZAR DIMENSÕES - SISTEMA CORRIGIDO COM baseHeight
+  // ✅ Padrão PortaJusante: baseWidth para horizontal, baseHeight para vertical
   const dimensions = React.useMemo(() => {
     // 📏 Aspect Ratios dos SVGs
     const caldeiraAspectRatio = 1168 / 253;
     const paredeAspectRatio = 1175 / 205;
-    
+
+    // 📐 Aspect ratio do layout Eclusa (largura:altura = 10:7)
+    const layoutAspectRatio = 10 / 7;
+
     // 🎯 CÁLCULO PROGRESSIVO DE ESCALA (padrão das outras páginas)
     let scale: number;
-    
+
     if (isMobile) {
-      scale = 0.90;
+      scale = 1.20;
     } else {
       if (windowWidth <= 1920) {
-        // Ajuste: escala mínima maior (0.65 ao invés de 0.55) para não diminuir tanto
-        scale = Math.max(0.65, (windowWidth / 1920) * 0.75);
+        scale = Math.max(0.75, (windowWidth / 1920) * 1.20);
       } else if (windowWidth <= 2560) {
-        scale = 0.75 + ((windowWidth - 1920) / 640) * 0.15;
+        scale = 0.85 + ((windowWidth - 1920) / 640) * 0.15;
       } else if (windowWidth <= 3840) {
-        scale = 0.90 + ((windowWidth - 2560) / 1280) * 0.08;
+        scale = 1.00 + ((windowWidth - 2560) / 1280) * 0.08;
       } else {
-        scale = Math.min(0.98, 0.98 + ((windowWidth - 3840) / 1920) * 0.00);
+        scale = Math.min(1.08, 1.08);
       }
     }
-    
-    // 📐 Cálculo de largura disponível e dimensões
+
+    // 📐 Cálculo com aspect ratio fixo (padrão PortaJusante)
     const sidebarWidth = 64;
-    const availableWidth = windowWidth - sidebarWidth;
-    const baseWidth = availableWidth * scale;
-    const maxWidth = baseWidth;
+    const availableWidth = windowWidth - sidebarWidth - 32;
+    const availableHeight = window.innerHeight - (isMobile ? 180 : 100);
+
+    let baseWidth: number;
+    let baseHeight: number;
+
+    const widthBasedHeight = availableWidth / layoutAspectRatio;
+
+    if (widthBasedHeight <= availableHeight) {
+      baseWidth = availableWidth;
+      baseHeight = baseWidth / layoutAspectRatio;
+    } else {
+      baseHeight = availableHeight;
+      baseWidth = baseHeight * layoutAspectRatio;
+    }
+
+    // Garante valores mínimos
+    baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
+    baseHeight = Math.max(baseHeight, isMobile ? 210 : 350);
+
+    const scaledWidth = baseWidth * scale;
+    const scaledHeight = baseHeight * scale;
 
     return {
       caldeiraAspectRatio,
       paredeAspectRatio,
-      maxWidth,
-      baseWidth,
+      maxWidth: scaledWidth,
+      baseWidth: scaledWidth,
+      baseHeight: scaledHeight,
       scale,
-      shouldRender: maxWidth > 100
+      shouldRender: scaledWidth > 100 && scaledHeight > 100
     };
   }, [windowWidth, isMobile]);
 
-  const { caldeiraAspectRatio, paredeAspectRatio, maxWidth, shouldRender } = dimensions;
-
-  // Altura base para os cards (70% da largura como no container principal)
-  const baseHeight = maxWidth * 0.7;
+  const { caldeiraAspectRatio, paredeAspectRatio, maxWidth, baseHeight, shouldRender } = dimensions;
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-start pt-4 relative overflow-hidden">
+    <div
+      className="w-full h-auto flex flex-col items-center relative"
+      style={{
+        overflow: 'hidden',
+        touchAction: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
 
-      {/* 📱 PAINEL MOBILE - POSICIONADO NO TOPO (IGUAL OUTRAS PÁGINAS) */}
+      {/* 📱 PAINEL MOBILE - FLOW-BASED (padrão PortaJusante) */}
       {isMobile && (
         <div
-          className="absolute top-0 left-0 right-0 z-20 pt-4"
+          className="w-full mt-4 mb-4 relative"
           style={{
-            padding: `16px ${Math.max(6, Math.min(16, windowWidth * 0.02))}px`
+            padding: `0 ${Math.max(6, Math.min(16, windowWidth * 0.02))}px`
           }}
         >
           <div
@@ -605,7 +640,8 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             className="relative w-full flex flex-col items-center"
             style={{
               maxWidth: `${maxWidth}px`,
-              height: `${maxWidth * 0.7}px` // Altura proporcional ao maxWidth (70% da largura)
+              height: `${baseHeight}px`,
+              minHeight: `${baseHeight}px`
             }}
           >
             
@@ -809,7 +845,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute cursor-pointer"
               style={{
-                top: `${(maxWidth * caldeiraEclusaConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * caldeiraEclusaConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * caldeiraEclusaConfig.horizontalPercent) / 100}px`,
                 transform: `translateX(-50%)`,
                 width: `${(maxWidth * caldeiraEclusaConfig.widthPercent) / 100}px`,
@@ -838,7 +874,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * paredeEclusaConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * paredeEclusaConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * paredeEclusaConfig.horizontalPercent) / 100}px`,
                 transform: `translateX(-50%)`,
                 width: `${(maxWidth * paredeEclusaConfig.widthPercent) / 100}px`,
@@ -871,7 +907,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${((maxWidth * caldeiraEclusaConfig.verticalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100) / caldeiraAspectRatio * caldeiraConfig.verticalPercent) / 100}px`,
+                top: `${((baseHeight * caldeiraEclusaConfig.verticalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100) / caldeiraAspectRatio * caldeiraConfig.verticalPercent) / 100}px`,
                 left: `${((maxWidth * caldeiraEclusaConfig.horizontalPercent) / 100) + (((maxWidth * caldeiraEclusaConfig.widthPercent) / 100 * caldeiraConfig.horizontalPercent) / 100) - ((maxWidth * caldeiraEclusaConfig.widthPercent) / 200)}px`,
                 width: `${((maxWidth * caldeiraEclusaConfig.widthPercent) / 100 * caldeiraConfig.widthPercent) / 100}px`,
                 height: `${(((maxWidth * caldeiraEclusaConfig.widthPercent) / 100) / caldeiraAspectRatio * caldeiraConfig.heightPercent) / 100}px`,
@@ -890,10 +926,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * jusanteConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * jusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * jusanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * jusanteConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * jusanteConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * jusanteConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout',
                 willChange: 'transform'
@@ -909,10 +945,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * montanteConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * montanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * montanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * montanteConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * montanteConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * montanteConfig.heightPercent) / 100}px`,
                 zIndex: 10,
                 contain: 'layout',
                 willChange: 'transform'
@@ -928,10 +964,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * portaJusanteConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * portaJusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * portaJusanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * portaJusanteConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * portaJusanteConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * portaJusanteConfig.heightPercent) / 100}px`,
                 zIndex: 18,
                 contain: 'layout',
                 willChange: 'transform'
@@ -947,10 +983,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * portaMontanteConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * portaMontanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * portaMontanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * portaMontanteConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * portaMontanteConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * portaMontanteConfig.heightPercent) / 100}px`,
                 zIndex: 18,
                 contain: 'layout',
                 willChange: 'transform'
@@ -959,6 +995,8 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               <PortaMontante
                 websocketValue={portaMontanteValue}
                 editMode={false}
+                width={(maxWidth * portaMontanteConfig.widthPercent) / 100}
+                height={(baseHeight * portaMontanteConfig.heightPercent) / 100}
               />
             </div>
 
@@ -966,10 +1004,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * semaforo1Config.verticalPercent) / 100}px`,
+                top: `${(baseHeight * semaforo1Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo1Config.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * semaforo1Config.widthPercent) / 100}px`,
-                height: `${(maxWidth * semaforo1Config.heightPercent) / 100}px`,
+                height: `${(baseHeight * semaforo1Config.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -984,10 +1022,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * semaforo2Config.verticalPercent) / 100}px`,
+                top: `${(baseHeight * semaforo2Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo2Config.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * semaforo2Config.widthPercent) / 100}px`,
-                height: `${(maxWidth * semaforo2Config.heightPercent) / 100}px`,
+                height: `${(baseHeight * semaforo2Config.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1002,10 +1040,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * semaforo3Config.verticalPercent) / 100}px`,
+                top: `${(baseHeight * semaforo3Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo3Config.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * semaforo3Config.widthPercent) / 100}px`,
-                height: `${(maxWidth * semaforo3Config.heightPercent) / 100}px`,
+                height: `${(baseHeight * semaforo3Config.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1020,10 +1058,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * semaforo4Config.verticalPercent) / 100}px`,
+                top: `${(baseHeight * semaforo4Config.verticalPercent) / 100}px`,
                 left: `${(maxWidth * semaforo4Config.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * semaforo4Config.widthPercent) / 100}px`,
-                height: `${(maxWidth * semaforo4Config.heightPercent) / 100}px`,
+                height: `${(baseHeight * semaforo4Config.heightPercent) / 100}px`,
                 zIndex: 15
               }}
             >
@@ -1038,10 +1076,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * basePortaJusanteConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * basePortaJusanteConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * basePortaJusanteConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * basePortaJusanteConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * basePortaJusanteConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * basePortaJusanteConfig.heightPercent) / 100}px`,
                 zIndex: 18 // Por cima dos níveis (zIndex: 10)
               }}
             >
@@ -1065,10 +1103,10 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             <div
               className="absolute"
               style={{
-                top: `${(maxWidth * tubulacaoConfig.verticalPercent) / 100}px`,
+                top: `${(baseHeight * tubulacaoConfig.verticalPercent) / 100}px`,
                 left: `${(maxWidth * tubulacaoConfig.horizontalPercent) / 100}px`,
                 width: `${(maxWidth * tubulacaoConfig.widthPercent) / 100}px`,
-                height: `${(maxWidth * tubulacaoConfig.heightPercent) / 100}px`,
+                height: `${(baseHeight * tubulacaoConfig.heightPercent) / 100}px`,
                 zIndex: 20,
                 contain: 'layout',
                 willChange: 'transform'
