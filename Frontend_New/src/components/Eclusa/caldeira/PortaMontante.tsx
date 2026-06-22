@@ -4,15 +4,13 @@ import React from 'react';
 interface PortaMontanteProps {
   editMode?: boolean;
   websocketValue?: number | null;
-  width?: number;
-  height?: number;
+  instant?: boolean; // true quando o valor já chega suavemente interpolado (ex: simulação) - desativa a transição CSS
 }
 
 export default function PortaMontante({
   editMode = false,
   websocketValue = null,
-  width,
-  height
+  instant = false
 }: PortaMontanteProps) {
   // Calcula abertura diretamente do websocketValue - SEM useState para evitar animação no primeiro render
   const displayAbertura = React.useMemo(() => {
@@ -21,39 +19,32 @@ export default function PortaMontante({
     return Math.max(0, Math.min(100, websocketValue));
   }, [websocketValue, editMode]);
 
-  // Calcula o movimento proporcional ao height do componente
-  const movimentoVertical = React.useMemo(() => {
-    if (!height) return 0;
-    // 0 = porta embaixo, 100 = porta SOBE (em cima)
-    return ((100 - displayAbertura) / 100) * (height * 0.25);
-  }, [displayAbertura, height]);
+  // Deslocamento em UNIDADES DO VIEWBOX (não % CSS, não px de HTML) - o transform é
+  // aplicado diretamente no <g> do SVG, na sua própria coordenada interna. Isto evita
+  // por completo a resolução de altura percentual em cascata dentro do foreignObject,
+  // que o Safari/WebKit (iOS) resolve de forma diferente do Chrome/Blink.
+  // 0 = porta embaixo (fechada), 100 = porta SOBE até o topo (aberta). Altura do viewBox = 102.
+  const movimentoVerticalUnits = React.useMemo(() => {
+    return ((100 - displayAbertura) / 100) * (102 * 0.25);
+  }, [displayAbertura]);
 
   return (
-    <div className="w-full h-full"
-      style={{
-        width: width ? `${width}px` : '100%',
-        height: height ? `${height}px` : '100%'
-      }}
-    >
-      <div className="w-full h-full flex flex-col items-center justify-center">
-        {/* Container da Porta - igual aos outros componentes */}
-        <div className="relative flex-1 flex items-center justify-center w-full h-full">
-          <div
-            className="w-full h-full"
-            style={{
-              transform: `translateY(${movimentoVertical}px)`, // Movimento vertical PROPORCIONAL
-              transition: 'transform 0.8s ease-in-out', // Animação suave
-            }}
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 16 102"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              preserveAspectRatio="xMidYMid meet"
-              className="w-full h-full"
-            >
+    <div className="w-full h-full">
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 16 102"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet"
+        className="w-full h-full"
+      >
+        <g
+          style={{
+            transform: `translateY(${movimentoVerticalUnits}px)`, // px aqui = unidades do viewBox (contexto SVG), não píxeis CSS
+            transition: instant ? 'none' : 'transform 0.8s ease-in-out', // CSS só suaviza updates esparsos do PLC real
+          }}
+        >
               <path
                 fillRule="evenodd"
                 clipRule="evenodd"
@@ -187,10 +178,8 @@ export default function PortaMontante({
                   <stop offset="0.93" stopColor="#302A31"/>
                 </linearGradient>
               </defs>
-            </svg>
-          </div>
-        </div>
-      </div>
+        </g>
+      </svg>
     </div>
   );
 }

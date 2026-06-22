@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePLC } from '../contexts/PLCContext';
+import { useNav } from '../contexts/NavContext';
 import ContraPeso20t from '../components/Porta_Montante/Porta_Montante_Contrapeso';
 import PortaMontanteRegua from '../components/Porta_Montante/PortaMontanteRegua';
 import MotorMontante from '../components/Porta_Montante/Motor_Montante';
@@ -14,9 +15,7 @@ import {
   ArrowDownIcon,
   EyeIcon,
   ShieldCheckIcon,
-  XMarkIcon,
-  ChevronUpIcon,
-  ChevronDownIcon
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 // Declaração global para window.lastContrapesoTime
@@ -49,101 +48,59 @@ const DEMARCACAO_LATERAL_CONFIG = {
   }
 };
 
-// 🏗️ CONFIGURAÇÃO DOS CONTRAPESOS E RÉGUA - SEPARADO MOBILE/DESKTOP
-const CONTRAPESO_CONFIG = {
-  desktop: {
-    direito: {
-      verticalPercent: 40.5,    // % da altura total (posição Y)
-      horizontalPercent: 41.5,  // % da largura total (posição X)
-      widthPercent: 100,          // % da largura total (tamanho)
-      heightPercent: 60,        // % da altura total (tamanho)
-    },
-    esquerdo: {
-      verticalPercent: 40.5,    // % da altura total (posição Y)
-      horizontalPercent: -41.1,  // % da largura total (posição X)
-      widthPercent: 100,          // % da largura total (tamanho)
-      heightPercent: 60,        // % da altura total (tamanho)
-    }
-  },
-  mobile: {
-    direito: {
-      verticalPercent: 34.8,    // % da altura total (posição Y) - mesmo que desktop
-      horizontalPercent: 83,  // % da largura total (posição X) - ajustado para mobile
-      widthPercent: 8,          // % da largura total (tamanho)
-      heightPercent: 60,        // % da altura total (tamanho)
-    },
-    esquerdo: {
-      verticalPercent: 34.8,    // % da altura total (posição Y) - mesmo que desktop
-      horizontalPercent: 9.6,  // % da largura total (posição X) - ajustado para mobile
-      widthPercent: 8,          // % da largura total (tamanho)
-      heightPercent: 60,        // % da altura total (tamanho)
-    }
-  }
-};
+// 🗺️ CANVAS ÚNICO DE COORDENADAS FIXAS (estilo WinCC: viewBox fixo, o SVG
+// escala como um todo pra caber em qualquer tela). Sem mais tabela
+// mobile/desktop separada - posição relativa é sempre a mesma.
+// Base_Porta_Montante.svg tem 1075 x 1098, então o canvas usa essa proporção.
+const VIEWBOX_W = 1075;
+const VIEWBOX_H = 1098;
 
-// 📏 CONFIGURAÇÃO DA RÉGUA PORTA MONTANTE - SEPARADO MOBILE/DESKTOP
-const REGUA_CONFIG = {
-  desktop: {
-    verticalPercent: 22.8,      // % da altura total (posição Y)
-    horizontalPercent: 0,    // % da largura total (posição X) - VOLTA POSIÇÃO ORIGINAL
-    widthPercent: 100,      // % da largura total (tamanho) +34% (57.02 * 1.02)
-    heightPercent: 72.3,     // % da altura total (tamanho) +34% (70.59 * 1.02)
-  },
-  mobile: {
-    verticalPercent: 7,      // % da altura total (posição Y)
-    horizontalPercent: 22.5,    // % da largura total (posição X) - ajustado para mobile
-    widthPercent: 55.4,      // % da largura total (tamanho) +34% (65.17 * 1.02)
-    heightPercent: 100,    // % da altura total (tamanho) +34% (112.68 * 1.02)
-  }
+const LAYOUT = {
+  base: { x: 0, y: 0, width: 1075, height: 1098 },
+  contrapesoDireito: { x: 446, y: 445, width: 1075, height: 659 },
+  contrapesoEsquerdo: { x: -442, y: 445, width: 1075, height: 659 },
+  regua: { x: 0, y: 250, width: 1075, height: 794 },
+  motorDireito: { x: 452, y: 52, width: 1075, height: 77 },
+  motorEsquerdo: { x: -452, y: 52, width: 1075, height: 77 },
+  portaAberta: { x: 452, y: 55, width: 172, height: 33 },
+  portaFechada: { x: 452, y: 1010, width: 172, height: 33 }
 };
 
 
-// ⚙️ CONFIGURAÇÃO DOS MOTORES PORTA MONTANTE - SEPARADO MOBILE/DESKTOP
-const MOTOR_CONFIG = {
-  desktop: {
-    direito: {
-      verticalPercent: 4.7,      // % da altura total (posição Y)
-      horizontalPercent: 42,    // % da largura total (posição X)
-      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
-    },
-    esquerdo: {
-      verticalPercent: 4.7,      // % da altura total (posição Y)
-      horizontalPercent: -42,    // % da largura total (posição X)
-      widthPercent: 100,        // % da largura total (tamanho) - 45% menor
-      heightPercent: 7,       // % da altura total (tamanho) - 45% menor
-    }
-  },
-  mobile: {
-    direito: {
-      verticalPercent: 0,      // % da altura total (posição Y)
-      horizontalPercent: 81.5,    // % da largura total (posição X)
-      widthPercent: 13.5,       // % da largura total (tamanho) - 10% menor
-      heightPercent: 16.2,      // % da altura total (tamanho) - 10% menor
-    },
-    esquerdo: {
-      verticalPercent: 0,      // % da altura total (posição Y)
-      horizontalPercent: 5,    // % da largura total (posição X)
-      widthPercent: 13.5,       // % da largura total (tamanho) - 10% menor
-      heightPercent: 16.2,      // % da altura total (tamanho) - 10% menor
-    }
-  }
-};
-
-
-const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => {
+const PortaMontante: React.FC<PortaMontanteProps> = () => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  // 🎯 LARGURA DO SIDEBAR - Aberto: 256px (w-64), Fechado: 64px (w-16)
-  const sidebarWidth = sidebarOpen ? 256 : 64;
+  // Sem sidebar lateral - navegação é uma barra de botões fixa na base
+  const sidebarWidth = 0;
+
+  // 📐 Mede o espaço REALMENTE disponível (o próprio containerRef, que é
+  // "flex-1" dentro de um root h-full) em vez de adivinhar
+  // "window.innerHeight - 100". Assim o diagrama se ajusta certo em
+  // qualquer tela/notebook/zoom, sem depender de nenhum valor fixo chutado.
+  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
+
+  React.useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => setContainerSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const [windowWidth, setWindowWidth] = React.useState(() => {
     if (typeof window !== 'undefined') return window.innerWidth;
     return 1920;
   });
-  
+
   const [menuParametrosOpen, setMenuParametrosOpen] = React.useState(false);
   const [mobileCardsOpen, setMobileCardsOpen] = React.useState(false);
+  const { setParamAction } = useNav();
+  React.useEffect(() => {
+    setParamAction(() => setMenuParametrosOpen(true));
+    return () => setParamAction(null);
+  }, [setParamAction]);
 
   // ============================================
   // SISTEMA DE COORDENADAS UNIFICADO
@@ -161,9 +118,10 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     // Aspect ratio original da Porta Montante (1075 x 1098)
     const aspectRatio = 1075 / 1098;
 
-    // Calcula o espaço disponível - EXPANSÃO TOTAL PARA TELAS GRANDES
-    const availableWidth = windowWidth - 32; // Sem limite de 1920px
-    const availableHeight = window.innerHeight - 100;
+    // Espaço REALMENTE disponível, medido no DOM (containerSize), com
+    // fallback pra primeira renderização (antes do ResizeObserver disparar).
+    const availableWidth = containerSize.width > 0 ? containerSize.width : windowWidth - 32;
+    const availableHeight = containerSize.height > 0 ? containerSize.height : window.innerHeight - 160;
 
     // Determina o tamanho máximo mantendo aspect ratio
     let baseWidth: number;
@@ -183,46 +141,22 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     baseWidth = Math.max(baseWidth, isMobile ? 300 : 500);
     baseHeight = Math.max(baseHeight, isMobile ? 300 : 500);
 
-    // ESCALA ULTRA-INTELIGENTE: cresce progressivamente com a tela
-    // Em telas pequenas: mínimo 0.55, em telas grandes: até 0.95, em telas ultra-wide: até 1.0
-    let scale: number;
-    if (isMobile) {
-      scale = 0.90;
-    } else {
-      // Base scale: 0.55 para 1920px, crescendo linearmente
-      const baseScale = windowWidth / 1920 * 1.0;
+    // Sem multiplicador de escala extra: o cálculo acima já preenche o
+    // espaço disponível (largura OU altura, o que limitar primeiro).
+    // Aplicar outro fator por cima desalinhava o tamanho final do espaço
+    // real, deixando sobra em branco em telas grandes.
 
-      // Ajuste progressivo: mais agressivo em telas grandes
-      if (windowWidth <= 1920) {
-        scale = Math.max(0.55, baseScale);
-      } else if (windowWidth <= 2560) {
-        // De 1920px a 2560px: de 0.70 até 0.85
-        scale = 0.70 + ((windowWidth - 1920) / (2560 - 1920)) * 0.15;
-      } else if (windowWidth <= 3840) {
-        // De 2560px a 3840px: de 0.85 até 0.95
-        scale = 0.85 + ((windowWidth - 2560) / (3840 - 2560)) * 0.10;
-      } else {
-        // Acima de 3840px: até 0.98 (quase tela cheia)
-        scale = Math.min(0.98, 0.95 + ((windowWidth - 3840) / 1920) * 0.03);
-      }
-    }
-
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-
-    // Adicionar maxWidth igual à PortaJusante
-    const containerWidth = Math.min(windowWidth - 32, 1920);
-    const maxWidth = Math.max(containerWidth, 300);
+    const maxWidth = Math.max(availableWidth, 300);
 
     return {
       isMobile,
       maxWidth,
-      baseWidth: scaledWidth,
-      baseHeight: scaledHeight,
-      alturaTotal: scaledHeight,
-      shouldRender: scaledWidth > 100 && scaledHeight > 100
+      baseWidth,
+      baseHeight,
+      alturaTotal: baseHeight,
+      shouldRender: baseWidth > 100 && baseHeight > 100
     };
-  }, [windowWidth]);
+  }, [windowWidth, containerSize]);
 
   // Desestruturar para uso
   const { isMobile, maxWidth, baseWidth, baseHeight, alturaTotal, shouldRender } = dimensions;
@@ -348,16 +282,6 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
     }
   }, [contrapesoDirecto, contrapesoEsquerdo, contrapesoDirectoRaw, contrapesoEsquerdoRaw]);
 
-  // Configuração responsiva SIMPLES - igual outros componentes
-  const configAtual = isMobile ? CONTRAPESO_CONFIG.mobile : CONTRAPESO_CONFIG.desktop;
-  const contrapesoDireitoConfig = configAtual.direito;
-  const contrapesoEsquerdoConfig = configAtual.esquerdo;
-
-  const reguaConfigAtual = isMobile ? REGUA_CONFIG.mobile : REGUA_CONFIG.desktop;
-
-  const motorConfigAtual = isMobile ? MOTOR_CONFIG.mobile : MOTOR_CONFIG.desktop;
-  const motorDireitoConfig = motorConfigAtual.direito;
-  const motorEsquerdoConfig = motorConfigAtual.esquerdo;
 
 
   // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
@@ -447,7 +371,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
   }
 
   return (
-    <div className="w-full h-auto flex flex-col items-center relative">
+    <div className="w-full h-full flex flex-col items-center relative pb-20 lg:pb-[104px]">
 
       {/*  PAINEL MOBILE - SISTEMA UNIVERSAL RESPONSIVO */}
       {isMobile && (
@@ -572,8 +496,8 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               </div>
             </div>
 
-            {/* Modal Parâmetros Mobile */}
-            {menuParametrosOpen && (
+            {/* Parâmetros agora abre via botão na nav flutuante */}
+            {false && (
               <div className="mt-4 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-top duration-200">
                 <div className="bg-[#212E3E] text-white px-3 py-2">
                   <h3
@@ -735,67 +659,10 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
         </div>
       )}
 
-      {/* BOTÃO MOBILE - Canto inferior direito */}
-      {isMobile && (
-        <button
-          onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-          className="fixed bottom-24 right-4 bg-gradient-to-r from-[#212E3E] to-[#2A3A4E] text-white shadow-xl flex items-center gap-1.5 transition-all duration-300 hover:scale-105 active:scale-95 z-50"
-          style={{
-            padding: `${Math.max(6, Math.min(8, windowWidth * 0.015))}px ${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
-            fontSize: `${Math.max(8, Math.min(10, windowWidth * 0.02))}px`,
-            borderRadius: `${Math.max(8, Math.min(12, windowWidth * 0.025))}px`,
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}
-        >
-          <div
-            className="bg-white/20 rounded p-0.5 flex items-center justify-center"
-            style={{
-              width: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
-              height: `${Math.max(16, Math.min(20, windowWidth * 0.04))}px`,
-              borderRadius: `${Math.max(4, Math.min(6, windowWidth * 0.012))}px`
-            }}
-          >
-            <CogIcon
-              className="text-white"
-              style={{
-                width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
-                height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-              }}
-            />
-          </div>
-          <span className="font-medium tracking-wide">PARÂMETROS</span>
-          <div
-            className={`transition-transform duration-200 ${menuParametrosOpen ? 'rotate-180' : 'rotate-0'}`}
-            style={{
-              width: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`,
-              height: `${Math.max(10, Math.min(12, windowWidth * 0.025))}px`
-            }}
-          >
-            <ChevronUpIcon className="w-full h-full text-white/80" />
-          </div>
-        </button>
-      )}
-
-      {/* BOTÃO DESKTOP - Grande com texto NO FUNDO (acima de 1024px) */}
-      <button
-        onClick={() => setMenuParametrosOpen(!menuParametrosOpen)}
-        className="hidden xl:flex fixed bottom-6 right-6 z-50 px-8 py-5 bg-[#212E3E] text-white rounded-2xl shadow-2xl items-center gap-5 hover:scale-105 transition-all duration-200 touch-manipulation"
-        style={{ touchAction: 'manipulation' }}
-      >
-        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-          <CogIcon className="w-6 h-6" />
-        </div>
-        <div className="text-left">
-          <div className="font-bold text-lg">PARÂMETROS</div>
-          <div className="text-sm opacity-80">Porta Montante</div>
-        </div>
-      </button>
-
       {/* DIALOG PARÂMETROS - RESPONSIVO */}
       {menuParametrosOpen && (
         <div
-          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4"
+          className="fixed inset-0 z-[220] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4"
           onClick={() => setMenuParametrosOpen(false)}
           style={{
             touchAction: 'none',
@@ -1016,10 +883,8 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
       {/* Container do SVG - SISTEMA ORIGINAL INALTERADO */}
       <div
         ref={containerRef}
-        className="w-full max-w-[1920px] flex flex-col items-center relative z-10"
+        className={`w-full max-w-[1920px] flex flex-col items-center ${isMobile ? 'justify-start' : 'justify-center'} relative z-10 flex-1 min-h-0`}
         style={{
-          height: 'auto',
-          minHeight: '50vh',
           overflow: 'visible'
         }}
       >
@@ -1031,8 +896,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               style={{
                 maxWidth: `${baseWidth}px`,
                 height: `${baseHeight}px`,
-                minHeight: `${baseHeight}px`,
-                border: '1px solid red' // 🔴 Demarcação da área dos SVGs
+                minHeight: `${baseHeight}px`
               }}
             >
             
@@ -1060,8 +924,6 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                     left: `${posicaoFixa}px`,
                     width: `${larguraFinal}px`,
                     height: `${(baseHeight * configEsq.heightPercent) / 100}px`,
-                    backgroundColor: 'rgba(34, 197, 94, 0.05)',
-                    border: '2px dashed rgba(34, 197, 94, 0.3)',
                     borderRadius: '8px',
                     zIndex: 200,
                     padding: `${spacing(10)}px`
@@ -1157,8 +1019,6 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
                     left: `${posicaoFixa}px`,
                     width: `${larguraFinal}px`,
                     height: `${(baseHeight * configDir.heightPercent) / 100}px`,
-                    backgroundColor: 'rgba(34, 197, 94, 0.05)',
-                    border: '2px dashed rgba(34, 197, 94, 0.3)',
                     borderRadius: '8px',
                     zIndex: 200,
                     padding: `${spacing(10)}px`
@@ -1249,169 +1109,95 @@ const PortaMontante: React.FC<PortaMontanteProps> = ({ sidebarOpen = true }) => 
               );
             })()}
 
-            {/* SVG Base Porta Montante - CENTRALIZADO */}
+            {/* 🗺️ CANVAS ÚNICO: um só <svg viewBox> com coordenadas fixas (LAYOUT).
+                overflow:visible porque contrapeso/motor são intencionalmente
+                mais largos que o canvas e ficam deslocados pra fora dele. */}
             <div
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-              style={{
-                width: `${baseWidth}px`,
-                height: `${baseHeight}px`,
-                zIndex: 1
-              }}
+              style={{ width: `${baseWidth}px`, height: `${baseHeight}px`, zIndex: 1 }}
             >
               <svg
+                viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+                preserveAspectRatio="xMidYMid meet"
                 width="100%"
                 height="100%"
-                viewBox="0 0 1075 1098"
-                preserveAspectRatio="xMidYMid meet"
-                className="w-full h-full drop-shadow-sm"
+                style={{ overflow: 'visible' }}
+                className="drop-shadow-sm"
               >
                 <image
                   href="/PortaMontante/Base_Porta_Montante.svg"
-                  width="1075"
-                  height="1098"
+                  x={LAYOUT.base.x}
+                  y={LAYOUT.base.y}
+                  width={LAYOUT.base.width}
+                  height={LAYOUT.base.height}
                   preserveAspectRatio="xMidYMid meet"
                 />
+
+                {/* 🎯 CONTRAPESO DIREITO - WEBSOCKET ÍNDICE 57 */}
+                <foreignObject x={LAYOUT.contrapesoDireito.x} y={LAYOUT.contrapesoDireito.y} width={LAYOUT.contrapesoDireito.width} height={LAYOUT.contrapesoDireito.height}>
+                  <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
+                    <ContraPeso20t websocketValue={contrapesoDirecto} editMode={false} />
+                  </div>
+                </foreignObject>
+
+                {/* 🎯 CONTRAPESO ESQUERDO - WEBSOCKET ÍNDICE 58 */}
+                <foreignObject x={LAYOUT.contrapesoEsquerdo.x} y={LAYOUT.contrapesoEsquerdo.y} width={LAYOUT.contrapesoEsquerdo.width} height={LAYOUT.contrapesoEsquerdo.height}>
+                  <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
+                    <ContraPeso20t websocketValue={contrapesoEsquerdo} editMode={false} />
+                  </div>
+                </foreignObject>
+
+                {/* 📏 RÉGUA PORTA MONTANTE - WEBSOCKET ÍNDICE 56 */}
+                <foreignObject x={LAYOUT.regua.x} y={LAYOUT.regua.y} width={LAYOUT.regua.width} height={LAYOUT.regua.height}>
+                  <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
+                    <PortaMontanteRegua websocketValue={reguaPortaMontante} editMode={false} />
+                  </div>
+                </foreignObject>
+
+                {/* ⚙️ MOTOR DIREITO - WEBSOCKET ÍNDICE 50 */}
+                <foreignObject x={LAYOUT.motorDireito.x} y={LAYOUT.motorDireito.y} width={LAYOUT.motorDireito.width} height={LAYOUT.motorDireito.height}>
+                  <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
+                    <MotorMontante websocketValue={motorDireito} editMode={false} direction="left" />
+                  </div>
+                </foreignObject>
+
+                {/* ⚙️ MOTOR ESQUERDO - WEBSOCKET ÍNDICE 51 - ESPELHADO */}
+                <foreignObject x={LAYOUT.motorEsquerdo.x} y={LAYOUT.motorEsquerdo.y} width={LAYOUT.motorEsquerdo.width} height={LAYOUT.motorEsquerdo.height}>
+                  <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
+                    <MotorMontante websocketValue={motorEsquerdo} editMode={false} direction="right" />
+                  </div>
+                </foreignObject>
+
+                {/* 🚪 INDICADOR STATUS PORTA */}
+                {reguaPortaMontante >= 95 && (
+                  <foreignObject x={LAYOUT.portaAberta.x} y={LAYOUT.portaAberta.y} width={LAYOUT.portaAberta.width} height={LAYOUT.portaAberta.height}>
+                    <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full flex items-center justify-center">
+                      <div className="bg-green-600 border border-green-500 rounded-md w-full h-full flex items-center justify-center p-1">
+                        <div className="text-center">
+                          <div className="font-bold text-[#212E3E] uppercase tracking-wide text-[10px]">
+                            PORTA ABERTA
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </foreignObject>
+                )}
+
+                {reguaPortaMontante <= 5 && (
+                  <foreignObject x={LAYOUT.portaFechada.x} y={LAYOUT.portaFechada.y} width={LAYOUT.portaFechada.width} height={LAYOUT.portaFechada.height}>
+                    <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full flex items-center justify-center">
+                      <div className="bg-yellow-600 border border-yellow-500 rounded-md w-full h-full flex items-center justify-center p-1">
+                        <div className="text-center">
+                          <div className="font-bold text-[#212E3E] uppercase tracking-wide text-[10px]">
+                            PORTA FECHADA
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </foreignObject>
+                )}
               </svg>
             </div>
-
-            {/* 🎯 CONTRAPESO DIREITO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 57 */}
-            <div
-              className="absolute"
-              style={{
-                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
-                top: `${(baseHeight * contrapesoDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(baseWidth * contrapesoDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(baseWidth * contrapesoDireitoConfig.widthPercent) / 100}px`,
-                height: `${(baseHeight * contrapesoDireitoConfig.heightPercent) / 100}px`,
-                zIndex: 10,
-                contain: 'layout'
-              }}
-            >
-              <ContraPeso20t
-                websocketValue={contrapesoDirecto}
-                editMode={false}
-              />
-            </div>
-
-            {/* 🎯 CONTRAPESO ESQUERDO - COM MOVIMENTO PROPORCIONAL - WEBSOCKET ÍNDICE 58 */}
-            <div
-              className="absolute"
-              style={{
-                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
-                top: `${(baseHeight * contrapesoEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(baseWidth * contrapesoEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(baseWidth * contrapesoEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(baseHeight * contrapesoEsquerdoConfig.heightPercent) / 100}px`,
-                zIndex: 10,
-                contain: 'layout'
-              }}
-            >
-              <ContraPeso20t
-                websocketValue={contrapesoEsquerdo}
-                editMode={false}
-              />
-            </div>
-
-            {/* 📏 RÉGUA PORTA MONTANTE - WEBSOCKET ÍNDICE 56 */}
-            <div
-              className="absolute"
-              style={{
-                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
-                top: `${(baseHeight * reguaConfigAtual.verticalPercent) / 100}px`,
-                left: `${(baseWidth * reguaConfigAtual.horizontalPercent) / 100}px`,
-                width: `${(baseWidth * reguaConfigAtual.widthPercent) / 100}px`,
-                height: `${(baseHeight * reguaConfigAtual.heightPercent) / 100}px`,
-                zIndex: 5,
-                contain: 'layout'
-              }}
-            >
-              <PortaMontanteRegua
-                websocketValue={reguaPortaMontante}
-                editMode={false}
-              />
-            </div>
-
-            {/* ⚙️ MOTOR DIREITO - WEBSOCKET ÍNDICE 50 */}
-            <div
-              className="absolute"
-              style={{
-                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
-                top: `${(baseHeight * motorDireitoConfig.verticalPercent) / 100}px`,
-                left: `${(baseWidth * motorDireitoConfig.horizontalPercent) / 100}px`,
-                width: `${(baseWidth * motorDireitoConfig.widthPercent) / 100}px`,
-                height: `${(baseHeight * motorDireitoConfig.heightPercent) / 100}px`,
-                zIndex: 15
-              }}
-            >
-              <MotorMontante
-                websocketValue={motorDireito}
-                editMode={false}
-                direction="left"
-              />
-            </div>
-
-            {/* ⚙️ MOTOR ESQUERDO - WEBSOCKET ÍNDICE 51 - ESPELHADO */}
-            <div
-              className="absolute"
-              style={{
-                // 📐 SISTEMA UNIFICADO: baseWidth horizontal + baseHeight vertical
-                top: `${(baseHeight * motorEsquerdoConfig.verticalPercent) / 100}px`,
-                left: `${(baseWidth * motorEsquerdoConfig.horizontalPercent) / 100}px`,
-                width: `${(baseWidth * motorEsquerdoConfig.widthPercent) / 100}px`,
-                height: `${(baseHeight * motorEsquerdoConfig.heightPercent) / 100}px`,
-                zIndex: 15
-              }}
-            >
-              <MotorMontante
-                websocketValue={motorEsquerdo}
-                editMode={false}
-                direction="right"
-              />
-            </div>
-
-            {/* 🚪 INDICADOR STATUS PORTA - RESPONSIVO MOBILE/DESKTOP - CENTRALIZADO COM SVG */}
-            {reguaPortaMontante >= 95 && (
-              <div
-                className="absolute flex items-center justify-center z-20"
-                style={{
-                  top: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `50%`, // Centralizado horizontalmente
-                  transform: 'translateX(-50%)', // Ajuste de centralização
-                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 3) / 100}px` // REDUZIDO para 3%
-                }}
-              >
-                <div className={`bg-green-600 border border-green-500 rounded-md w-full h-full flex items-center justify-center ${isMobile ? 'p-1' : 'p-1'}`}>
-                  <div className="text-center">
-                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-[10px]'}`}>
-                      PORTA ABERTA
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {reguaPortaMontante <= 5 && (
-              <div
-                className="absolute flex items-center justify-center z-20"
-                style={{
-                  bottom: `${isMobile ? (alturaTotal * 4) / 100 : (alturaTotal * 5) / 100}px`, // Mobile: 4%, Desktop: 5%
-                  left: `50%`, // Centralizado horizontalmente
-                  transform: 'translateX(-50%)', // Ajuste de centralização
-                  width: `${isMobile ? (baseWidth * 30) / 100 : (baseWidth * 16) / 100}px`, // Baseado no SVG
-                  height: `${isMobile ? (alturaTotal * 2.5) / 100 : (alturaTotal * 3) / 100}px` // REDUZIDO para 3%
-                }}
-              >
-                <div className={`bg-yellow-600 border border-yellow-500 rounded-md w-full h-full flex items-center justify-center ${isMobile ? 'p-1' : 'p-1'}`}>
-                  <div className="text-center">
-                    <div className={`font-bold text-[#212E3E] uppercase tracking-wide ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
-                      PORTA FECHADA
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
 
           </div>
           </>

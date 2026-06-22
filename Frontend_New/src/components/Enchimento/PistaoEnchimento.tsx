@@ -13,10 +13,13 @@ const PistaoEnchimento: React.FC<PistaoEnchimentoProps> = ({
   editMode = false
 }) => {
   const valor = websocketValue;
-  
-  // Movimento vertical - PROPORCIONAL À ALTURA DO CONTAINER
-  const maxDeslocamentoPercent = 47.52; // 47.52% da altura do container (movimento aumentado em mais 10%)
-  const deslocamentoVertical = (valor / 100) * maxDeslocamentoPercent;
+
+  // Movimento vertical em UNIDADES DO VIEWBOX (não % CSS) - o transform é aplicado no
+  // <g> do SVG, na coordenada interna do próprio SVG. Isto evita por completo a resolução
+  // de altura percentual em cascata dentro do foreignObject, que Safari/WebKit (iOS)
+  // resolve de forma diferente do Chrome/Blink. Altura do viewBox = 470.
+  const maxDeslocamentoPercent = 47.52; // 47.52% da altura do viewBox (movimento aumentado em mais 10%)
+  const deslocamentoVerticalUnits = (valor / 100) * (maxDeslocamentoPercent / 100) * 470;
 
   return (
     <div className="w-full h-full flex items-center justify-center">
@@ -27,16 +30,22 @@ const PistaoEnchimento: React.FC<PistaoEnchimentoProps> = ({
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-full"
         style={{
-          transform: `translateY(-${deslocamentoVertical}%) ${side === 'esquerdo' ? 'scaleX(-1)' : ''}`,
-          transition: 'transform 0.5s ease-in-out'
+          transform: side === 'esquerdo' ? 'scaleX(-1)' : 'none',
         }}
       >
-        <image
-          href="/Enchimento/Pistao_enchimento.svg"
-          width="298"
-          height="470"
-          preserveAspectRatio="xMidYMid meet"
-        />
+        <g
+          style={{
+            transform: `translateY(-${deslocamentoVerticalUnits}px)`, // px aqui = unidades do viewBox (contexto SVG), não píxeis CSS
+            transition: 'transform 0.5s ease-in-out',
+          }}
+        >
+          <image
+            href="/Enchimento/Pistao_enchimento.svg"
+            width="298"
+            height="470"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </g>
       </svg>
     </div>
   );

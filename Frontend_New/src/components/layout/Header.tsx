@@ -38,14 +38,14 @@ export const Header = () => {
   const getPageTitle = () => {
     const pathname = location.pathname;
     
-    if (pathname.includes('dashboard') || pathname === '/') {
-      return 'Dashboard';
-    } else if (pathname.includes('eclusa-regua')) {
+    if (pathname.includes('eclusa-regua') || pathname === '/') {
       return 'Eclusa Régua';
     } else if (pathname.includes('porta-jusante')) {
       return 'Porta Jusante';
     } else if (pathname.includes('porta-montante')) {
       return 'Porta Montante';
+    } else if (pathname.includes('esvaziamento')) {
+      return 'Esvaziamento';
     } else if (pathname.includes('enchimento')) {
       return 'Enchimento';
     } else if (pathname.includes('sistema-agua')) {
@@ -53,7 +53,7 @@ export const Header = () => {
     } else if (pathname.includes('falhas')) {
       return 'Falhas';
     } else {
-      return 'Dashboard';
+      return 'Eclusa Régua';
     }
   };
 
