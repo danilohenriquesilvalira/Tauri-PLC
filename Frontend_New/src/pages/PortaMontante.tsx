@@ -736,7 +736,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
               }}
             >
               <div className="p-1.5 md:p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5 lg:gap-4">
 
                   {/* PROGRAMA ABERTURA AUTOMÁTICA */}
                   <Card

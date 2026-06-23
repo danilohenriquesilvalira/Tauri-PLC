@@ -844,7 +844,7 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
             >
               <div className="p-1.5 md:p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5 lg:gap-4">
 
                   <Card title="VELOCIDADE DE DESCIDA" icon={<ArrowDownIcon className="w-5 h-5" />} variant="default" className="h-fit">
                     <div className="space-y-1 md:space-y-3">
@@ -888,7 +888,7 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                     </div>
                   </Card>
 
-                  <Card title="QUADRO DE POTÊNCIA" icon={<BoltIcon className="w-5 h-5" />} variant="default" className="md:col-span-2">
+                  <Card title="QUADRO DE POTÊNCIA" icon={<BoltIcon className="w-5 h-5" />} variant="default" className="lg:col-span-2">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4">
                       <div className="text-center">
                         <h4 className="font-semibold text-gray-700 mb-1 md:mb-3 text-[8px] md:text-sm">L1-L2</h4>

@@ -56,17 +56,17 @@ export const Card: React.FC<CardProps> = ({
       className={`w-full rounded-xl shadow-sm border overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${styles.container} ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
-      {/* Header Section - RETÂNGULO EM CIMA como solicitado */}
+      {/* Header Section */}
       {(title || icon) && (
-        <div className={`${styles.header} px-4 py-3`}>
-          <div className="flex items-center gap-3">
+        <div className={`${styles.header} px-3 py-2 lg:px-4 lg:py-3`}>
+          <div className="flex items-center gap-2">
             {icon && (
-              <div className="w-6 h-6 text-white flex-shrink-0">
+              <div className="w-4 h-4 lg:w-5 lg:h-5 text-white flex-shrink-0">
                 {icon}
               </div>
             )}
             {title && (
-              <h3 className="text-sm font-semibold text-white truncate">
+              <h3 className="text-[11px] lg:text-sm font-semibold text-white leading-tight uppercase tracking-wide">
                 {title}
               </h3>
             )}
@@ -75,7 +75,7 @@ export const Card: React.FC<CardProps> = ({
       )}
 
       {/* Content Section */}
-      <div className="p-4">
+      <div className="p-3 lg:p-4">
         {children}
       </div>
     </div>

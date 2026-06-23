@@ -304,102 +304,94 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               maxWidth: `${maxWidth}px` // Usa o mesmo maxWidth responsivo
             }}
           >
-            {/* Cards horizontais compactos - sempre visíveis - PADRONIZADO COM OUTRAS PÁGINAS */}
+            {/* Cards horizontais compactos - sempre visíveis */}
             <div className="grid grid-cols-3 gap-1.5 mb-2">
-              {/* CARD NÍVEIS */}
+
+              {/* CARD 1 — NÍVEIS DA ECLUSA */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
-                    NÍVEIS
+                  <h3 className="font-bold text-[7px] uppercase tracking-wide text-center leading-tight">
+                    NÍVEIS DA ECLUSA
                   </h3>
                 </div>
-                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
+                <div className="p-2 flex-1 flex flex-col justify-between">
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Montante:</div>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Montante</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {nivelMontante.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                      {dispNivelMontante.toFixed(2)} <span className="text-gray-400 text-[7px]">m</span>
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Caldeira:</div>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Caldeira</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {nivelCaldeira.toFixed(2)} <span className="text-gray-500 text-[7px]">m</span>
+                      {dispNivelCaldeira.toFixed(2)} <span className="text-gray-400 text-[7px]">m</span>
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 pt-1">
-                    <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Jusante:</div>
-                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
-                        {nivelJusante.toFixed(2)} <span className="text-gray-500 text-[6px]">m</span>
-                      </div>
+                  <div className="border-t border-gray-100 pt-1 text-center">
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Jusante</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {dispNivelJusante.toFixed(2)} <span className="text-gray-400 text-[7px]">m</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* CARD SISTEMA */}
+              {/* CARD 2 — STATUS DO SISTEMA */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
-                    SISTEMA
+                  <h3 className="font-bold text-[7px] uppercase tracking-wide text-center leading-tight">
+                    STATUS DO SISTEMA
                   </h3>
                 </div>
-                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
+                <div className="p-2 flex-1 flex flex-col justify-between">
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Status:</div>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Operação</div>
+                    <div className="font-mono font-bold text-green-600 text-[10px]">AUTO</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Níveis</div>
                     <div className={`font-mono font-bold text-[10px] ${statusCaldeira === 'normal' ? 'text-green-600' : statusCaldeira === 'alerta' ? 'text-yellow-600' : 'text-red-600'}`}>
                       {statusCaldeira === 'normal' ? 'NORMAL' : statusCaldeira === 'alerta' ? 'ALERTA' : 'CRÍTICO'}
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Diferença:</div>
+                  <div className="border-t border-gray-100 pt-1 text-center">
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Diff</div>
                     <div className={`font-mono font-bold text-[10px] ${Math.abs(diffMontCald) > 0.05 ? 'text-red-600' : 'text-green-600'}`}>
-                      {Math.abs(diffMontCald).toFixed(3)} <span className="text-gray-500 text-[7px]">m</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-200 pt-1">
-                    <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Operação:</div>
-                      <div className="font-mono font-bold text-green-600 text-[9px]">
-                        AUTO
-                      </div>
+                      {diffMontCald.toFixed(3)} <span className="text-gray-400 text-[7px]">m</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* CARD VÁLVULAS */}
+              {/* CARD 3 — VELOCIDADES RADARES */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">
-                    VÁLVULAS
+                  <h3 className="font-bold text-[7px] uppercase tracking-wide text-center leading-tight">
+                    VELOC. RADARES
                   </h3>
                 </div>
-                <div className="p-2 space-y-1 flex-1 flex flex-col justify-between">
+                <div className="p-2 flex-1 flex flex-col justify-between">
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Mont-Cald:</div>
-                    <div className="font-mono font-bold text-[10px]">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${bitMontanteCaldeira ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                      {bitMontanteCaldeira ? 'ON' : 'OFF'}
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Montante</div>
+                    <div className={`font-mono font-bold text-[10px] ${radarMontante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
+                      {radarMontante.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Cald-Jus:</div>
-                    <div className="font-mono font-bold text-[10px]">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${bitCaldeiraJusante ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                      {bitCaldeiraJusante ? 'ON' : 'OFF'}
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Caldeira</div>
+                    <div className={`font-mono font-bold text-[10px] ${radarCaldeira > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
+                      {radarCaldeira.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 pt-1">
-                    <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Ativas:</div>
-                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
-                        {[bitMontanteCaldeira, bitCaldeiraJusante].filter(Boolean).length} <span className="text-gray-500 text-[6px]">/ 2</span>
-                      </div>
+                  <div className="border-t border-gray-100 pt-1 text-center">
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Jusante</div>
+                    <div className={`font-mono font-bold text-[10px] ${radarJusante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
+                      {radarJusante.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
                     </div>
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -789,24 +781,24 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               overscrollBehavior: 'contain'
             }}
           >
-            {/* Header azul escuro EDP */}
-            <div className="bg-[#212E3E] p-3 md:p-4 text-white flex-shrink-0">
+            {/* Header */}
+            <div className="bg-edp-marine px-3 py-2.5 lg:px-4 lg:py-3 text-white flex-shrink-0">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 md:gap-3">
-                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <CogIcon className="w-4 h-4 md:w-5 md:h-5" />
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 lg:w-9 lg:h-9 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <CogIcon className="w-3.5 h-3.5 lg:w-5 lg:h-5" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-sm md:text-base font-bold truncate">PARÂMETROS</h2>
-                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitoramento</p>
+                    <h2 className="text-xs lg:text-sm font-bold tracking-wide">PARÂMETROS</h2>
+                    <p className="text-white/60 text-[10px] lg:text-xs mt-0.5">Configurações e Monitoramento</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setMenuParametrosOpen(false)}
-                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/20 hover:bg-white/30 active:bg-white/40 flex items-center justify-center transition-colors flex-shrink-0"
+                  className="w-7 h-7 lg:w-9 lg:h-9 rounded-lg bg-white/20 hover:bg-white/30 active:bg-white/40 flex items-center justify-center transition-colors flex-shrink-0"
                   style={{ touchAction: 'manipulation' }}
                 >
-                  <XMarkIcon className="w-4 h-4 md:w-5 md:h-5" />
+                  <XMarkIcon className="w-3.5 h-3.5 lg:w-5 lg:h-5" />
                 </button>
               </div>
             </div>
@@ -814,102 +806,77 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             {/* Conteúdo com scroll */}
             <div
               className="flex-1 overflow-y-auto overscroll-contain"
-              style={{
-                WebkitOverflowScrolling: 'touch',
-                touchAction: 'pan-y',
-                overscrollBehavior: 'contain'
-              }}
+              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehavior: 'contain' }}
             >
-              <div className="p-3 md:p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <div className="p-2.5 lg:p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 lg:gap-4">
 
                   {/* IGUALDADE DE NÍVEIS MONTANTE */}
-                  <Card
-                    title="IGUALDADE NÍVEIS MONTANTE"
-                    icon={<ArrowUpIcon className="w-5 h-5" />}
-                    variant="default"
-                    className="h-fit"
-                  >
-                    <div className="space-y-2 md:space-y-3">
+                  <Card title="Igualdade Níveis Montante" icon={<ArrowUpIcon className="w-4 h-4" />} variant="default" className="h-fit">
+                    <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Tolerância:</span>
-                        <span className="text-sm md:text-lg font-mono font-bold text-gray-900">0.05 m</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Tolerância</span>
+                        <span className="text-[11px] font-mono font-bold text-gray-900">0.05 m</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Tempo Estab.:</span>
-                        <span className="text-sm md:text-lg font-mono font-bold text-gray-900">30 s</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Tempo Estab.</span>
+                        <span className="text-[11px] font-mono font-bold text-gray-900">30 s</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Status:</span>
-                        <div className="flex items-center gap-1 md:gap-2">
-                          <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-500"></div>
-                          <span className="text-green-600 font-semibold text-xs md:text-sm">OK</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Status</span>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                          <span className="text-green-600 font-semibold text-[11px]">OK</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Bypass:</span>
-                        <button className="px-2 py-1 md:px-3 md:py-1.5 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded text-xs transition-colors font-medium">
-                          Desabilitado
-                        </button>
+                        <span className="text-gray-500 text-[11px] font-medium">Bypass</span>
+                        <button className="px-2 py-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-[10px] font-medium">Desabilitado</button>
                       </div>
                     </div>
                   </Card>
 
                   {/* IGUALDADE DE NÍVEIS JUSANTE */}
-                  <Card
-                    title="IGUALDADE NÍVEIS JUSANTE"
-                    icon={<ArrowDownIcon className="w-5 h-5" />}
-                    variant="default"
-                    className="h-fit"
-                  >
-                    <div className="space-y-2 md:space-y-3">
+                  <Card title="Igualdade Níveis Jusante" icon={<ArrowDownIcon className="w-4 h-4" />} variant="default" className="h-fit">
+                    <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Tolerância:</span>
-                        <span className="text-sm md:text-lg font-mono font-bold text-gray-900">0.03 m</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Tolerância</span>
+                        <span className="text-[11px] font-mono font-bold text-gray-900">0.03 m</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Tempo Estab.:</span>
-                        <span className="text-sm md:text-lg font-mono font-bold text-gray-900">25 s</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Tempo Estab.</span>
+                        <span className="text-[11px] font-mono font-bold text-gray-900">25 s</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Status:</span>
-                        <div className="flex items-center gap-1 md:gap-2">
-                          <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-500"></div>
-                          <span className="text-green-600 font-semibold text-xs md:text-sm">OK</span>
+                        <span className="text-gray-500 text-[11px] font-medium">Status</span>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                          <span className="text-green-600 font-semibold text-[11px]">OK</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600 font-medium text-xs md:text-sm">Bypass:</span>
-                        <button className="px-2 py-1 md:px-3 md:py-1.5 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded text-xs transition-colors font-medium">
-                          Desabilitado
-                        </button>
+                        <span className="text-gray-500 text-[11px] font-medium">Bypass</span>
+                        <button className="px-2 py-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-[10px] font-medium">Desabilitado</button>
                       </div>
                     </div>
                   </Card>
 
-                  {/* CONFIGURAÇÕES ADICIONAIS DE SISTEMA */}
-                  <Card
-                    title="CONFIGURAÇÕES SISTEMA"
-                    icon={<WrenchScrewdriverIcon className="w-5 h-5" />}
-                    variant="default"
-                    className="h-fit md:col-span-2"
-                  >
-                    <div className="space-y-3 md:space-y-4">
-                      <div className="grid grid-cols-2 gap-3 md:gap-4">
-                        <div className="text-center">
-                          <div className="text-xs text-blue-600 font-medium mb-1">TIMEOUT OPERAÇÃO</div>
-                          <div className="text-sm md:text-lg font-mono font-bold text-blue-800">30 <span className="text-xs">seg</span></div>
+                  {/* CONFIGURAÇÕES SISTEMA */}
+                  <Card title="Configurações Sistema" icon={<WrenchScrewdriverIcon className="w-4 h-4" />} variant="default" className="h-fit lg:col-span-2">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 rounded-lg px-3 py-2 text-center">
+                          <div className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">Timeout Operação</div>
+                          <div className="text-sm font-mono font-bold text-blue-800 mt-0.5">30 <span className="text-[10px]">seg</span></div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-xs text-green-600 font-medium mb-1">CICLO AUTOMÁTICO</div>
-                          <div className="text-sm md:text-lg font-mono font-bold text-green-800">ATIVO</div>
+                        <div className="bg-green-50 rounded-lg px-3 py-2 text-center">
+                          <div className="text-[10px] text-green-600 font-medium uppercase tracking-wide">Ciclo Automático</div>
+                          <div className="text-sm font-mono font-bold text-green-800 mt-0.5">ATIVO</div>
                         </div>
                       </div>
-                      <div className="pt-2 md:pt-3 border-t border-gray-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600 text-xs font-medium">Manutenção Programada:</span>
-                          <span className="text-xs font-mono font-medium text-orange-600">15 dias</span>
-                        </div>
+                      <div className="border-t border-gray-100 pt-2 flex justify-between items-center">
+                        <span className="text-gray-500 text-[11px] font-medium">Manutenção Programada</span>
+                        <span className="text-[11px] font-mono font-semibold text-orange-600">15 dias</span>
                       </div>
                     </div>
                   </Card>
@@ -918,18 +885,18 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
               </div>
             </div>
 
-            {/* Footer com ações - Fixed no mobile */}
-            <div className="bg-gray-50 px-3 py-3 md:px-4 md:py-4 border-t border-gray-200 flex-shrink-0 safe-area-bottom">
-              <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end md:gap-3">
+            {/* Footer */}
+            <div className="bg-gray-50 px-3 py-2.5 lg:px-4 lg:py-3 border-t border-gray-200 flex-shrink-0">
+              <div className="flex gap-2 lg:justify-end">
                 <button
                   onClick={() => setMenuParametrosOpen(false)}
-                  className="w-full md:w-auto px-4 py-2.5 md:px-6 md:py-2.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-700 rounded-lg transition-colors font-medium text-sm md:text-base"
+                  className="flex-1 lg:flex-none lg:w-auto px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs lg:text-sm font-medium transition-colors"
                   style={{ touchAction: 'manipulation' }}
                 >
                   Fechar
                 </button>
                 <button
-                  className="w-full md:w-auto px-4 py-2.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white rounded-lg transition-colors font-medium text-sm md:text-base shadow-lg"
+                  className="flex-1 lg:flex-none lg:w-auto px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs lg:text-sm font-medium transition-colors shadow-sm"
                   style={{ touchAction: 'manipulation' }}
                 >
                   Salvar Configurações

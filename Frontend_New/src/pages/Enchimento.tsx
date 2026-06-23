@@ -1151,7 +1151,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
               }}
             >
               <div className="p-1.5 md:p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5 lg:gap-4">
 
                   {/* VELOCIDADE DE ABERTURA */}
                   <Card
@@ -1212,7 +1212,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                     title="QUADRO DE POTÊNCIA"
                     icon={<BoltIcon className="w-5 h-5" />}
                     variant="default"
-                    className="md:col-span-2"
+                    className="lg:col-span-2"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-1 md:gap-4">
                       {/* L1-L2 */}
