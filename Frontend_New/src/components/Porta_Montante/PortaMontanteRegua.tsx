@@ -28,13 +28,6 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
-        style={{
-          willChange: 'transform',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transformStyle: 'preserve-3d',
-          transform: 'scale(1.01)'
-        }}
       >
         {/* Porta com movimento vertical */}
         <g transform={`translate(0, ${posicaoPorta})`}>

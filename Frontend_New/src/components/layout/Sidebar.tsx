@@ -61,13 +61,13 @@ export const Sidebar = () => {
                 onClick={() => handleItemClick(item.id, item.path)}
                 title={item.label}
                 className={`
-                  flex flex-col items-center justify-center
+                  relative flex flex-col items-center justify-center
                   px-2.5 py-1.5 lg:px-3.5 lg:py-2 rounded-xl
                   min-w-[48px] lg:min-w-[64px]
                   transition-all duration-200 ease-out select-none touch-manipulation
                   ${isActive
-                    ? 'bg-white/[0.13] text-white'
-                    : 'text-white/35 hover:text-white/65 hover:bg-white/[0.07] active:bg-white/[0.11]'
+                    ? 'bg-white/[0.14] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                    : 'text-white/70 hover:text-white hover:bg-white/[0.08] active:bg-white/[0.12]'
                   }
                 `}
               >
@@ -77,14 +77,14 @@ export const Sidebar = () => {
                   className={`
                     w-[18px] h-[18px] lg:w-[22px] lg:h-[22px] brightness-0 invert
                     transition-opacity duration-200
-                    ${isActive ? 'opacity-100' : 'opacity-35'}
+                    ${isActive ? 'opacity-100' : 'opacity-70'}
                   `}
                 />
                 <span className={`
                   mt-0.5 leading-none font-medium tracking-wide text-center
                   text-[7.5px] lg:text-[9px]
                   transition-opacity duration-200
-                  ${isActive ? 'opacity-100' : 'opacity-35'}
+                  ${isActive ? 'opacity-100' : 'opacity-70'}
                 `}>
                   <span className="lg:hidden">{item.shortLabel}</span>
                   <span className="hidden lg:inline">{item.shortLabel}</span>
@@ -107,8 +107,8 @@ export const Sidebar = () => {
               min-w-[48px] lg:min-w-[56px]
               transition-all duration-200 select-none touch-manipulation
               ${paramAction
-                ? 'text-white/50 hover:text-white hover:bg-white/[0.1] active:bg-white/[0.15]'
-                : 'text-white/20 cursor-default'
+                ? 'text-white/70 hover:text-white hover:bg-white/[0.1] active:bg-white/[0.15]'
+                : 'text-white/25 cursor-default'
               }
             `}
           >

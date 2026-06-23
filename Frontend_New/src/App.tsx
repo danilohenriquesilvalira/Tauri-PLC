@@ -3,6 +3,10 @@ import { useEffect } from 'react';
 import { PLCProvider } from './contexts/PLCContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SimulacaoProvider } from './contexts/SimulacaoContext';
+import { SimulacaoEnchimentoProvider } from './contexts/SimulacaoEnchimentoContext';
+import { SimulacaoEsvaziamentoProvider } from './contexts/SimulacaoEsvaziamentoContext';
+import { SimulacaoPortaMontanteProvider } from './contexts/SimulacaoPortaMontanteContext';
+import { SimulacaoPortaJusanteProvider } from './contexts/SimulacaoPortaJusanteContext';
 import { Layout } from './components/layout';
 import EclusaRegua from './pages/Eclusa_Regua';
 import PortaMontante from './pages/PortaMontante';
@@ -44,6 +48,10 @@ const App = () => {
       <ThemeProvider>
         <PLCProvider>
           <SimulacaoProvider>
+          <SimulacaoEnchimentoProvider>
+          <SimulacaoEsvaziamentoProvider>
+          <SimulacaoPortaMontanteProvider>
+          <SimulacaoPortaJusanteProvider>
           <Routes>
             {/* Rotas do Sistema HMI */}
             <Route
@@ -115,6 +123,10 @@ const App = () => {
             {/* Rota 404 - Redireciona para Eclusa */}
             <Route path="*" element={<Navigate to="/eclusa-regua" replace />} />
           </Routes>
+          </SimulacaoPortaJusanteProvider>
+          </SimulacaoPortaMontanteProvider>
+          </SimulacaoEsvaziamentoProvider>
+          </SimulacaoEnchimentoProvider>
           </SimulacaoProvider>
         </PLCProvider>
       </ThemeProvider>

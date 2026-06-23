@@ -17,23 +17,25 @@ const ValveDirecional: React.FC<ValveDirecionalProps> = ({
   // Define se a válvula está aberta baseado no bit
   const isOpen = (websocketBit === 1 || websocketBit === true);
 
-  // Cria a transformação CSS
-  const transform = `${mirrored ? 'scaleX(-1)' : ''} rotate(${rotation}deg)`.trim();
+  // Rotação/espelhamento em UNIDADES DO VIEWBOX, ancorando o centro via
+  // translate explícito (28.5, 19 = centro de 57x38) em vez de depender de
+  // transform-origin:50% (percentual no <svg> raiz), que o Safari/WebKit
+  // (iOS) resolve de forma diferente do Chrome/Blink dentro de um
+  // foreignObject. Mesma ordem matemática do CSS original: mirror aplicado
+  // por fora do rotate.
+  const transform = `translate(28.5px, 19px) ${mirrored ? 'scale(-1, 1) ' : ''}rotate(${rotation}deg) translate(-28.5px, -19px)`;
 
   return (
     <div className="w-full h-full flex items-center justify-center">
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 57 38" 
-        fill="none" 
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 57 38"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
-        style={{
-          transform: transform,
-          transition: 'all 0.3s ease-in-out'
-        }}
       >
+        <g style={{ transform, transition: 'all 0.3s ease-in-out' }}>
         {/* Corpo principal da válvula */}
         <rect 
           x="-0.1" 
@@ -87,13 +89,14 @@ const ValveDirecional: React.FC<ValveDirecionalProps> = ({
         />
         
         {/* Indicador de status */}
-        <path 
-          d="M56 22H44V29.9023H56V22Z" 
+        <path
+          d="M56 22H44V29.9023H56V22Z"
           fill={isOpen ? "#22C55E" : "#808080"}
-          stroke="black" 
+          stroke="black"
           strokeWidth="0.2"
           style={{ transition: 'fill 0.3s ease' }}
         />
+        </g>
       </svg>
     </div>
   );

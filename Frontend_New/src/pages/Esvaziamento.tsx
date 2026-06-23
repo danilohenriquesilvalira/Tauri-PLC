@@ -13,21 +13,33 @@ import MotorEnchimento from '../components/Enchimento/MotorEnchimento';
 import ValvulaGaveta from '../components/Enchimento/ValvulaGaveta';
 import ValveDirecional from '../components/Enchimento/ValveDirecional';
 import ValvulaVertical from '../components/Enchimento/ValvulaVertical';
+import { useSimulacaoEsvaziamento } from '../contexts/SimulacaoEsvaziamentoContext';
 
 interface EsvaziamentoProps {
   sidebarOpen?: boolean;
 }
 
+// O pistão/base do pistão (basePistaoEsquerdo/Direito, pistaoEsquerdo/Direito)
+// realmente "vazam" até y=1008 (confirmado pela geometria: viewBox interno +
+// preserveAspectRatio meet). Em Chrome/Blink isso é tolerado via
+// overflow:visible; o Safari/WebKit do iPhone corta nesse limite. Por isso a
+// altura do canvas vai até 1008, não 900 - só o suficiente pra conter esse
+// vazamento real, sem inflar o resto do layout.
 const VIEWBOX_W = 1600;
-const VIEWBOX_H = 900;
+const VIEWBOX_H = 1008;
 
 const LAYOUT = {
   pipeSystem: { x: 0, y: -180, width: 1600, height: 900 },
   baseFundo: { x: 0, y: 148.5, width: 1600, height: 900 },
   basePistaoEsquerdo: { x: 14.4, y: 594, width: 320, height: 414 },
   basePistaoDireito: { x: 1264, y: 594, width: 320, height: 414 },
-  pistaoEsquerdo: { x: -65.6, y: 351, width: 480, height: 630 },
-  pistaoDireito: { x: 1184, y: 351, width: 480, height: 630 },
+  // y/height compensados para a margem extra de 224 unidades adicionada ao
+  // viewBox do PistaoEnchimento (componente partilhado com a página
+  // Enchimento - ver comentário lá) - mantém o pistão visível por completo
+  // enquanto sobe/desce, sem mudar o tamanho/posição visual de hoje (borda
+  // inferior permanece em y=981, igual a antes: 351+630=981).
+  pistaoEsquerdo: { x: -65.6, y: 50.7, width: 480, height: 930.3 },
+  pistaoDireito: { x: 1184, y: 50.7, width: 480, height: 930.3 },
   cilindroEsquerdo: { x: 96, y: 40.5, width: 160, height: 441 },
   cilindroDireito: { x: 1342.4, y: 40.5, width: 160, height: 441 },
   suportePistaEsquerdo: { x: -624, y: 380.7, width: 1600, height: 171 },
@@ -135,6 +147,11 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
 
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
+  // 🎬 SIMULAÇÃO CONTÍNUA (igual ao padrão da Eclusa/Enchimento): enquanto
+  // simulacaoAtiva=true, os valores simulados substituem os reais do PLC,
+  // animando o ciclo completo de abertura/fecho do esvaziamento.
+  const { simulacaoAtiva, values: sim } = useSimulacaoEsvaziamento();
+
   const hasSubscribedRef = React.useRef(false);
   React.useEffect(() => { hasSubscribedRef.current = false; }, []);
   React.useEffect(() => {
@@ -183,23 +200,24 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
     };
   }, [plcData?.tags]);
 
+  // 🎬 simulado quando simulacaoAtiva, igual ao resto da página
   const pistaoDireitoRaw        = webSocketData?.pistaoDireitoRaw        || 0;
   const pistaoEsquerdoRaw       = webSocketData?.pistaoEsquerdoRaw       || 0;
-  const tempoAberturaDireito    = webSocketData?.tempoAberturaDireito    || 0;
-  const velocidadeDireito       = webSocketData?.velocidadeDireito       || 0;
-  const tempoAberturaLentaDireito = webSocketData?.tempoAberturaLentaDireito || 0;
-  const tempoFechoDireito       = webSocketData?.tempoFechoDireito       || 0;
-  const posicaoMetrosDireito    = webSocketData?.posicaoMetrosDireito    || 0;
-  const posicaoPorcentagemDireito = webSocketData?.posicaoPorcentagemDireito || 0;
-  const tempoAberturaEsquerdo   = webSocketData?.tempoAberturaEsquerdo   || 0;
-  const velocidadeEsquerdo      = webSocketData?.velocidadeEsquerdo      || 0;
-  const tempoAberturaLentaEsquerdo = webSocketData?.tempoAberturaLentaEsquerdo || 0;
-  const tempoFechoEsquerdo      = webSocketData?.tempoFechoEsquerdo      || 0;
-  const posicaoMetrosEsquerdo   = webSocketData?.posicaoMetrosEsquerdo   || 0;
-  const posicaoPorcentagemEsquerdo = webSocketData?.posicaoPorcentagemEsquerdo || 0;
+  const tempoAberturaDireito    = simulacaoAtiva ? Math.round(sim.tempoAbertura) : (webSocketData?.tempoAberturaDireito || 0);
+  const velocidadeDireito       = simulacaoAtiva ? sim.velocidade : (webSocketData?.velocidadeDireito || 0);
+  const tempoAberturaLentaDireito = simulacaoAtiva ? Math.round(sim.tempoAberturaLenta) : (webSocketData?.tempoAberturaLentaDireito || 0);
+  const tempoFechoDireito       = simulacaoAtiva ? Math.round(sim.tempoFecho) : (webSocketData?.tempoFechoDireito || 0);
+  const posicaoMetrosDireito    = simulacaoAtiva ? sim.posicaoMetros : (webSocketData?.posicaoMetrosDireito || 0);
+  const posicaoPorcentagemDireito = simulacaoAtiva ? sim.pistaoDireito : (webSocketData?.posicaoPorcentagemDireito || 0);
+  const tempoAberturaEsquerdo   = simulacaoAtiva ? Math.round(sim.tempoAbertura) : (webSocketData?.tempoAberturaEsquerdo || 0);
+  const velocidadeEsquerdo      = simulacaoAtiva ? sim.velocidade : (webSocketData?.velocidadeEsquerdo || 0);
+  const tempoAberturaLentaEsquerdo = simulacaoAtiva ? Math.round(sim.tempoAberturaLenta) : (webSocketData?.tempoAberturaLentaEsquerdo || 0);
+  const tempoFechoEsquerdo      = simulacaoAtiva ? Math.round(sim.tempoFecho) : (webSocketData?.tempoFechoEsquerdo || 0);
+  const posicaoMetrosEsquerdo   = simulacaoAtiva ? sim.posicaoMetros : (webSocketData?.posicaoMetrosEsquerdo || 0);
+  const posicaoPorcentagemEsquerdo = simulacaoAtiva ? sim.pistaoEsquerdo : (webSocketData?.posicaoPorcentagemEsquerdo || 0);
 
-  const pistaoDireito  = React.useMemo(() => Math.max(0, Math.min(100, pistaoDireitoRaw)),  [pistaoDireitoRaw]);
-  const pistaoEsquerdo = React.useMemo(() => Math.max(0, Math.min(100, pistaoEsquerdoRaw)), [pistaoEsquerdoRaw]);
+  const pistaoDireito  = React.useMemo(() => simulacaoAtiva ? sim.pistaoDireito  : Math.max(0, Math.min(100, pistaoDireitoRaw)),  [pistaoDireitoRaw, simulacaoAtiva, sim.pistaoDireito]);
+  const pistaoEsquerdo = React.useMemo(() => simulacaoAtiva ? sim.pistaoEsquerdo : Math.max(0, Math.min(100, pistaoEsquerdoRaw)), [pistaoEsquerdoRaw, simulacaoAtiva, sim.pistaoEsquerdo]);
 
   // ── VÁLVULAS, MOTORES, PIPES ─────────────────────────────────────────────
   const valvulasData = React.useMemo(() => {
@@ -235,28 +253,32 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
     };
   }, [plcData?.tags]);
 
-  const bombaMotorDireito  = valvulasData?.bombaMotorDireito  || 0;
-  const bombaMotorEsquerdo = valvulasData?.bombaMotorEsquerdo || 0;
+  // 🎬 simulado quando simulacaoAtiva - cada pipe/válvula mapeado para a
+  // fase correspondente do ciclo: bomba liga → válvulas alinham → sobe →
+  // aberto → desce (igual ao Enchimento)
+  const bombaMotorDireito  = simulacaoAtiva ? sim.motorDireito : (valvulasData?.bombaMotorDireito  || 0);
+  const bombaMotorEsquerdo = simulacaoAtiva ? sim.motorEsquerdo : (valvulasData?.bombaMotorEsquerdo || 0);
   const cilindroDireito    = valvulasData?.cilindroDireito    || 0;
   const cilindroEsquerdo   = valvulasData?.cilindroEsquerdo   || 0;
-  const pipe1Real  = valvulasData?.pipe1Real  || 0;
-  const pipe2Real  = valvulasData?.pipe2Real  || 0;
-  const pipe3Real  = valvulasData?.pipe3Real  || 0;
-  const pipe4Real  = valvulasData?.pipe4Real  || 0;
-  const pipe5Real  = valvulasData?.pipe5Real  || 0;
-  const pipe6Real  = valvulasData?.pipe6Real  || 0;
-  const pipe7Real  = valvulasData?.pipe7Real  || 0;
-  const pipe8Real  = valvulasData?.pipe8Real  || 0;
-  const pipe9Real  = valvulasData?.pipe9Real  || 0;
-  const pipe1EsqReal = valvulasData?.pipe1EsqReal || 0;
-  const pipe2EsqReal = valvulasData?.pipe2EsqReal || 0;
-  const pipe3EsqReal = valvulasData?.pipe3EsqReal || 0;
-  const pipe4EsqReal = valvulasData?.pipe4EsqReal || 0;
-  const pipe5EsqReal = valvulasData?.pipe5EsqReal || 0;
-  const pipe6EsqReal = valvulasData?.pipe6EsqReal || 0;
-  const pipe7EsqReal = valvulasData?.pipe7EsqReal || 0;
-  const pipe8EsqReal = valvulasData?.pipe8EsqReal || 0;
-  const pipe9EsqReal = valvulasData?.pipe9EsqReal || 0;
+  const rising = sim.risingSlow || sim.risingFast;
+  const pipe1Real  = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasData?.pipe1Real  || 0);
+  const pipe2Real  = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasData?.pipe2Real  || 0);
+  const pipe3Real  = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasData?.pipe3Real  || 0);
+  const pipe4Real  = simulacaoAtiva ? (sim.risingSlow ? 1 : 0) : (valvulasData?.pipe4Real  || 0);
+  const pipe5Real  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe5Real  || 0);
+  const pipe6Real  = simulacaoAtiva ? (sim.pumpRunning ? 1 : 0) : (valvulasData?.pipe6Real  || 0);
+  const pipe7Real  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe7Real  || 0);
+  const pipe8Real  = simulacaoAtiva ? (sim.risingFast ? 1 : 0) : (valvulasData?.pipe8Real  || 0);
+  const pipe9Real  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe9Real  || 0);
+  const pipe1EsqReal = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasData?.pipe1EsqReal || 0);
+  const pipe2EsqReal = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasData?.pipe2EsqReal || 0);
+  const pipe3EsqReal = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasData?.pipe3EsqReal || 0);
+  const pipe4EsqReal = simulacaoAtiva ? (sim.risingSlow ? 1 : 0) : (valvulasData?.pipe4EsqReal || 0);
+  const pipe5EsqReal = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe5EsqReal || 0);
+  const pipe6EsqReal = simulacaoAtiva ? (sim.pumpRunning ? 1 : 0) : (valvulasData?.pipe6EsqReal || 0);
+  const pipe7EsqReal = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe7EsqReal || 0);
+  const pipe8EsqReal = simulacaoAtiva ? (sim.risingFast ? 1 : 0) : (valvulasData?.pipe8EsqReal || 0);
+  const pipe9EsqReal = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasData?.pipe9EsqReal || 0);
 
   // Mapeamento bits SVG lado DIREITO
   const bit12 = pipe1Real;
@@ -312,19 +334,19 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
     };
   }, [plcData?.tags, plcData?.bit_data?.status_bits]);
 
-  const valvulaVerticalDireita  = valvulasComplexasData?.valvulaVerticalDireita  || 0;
-  const valvulaVerticalEsquerda = valvulasComplexasData?.valvulaVerticalEsquerda || 0;
+  const valvulaVerticalDireita  = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasComplexasData?.valvulaVerticalDireita  || 0);
+  const valvulaVerticalEsquerda = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasComplexasData?.valvulaVerticalEsquerda || 0);
   const bit13 = valvulasComplexasData?.bit13 || 0;
   const bit33 = pipe2EsqReal;
   const bit34 = pipe3EsqReal;
   const bit36 = valvulasComplexasData?.bit36 || 0;
 
-  const valvulaEsquerda1 = valvulasComplexasData?.valvulaEsquerda1 || 0;
-  const valvulaEsquerda2 = valvulasComplexasData?.valvulaEsquerda2 || 0;
-  const valvulaEsquerda3 = valvulasComplexasData?.valvulaEsquerda3 || 0;
-  const valvulaDireita1  = valvulasComplexasData?.valvulaDireita1  || 0;
-  const valvulaDireita2  = valvulasComplexasData?.valvulaDireita2  || 0;
-  const valvulaDireita3  = valvulasComplexasData?.valvulaDireita3  || 0;
+  const valvulaEsquerda1 = simulacaoAtiva ? (sim.risingSlow ? 1 : 0) : (valvulasComplexasData?.valvulaEsquerda1 || 0);
+  const valvulaEsquerda2 = simulacaoAtiva ? (sim.risingFast ? 1 : 0) : (valvulasComplexasData?.valvulaEsquerda2 || 0);
+  const valvulaEsquerda3 = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaEsquerda3 || 0);
+  const valvulaDireita1  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDireita1  || 0);
+  const valvulaDireita2  = simulacaoAtiva ? (sim.risingFast ? 1 : 0) : (valvulasComplexasData?.valvulaDireita2  || 0);
+  const valvulaDireita3  = simulacaoAtiva ? (sim.risingSlow ? 1 : 0) : (valvulasComplexasData?.valvulaDireita3  || 0);
 
   const valvulaFlangeEsquerda1 = valvulaEsquerda1;
   const valvulaFlangeEsquerda2 = valvulaEsquerda2;
@@ -333,26 +355,29 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
   const valvulaFlangeDireita2  = valvulaDireita2;
   const valvulaFlangeDireita3  = valvulaDireita3;
 
-  const valvulaGavetaEsquerda1 = valvulasComplexasData?.valvulaGavetaEsquerda1Real || 0;
-  const valvulaGavetaEsquerda2 = valvulasComplexasData?.valvulaGavetaEsquerda2Real || 0;
-  const valvulaGavetaEsquerda3 = valvulasComplexasData?.valvulaGavetaEsquerda3Real || 0;
-  const valvulaGavetaDireita1  = valvulasComplexasData?.valvulaGavetaDireita1Real  || 0;
-  const valvulaGavetaDireita2  = valvulasComplexasData?.valvulaGavetaDireita2Real  || 0;
-  const valvulaGavetaDireita3  = valvulasComplexasData?.valvulaGavetaDireita3Real  || 0;
+  const valvulaGavetaEsquerda1 = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaEsquerda1Real || 0);
+  const valvulaGavetaEsquerda2 = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaEsquerda2Real || 0);
+  const valvulaGavetaEsquerda3 = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaEsquerda3Real || 0);
+  const valvulaGavetaDireita1  = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaDireita1Real  || 0);
+  const valvulaGavetaDireita2  = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaDireita2Real  || 0);
+  const valvulaGavetaDireita3  = simulacaoAtiva ? (rising ? 1 : 0) : (valvulasComplexasData?.valvulaGavetaDireita3Real  || 0);
 
-  const valvulaDirecionalEsquerda1 = valvulasComplexasData?.valvulaDirecionalEsquerda1Real || 0;
-  const valvulaDirecionalEsquerda2 = valvulasComplexasData?.valvulaDirecionalEsquerda2Real || 0;
-  const valvulaDirecionalEsquerda3 = valvulasComplexasData?.valvulaDirecionalEsquerda3Real || 0;
-  const valvulaDirecionalDireita1  = valvulasComplexasData?.valvulaDirecionalDireita1Real  || 0;
-  const valvulaDirecionalDireita2  = valvulasComplexasData?.valvulaDirecionalDireita2Real  || 0;
-  const valvulaDirecionalDireita3  = valvulasComplexasData?.valvulaDirecionalDireita3Real  || 0;
+  const valvulaDirecionalEsquerda1 = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalEsquerda1Real || 0);
+  const valvulaDirecionalEsquerda2 = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalEsquerda2Real || 0);
+  const valvulaDirecionalEsquerda3 = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalEsquerda3Real || 0);
+  const valvulaDirecionalDireita1  = simulacaoAtiva ? (sim.descending ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalDireita1Real  || 0);
+  const valvulaDirecionalDireita2  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalDireita2Real  || 0);
+  const valvulaDirecionalDireita3  = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalDireita3Real  || 0);
 
-  // Estado textual da operação (drenagem = pistões descendo de 100→0)
-  const estadoOperacao = posicaoPorcentagemDireito > 80
-    ? 'CHEIO'
-    : posicaoPorcentagemDireito > 10
-    ? 'DRENANDO'
-    : 'VAZIO';
+  // 🏷️ ESTADO - segue a fase real do ciclo (não só a % de posição), igual
+  // ao padrão da página Enchimento.
+  const estadoPistao = simulacaoAtiva
+    ? (sim.fase === 'SUBINDO' ? 'SUBINDO'
+      : sim.fase === 'DESCENDO' ? 'FECHANDO'
+      : sim.fase === 'ABERTO' ? 'ABERTO'
+      : sim.fase === 'IDLE' ? 'FECHADO'
+      : 'PREPARANDO')
+    : (posicaoPorcentagemDireito > 50 ? 'ABRINDO' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL');
 
   return (
     <div
@@ -388,7 +413,7 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Nível:</div>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Abertura:</div>
                       <div className="font-mono font-bold text-[#212E3E] text-[9px]">
                         {((posicaoPorcentagemDireito + posicaoPorcentagemEsquerdo) / 2).toFixed(1)} <span className="text-gray-500 text-[6px]">%</span>
                       </div>
@@ -397,65 +422,58 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                 </div>
               </div>
 
-              {/* CARD SISTEMA */}
+              {/* CARD SISTEMA - tempos de abertura/fecho */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-edp-marine text-white px-2 py-1">
                   <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">SISTEMA</h3>
                 </div>
                 <div className="p-2 space-y-1">
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Velocidade:</div>
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">T. Abertura:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {((velocidadeDireito + velocidadeEsquerdo) / 2).toFixed(3)} <span className="text-gray-500 text-[7px]">m/s</span>
+                      {tempoAberturaDireito} <span className="text-gray-500 text-[7px]">s</span>
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[8px] text-gray-600 font-medium uppercase">Estado:</div>
-                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">{estadoOperacao}</div>
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Ab. Lenta:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {tempoAberturaLentaDireito} <span className="text-gray-500 text-[7px]">s</span>
+                    </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Sync:</div>
-                      <div className={`font-mono font-bold text-[9px] ${Math.abs(posicaoPorcentagemDireito - posicaoPorcentagemEsquerdo) < 5 ? 'text-green-600' : 'text-red-600'}`}>
-                        {Math.abs(posicaoPorcentagemDireito - posicaoPorcentagemEsquerdo) < 5 ? 'OK' : 'ERRO'}
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">T. Fecho:</div>
+                      <div className="font-mono font-bold text-[#212E3E] text-[9px]">
+                        {tempoFechoDireito} <span className="text-gray-500 text-[6px]">s</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* CARD VÁLVULAS */}
+              {/* CARD VELOCIDADE */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">VÁLVULAS</h3>
+                  <h3 className="font-bold text-[8px] uppercase tracking-wide text-center leading-tight">VELOCIDADE</h3>
                 </div>
                 <div className="p-2 space-y-1">
-                  <div className="grid grid-cols-2 gap-1">
-                    <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Gavetas:</div>
-                      <div className="flex justify-center gap-0.5">
-                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda1 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda2 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                        <div className={`w-1 h-1 rounded-full ${valvulaGavetaEsquerda3 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                      </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Direito:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {velocidadeDireito.toFixed(3)} <span className="text-gray-500 text-[7px]">m/s</span>
                     </div>
-                    <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Direcionais:</div>
-                      <div className="flex justify-center gap-0.5">
-                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda1 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda2 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-                        <div className={`w-1 h-1 rounded-full ${valvulaDirecionalEsquerda3 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-                      </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">Esquerdo:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {velocidadeEsquerdo.toFixed(3)} <span className="text-gray-500 text-[7px]">m/s</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Ativas:</div>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Estado:</div>
                       <div className="font-mono font-bold text-[#212E3E] text-[9px]">
-                        {[valvulaGavetaEsquerda1, valvulaGavetaEsquerda2, valvulaGavetaEsquerda3,
-                          valvulaDirecionalEsquerda1, valvulaDirecionalEsquerda2, valvulaDirecionalEsquerda3,
-                          valvulaGavetaDireita1, valvulaGavetaDireita2, valvulaGavetaDireita3
-                        ].filter(Boolean).length} <span className="text-gray-500 text-[6px]">/ 9</span>
+                        {estadoPistao}
                       </div>
                     </div>
                   </div>
@@ -673,26 +691,26 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>Nível:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>Abertura:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {posicaoPorcentagemDireito.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>%</span>
                         </span>
                       </div>
                       <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Descida:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Abertura:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoAberturaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Lento:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Ab. Lenta:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoAberturaLentaDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Subida:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Fecho:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoFechoDireito}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>
@@ -726,26 +744,26 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>Nível:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>Abertura:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {posicaoPorcentagemEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>%</span>
                         </span>
                       </div>
                       <div className="border-t border-gray-300" style={{ margin: `${Math.max(4, baseWidth * 0.003)}px 0` }}></div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Descida:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Abertura:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoAberturaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Lento:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Ab. Lenta:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoAberturaLentaEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Subida:</span>
+                        <span className="font-medium text-[#212E3E] uppercase tracking-wide" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>T. Fecho:</span>
                         <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${Math.max(12, Math.min(18, baseWidth * 0.011))}px` }}>
                           {tempoFechoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${Math.max(8, Math.min(11, baseWidth * 0.006))}px` }}>s</span>
                         </span>

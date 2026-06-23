@@ -4,6 +4,7 @@ import { useNav } from '../contexts/NavContext';
 import ContraPeso20t from '../components/Porta_Montante/Porta_Montante_Contrapeso';
 import PortaMontanteRegua from '../components/Porta_Montante/PortaMontanteRegua';
 import MotorMontante from '../components/Porta_Montante/Motor_Montante';
+import { useSimulacaoPortaMontante } from '../contexts/SimulacaoPortaMontanteContext';
 import { Card } from '../components/ui/Card';
 import { InfoCard } from '../components/ui/InfoCard';
 import { StatusCard } from '../components/ui/StatusCard';
@@ -59,7 +60,7 @@ const LAYOUT = {
   base: { x: 0, y: 0, width: 1075, height: 1098 },
   contrapesoDireito: { x: 446, y: 445, width: 1075, height: 659 },
   contrapesoEsquerdo: { x: -442, y: 445, width: 1075, height: 659 },
-  regua: { x: 0, y: 250, width: 1075, height: 794 },
+  regua: { x: -2.7, y: 248, width: 1080.4, height: 798 }, // +0.5%, centrado (era 0,250,1075,794)
   motorDireito: { x: 452, y: 52, width: 1075, height: 77 },
   motorEsquerdo: { x: -452, y: 52, width: 1075, height: 77 },
   portaAberta: { x: 452, y: 55, width: 172, height: 33 },
@@ -188,6 +189,11 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
 
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
+  // 🎬 SIMULAÇÃO CONTÍNUA (igual ao padrão da Eclusa/Enchimento): motores
+  // ligam, a porta sobe/desce e os contrapesos movem-se ao contrário ao
+  // mesmo tempo (mesmo valor partilhado - ver comentário no contexto).
+  const { simulacaoAtiva, values: sim } = useSimulacaoPortaMontante();
+
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA MONT usando sendCommand
   // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
   const hasSubscribedRef = React.useRef(false);
@@ -254,21 +260,42 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
 
   // 🔄 NORMALIZAÇÃO DIRETA DOS VALORES MONT (igual página PortaJusante)
   // WebSocket MONT provavelmente já envia valores normalizados ou precisam normalização direta
+  // 🎬 simulado quando simulacaoAtiva, igual ao resto da página
   const contrapesoDirecto = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.contrapesoDireito;
     return Math.max(0, Math.min(100, contrapesoDirectoRaw));
-  }, [contrapesoDirectoRaw]);
+  }, [contrapesoDirectoRaw, simulacaoAtiva, sim.contrapesoDireito]);
 
   const contrapesoEsquerdo = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.contrapesoEsquerdo;
     return Math.max(0, Math.min(100, contrapesoEsquerdoRaw));
-  }, [contrapesoEsquerdoRaw]);
+  }, [contrapesoEsquerdoRaw, simulacaoAtiva, sim.contrapesoEsquerdo]);
 
   const reguaPortaMontante = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.reguaPortaMontante;
     return Math.max(0, Math.min(100, reguaPortaMontanteRaw));
-  }, [reguaPortaMontanteRaw]);
+  }, [reguaPortaMontanteRaw, simulacaoAtiva, sim.reguaPortaMontante]);
 
-  // Motor status para animação (1 = ligado, 0 = desligado)
-  const motorDireito = animMotorDireito;
-  const motorEsquerdo = animMotorEsquerdo;
+  // Motor status para animação (0 = parado, 1 = ligado/rodando, 2 = falha)
+  const motorDireito = simulacaoAtiva ? sim.motorDireito : animMotorDireito;
+  const motorEsquerdo = simulacaoAtiva ? sim.motorEsquerdo : animMotorEsquerdo;
+
+  // 🏷️ RPM/Corrente/Status derivados do estado real do motor (em vez de
+  // Math.random() solto, que não tinha relação nenhuma com o motor estar
+  // ligado ou não) - 0 quando parado, valor nominal quando a rodar.
+  const RPM_NOMINAL = 1450;
+  const CORRENTE_NOMINAL = 12.5;
+  const motorDireitoRPM = motorDireito === 1 ? RPM_NOMINAL : 0;
+  const motorEsquerdoRPM = motorEsquerdo === 1 ? RPM_NOMINAL : 0;
+  const motorDireitoCorrente = motorDireito === 1 ? CORRENTE_NOMINAL : 0;
+  const motorEsquerdoCorrente = motorEsquerdo === 1 ? CORRENTE_NOMINAL : 0;
+  const statusLabel = (m: number) => (m === 1 ? 'RODANDO' : m === 2 ? 'FALHA' : 'PARADO');
+  const statusCor = (m: number) => (m === 1 ? 'text-green-600' : m === 2 ? 'text-red-600' : 'text-gray-500');
+  const motorDireitoStatus = statusLabel(motorDireito);
+  const motorEsquerdoStatus = statusLabel(motorEsquerdo);
+  const algumMotorEmFalha = motorDireito === 2 || motorEsquerdo === 2;
+  const algumMotorRodando = motorDireito === 1 || motorEsquerdo === 1;
+  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'RODANDO' : 'PARADO';
 
   // 🔍 DEBUG CRÍTICO: Monitorar valores em tempo real para detectar atraso
   React.useEffect(() => {
@@ -406,12 +433,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Abertura:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {reguaPortaMontante}<span className="text-gray-500 text-[7px]">%</span>
+                      {reguaPortaMontante.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Dif. E/D:</div>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Diferença:</div>
                       <div className="font-mono font-bold text-[#212E3E] text-[9px]">
                         {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500 text-[6px]">mm</span>
                       </div>
@@ -428,36 +455,23 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                   </h3>
                 </div>
                 <div className="p-2 space-y-1">
-                  {/* MOTOR DIREITO */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[7px] text-gray-600 font-medium uppercase">M. DIREITO</span>
-                      <div className={`w-1.5 h-1.5 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                        {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
-                      </span>
-                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                        {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
-                      </span>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">M. Direito:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {motorDireitoRPM} <span className="text-gray-500 text-[7px]">RPM</span>
                     </div>
                   </div>
-
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">M. Esquerdo:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {motorEsquerdoRPM} <span className="text-gray-500 text-[7px]">RPM</span>
+                    </div>
+                  </div>
                   <div className="border-t border-gray-200 pt-1">
-                    {/* MOTOR ESQUERDO */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[7px] text-gray-600 font-medium uppercase">M. ESQUERDO</span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
-                        </span>
-                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
-                        </span>
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
+                      <div className={`font-mono font-bold text-[9px] ${statusCor(algumMotorEmFalha ? 2 : algumMotorRodando ? 1 : 0)}`}>
+                        {statusGeralMotores}
                       </div>
                     </div>
                   </div>
@@ -475,20 +489,20 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Esquerdo:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {contrapesoEsquerdo}<span className="text-gray-500 text-[7px]">%</span>
+                      {contrapesoEsquerdo.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Direito:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {contrapesoDirecto}<span className="text-gray-500 text-[7px]">%</span>
+                      {contrapesoDirecto.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
                       <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
-                      <div className="font-mono font-bold text-green-600 text-[8px]">
-                        OPER.
+                      <div className={`font-mono font-bold text-[8px] ${statusCor(algumMotorRodando ? 1 : 0)}`}>
+                        {algumMotorRodando ? 'EM MOVIMENTO' : 'PARADO'}
                       </div>
                     </div>
                   </div>
@@ -947,12 +961,12 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Abertura:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {reguaPortaMontante}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {reguaPortaMontante.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                         <div className="border-t border-gray-200 my-1"></div>
                         <div className="flex justify-between items-center">
-                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Dif. E/D:</span>
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Diferença:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
                             {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>mm</span>
                           </span>
@@ -960,13 +974,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. E:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {contrapesoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {contrapesoEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. D:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {contrapesoDirecto}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {contrapesoDirecto.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                       </div>
@@ -1036,16 +1050,17 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                       <div style={{ marginBottom: `${spacing(6)}px` }}>
                         <div className="flex justify-between items-center" style={{ marginBottom: `${spacing(3)}px` }}>
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>M. DIREITO</span>
-                          <div className={`rounded-full ${animMotorDireito > 0 ? 'bg-green-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
+                          <div className={`rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {Math.round(motorDireitoVeloc)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                            {motorDireitoRPM} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
                           </span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                            {motorDireitoCorrente.toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
                           </span>
                         </div>
+                        <div className={`text-right font-mono font-bold ${statusCor(motorDireito)}`} style={{ fontSize: `${fontSize(9)}px` }}>{motorDireitoStatus}</div>
                       </div>
 
                       <div className="border-t border-gray-200 my-1"></div>
@@ -1054,16 +1069,17 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                       <div>
                         <div className="flex justify-between items-center" style={{ marginBottom: `${spacing(3)}px` }}>
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>M. ESQUERDO</span>
-                          <div className={`rounded-full ${animMotorEsquerdo > 0 ? 'bg-green-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
+                          <div className={`rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-400'}`} style={{ width: `${fontSize(8)}px`, height: `${fontSize(8)}px` }}></div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {Math.round(motorEsquerdoVeloc)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                            {motorEsquerdoRPM} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
                           </span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                            {motorEsquerdoCorrente.toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
                           </span>
                         </div>
+                        <div className={`text-right font-mono font-bold ${statusCor(motorEsquerdo)}`} style={{ fontSize: `${fontSize(9)}px` }}>{motorEsquerdoStatus}</div>
                       </div>
                     </div>
                   </div>
@@ -1098,8 +1114,8 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Status:</span>
-                          <span className="font-mono font-bold text-green-600" style={{ fontSize: `${fontSize(13)}px` }}>
-                            OK
+                          <span className={`font-mono font-bold ${algumMotorEmFalha ? 'text-red-600' : algumMotorRodando ? 'text-green-600' : 'text-gray-500'}`} style={{ fontSize: `${fontSize(13)}px` }}>
+                            {statusGeralMotores}
                           </span>
                         </div>
                       </div>

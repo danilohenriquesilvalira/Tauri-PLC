@@ -18,13 +18,18 @@ const PortaJusanteRegua: React.FC<PortaJusanteReguaProps> = ({
     return (websocketValue / 100) * (maxDeslocamentoPercent / 100) * 580;
   }, [websocketValue]);
 
+  // 🔧 Margem acima do viewBox original para a porta não ser cortada ao
+  // subir (translateY negativo) - desloca no máximo 377 unidades
+  // (65% de 580), por isso a margem cobre isso com folga.
+  const MARGEM_TOPO = 380;
+
   return (
     <div className="w-full h-full flex items-center justify-center">
       {/* SVG DIRETO NO CONTAINER - SEM DIV INTERMEDIÁRIA */}
       <svg
         width="100%"
         height="100%"
-        viewBox="0 0 576 580"
+        viewBox={`0 -${MARGEM_TOPO} 576 ${580 + MARGEM_TOPO}`}
         preserveAspectRatio="xMidYMid meet"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"

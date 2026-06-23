@@ -4,6 +4,7 @@ import { useNav } from '../contexts/NavContext';
 import ContraPeso60t from '../components/Porta_Jusante/Porta_Jusante_Contrapeso';
 import PortaJusanteRegua from '../components/Porta_Jusante/PortaJusanteRegua';
 import MotorJusante from '../components/Porta_Jusante/Motor_Jusante';
+import { useSimulacaoPortaJusante } from '../contexts/SimulacaoPortaJusanteContext';
 import { Card } from '../components/ui/Card';
 import { StatusCard } from '../components/ui/StatusCard';
 import {
@@ -51,7 +52,10 @@ const LAYOUT = {
   base: { x: 0, y: 0, width: 1075, height: 1098 },
   contrapesoDireito: { x: 469, y: 470, width: 1075, height: 659 },
   contrapesoEsquerdo: { x: -468, y: 470, width: 1075, height: 659 },
-  regua: { x: 0, y: 439, width: 1075, height: 571 },
+  // height/y ajustados para compensar a margem adicionada ao viewBox de
+  // PortaJusanteRegua (evitar a porta ser cortada ao subir) - borda
+  // inferior mantida no mesmo lugar (439+571=1010).
+  regua: { x: 0, y: 65, width: 1075, height: 945 },
   motorDireito: { x: 457, y: 11, width: 1075, height: 77 },
   motorEsquerdo: { x: -457, y: 11, width: 1075, height: 77 },
   portaAberta: { x: 452, y: 55, width: 172, height: 66 },
@@ -179,6 +183,11 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
   // 📡 USAR O SISTEMA PLC EXISTENTE (sem criar nova conexão!)
   const { data: plcData, sendCommand, connectionStatus } = usePLC();
 
+  // 🎬 SIMULAÇÃO CONTÍNUA (igual ao padrão da Eclusa/Enchimento/Porta
+  // Montante): motores ligam, a porta sobe/desce e os contrapesos movem-se
+  // ao contrário ao mesmo tempo (valor invertido - ver contexto).
+  const { simulacaoAtiva, values: sim } = useSimulacaoPortaJusante();
+
   // 🎯 SUBSCRIBE ESPECÍFICO PARA ÁREA JUS usando sendCommand
   // ⚡ OTIMIZADO: Força re-subscribe no mount da página para dados frescos
   const hasSubscribedRef = React.useRef(false);
@@ -224,24 +233,45 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
     parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'], 10) : 0;   // Tag real JUS contrapeso direito
   const contrapesoEsquerdoRaw = plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'] ?
     parseInt(plcData.tags['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'], 10) : 0;  // Tag real JUS contrapeso esquerdo
-  const motorDireito = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'] ?
-    parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'], 10) : 0;       // Tag real JUS motor direito (animação)  
-  const motorEsquerdo = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'] ?
+  const motorDireitoReal = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'] ?
+    parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'], 10) : 0;       // Tag real JUS motor direito (animação)
+  const motorEsquerdoReal = plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'] ?
     parseInt(plcData.tags['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ'], 10) : 0;      // Tag real JUS motor esquerdo (animação)
 
-  // 🔄 NORMALIZAÇÃO DIRETA DOS VALORES JUS (igual página Enchimento)
-  // WebSocket JUS provavelmente já envia valores normalizados ou precisam normalização direta
+  // 🎬 simulado quando simulacaoAtiva, igual ao resto da página
   const contrapesoDirecto = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.contrapesoDireito;
     return Math.max(0, Math.min(100, contrapesoDirectoRaw));
-  }, [contrapesoDirectoRaw]);
+  }, [contrapesoDirectoRaw, simulacaoAtiva, sim.contrapesoDireito]);
 
   const contrapesoEsquerdo = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.contrapesoEsquerdo;
     return Math.max(0, Math.min(100, contrapesoEsquerdoRaw));
-  }, [contrapesoEsquerdoRaw]);
+  }, [contrapesoEsquerdoRaw, simulacaoAtiva, sim.contrapesoEsquerdo]);
 
   const reguaPortaJusante = React.useMemo(() => {
+    if (simulacaoAtiva) return sim.reguaPortaJusante;
     return Math.max(0, Math.min(100, reguaPortaJusanteRaw));
-  }, [reguaPortaJusanteRaw]);
+  }, [reguaPortaJusanteRaw, simulacaoAtiva, sim.reguaPortaJusante]);
+
+  const motorDireito = simulacaoAtiva ? sim.motorDireito : motorDireitoReal;
+  const motorEsquerdo = simulacaoAtiva ? sim.motorEsquerdo : motorEsquerdoReal;
+
+  // 🏷️ RPM/Corrente/Status derivados do estado real do motor (em vez de
+  // Math.random() solto) - 0 quando parado, valor nominal quando a rodar.
+  const RPM_NOMINAL = 1450;
+  const CORRENTE_NOMINAL = 12.5;
+  const motorDireitoRPM = motorDireito === 1 ? RPM_NOMINAL : 0;
+  const motorEsquerdoRPM = motorEsquerdo === 1 ? RPM_NOMINAL : 0;
+  const motorDireitoCorrente = motorDireito === 1 ? CORRENTE_NOMINAL : 0;
+  const motorEsquerdoCorrente = motorEsquerdo === 1 ? CORRENTE_NOMINAL : 0;
+  const statusLabel = (m: number) => (m === 1 ? 'RODANDO' : m === 2 ? 'FALHA' : 'PARADO');
+  const statusCor = (m: number) => (m === 1 ? 'text-green-600' : m === 2 ? 'text-red-600' : 'text-gray-500');
+  const motorDireitoStatus = statusLabel(motorDireito);
+  const motorEsquerdoStatus = statusLabel(motorEsquerdo);
+  const algumMotorEmFalha = motorDireito === 2 || motorEsquerdo === 2;
+  const algumMotorRodando = motorDireito === 1 || motorEsquerdo === 1;
+  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'RODANDO' : 'PARADO';
 
   // Performance optimization: Debug logging only in development
   React.useEffect(() => {
@@ -314,12 +344,12 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Abertura:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {reguaPortaJusante}<span className="text-gray-500 text-[7px]">%</span>
+                      {reguaPortaJusante.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
-                      <div className="text-[7px] text-gray-600 font-medium uppercase">Dif. E/D:</div>
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Diferença:</div>
                       <div className="font-mono font-bold text-[#212E3E] text-[9px]">
                         {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500 text-[6px]">mm</span>
                       </div>
@@ -336,36 +366,23 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                   </h3>
                 </div>
                 <div className="p-2 space-y-1">
-                  {/* MOTOR DIREITO */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[7px] text-gray-600 font-medium uppercase">M. DIREITO</span>
-                      <div className={`w-1.5 h-1.5 rounded-full ${motorDireito === 1 ? 'bg-green-500' : motorDireito === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                        {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
-                      </span>
-                      <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                        {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
-                      </span>
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">M. Direito:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {motorDireitoRPM} <span className="text-gray-500 text-[7px]">RPM</span>
                     </div>
                   </div>
-
+                  <div className="text-center">
+                    <div className="text-[8px] text-gray-600 font-medium uppercase">M. Esquerdo:</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      {motorEsquerdoRPM} <span className="text-gray-500 text-[7px]">RPM</span>
+                    </div>
+                  </div>
                   <div className="border-t border-gray-200 pt-1">
-                    {/* MOTOR ESQUERDO */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[7px] text-gray-600 font-medium uppercase">M. ESQUERDO</span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${motorEsquerdo === 1 ? 'bg-green-500' : motorEsquerdo === 2 ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500 text-[6px]">RPM</span>
-                        </span>
-                        <span className="font-mono font-bold text-[#212E3E] text-[8px]">
-                          {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500 text-[6px]">A</span>
-                        </span>
+                    <div className="text-center">
+                      <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
+                      <div className={`font-mono font-bold text-[9px] ${statusCor(algumMotorEmFalha ? 2 : algumMotorRodando ? 1 : 0)}`}>
+                        {statusGeralMotores}
                       </div>
                     </div>
                   </div>
@@ -383,20 +400,20 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Esquerdo:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {contrapesoEsquerdo}<span className="text-gray-500 text-[7px]">%</span>
+                      {contrapesoEsquerdo.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-[8px] text-gray-600 font-medium uppercase">Direito:</div>
                     <div className="font-mono font-bold text-[#212E3E] text-[10px]">
-                      {contrapesoDirecto}<span className="text-gray-500 text-[7px]">%</span>
+                      {contrapesoDirecto.toFixed(1)}<span className="text-gray-500 text-[7px]">%</span>
                     </div>
                   </div>
                   <div className="border-t border-gray-200 pt-1">
                     <div className="text-center">
                       <div className="text-[7px] text-gray-600 font-medium uppercase">Status:</div>
-                      <div className="font-mono font-bold text-green-600 text-[8px]">
-                        OPER.
+                      <div className={`font-mono font-bold text-[8px] ${statusCor(algumMotorRodando ? 1 : 0)}`}>
+                        {algumMotorRodando ? 'EM MOVIMENTO' : 'PARADO'}
                       </div>
                     </div>
                   </div>
@@ -696,12 +713,12 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Abertura:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {reguaPortaJusante}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {reguaPortaJusante.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                         <div className="border-t border-gray-200 my-1"></div>
                         <div className="flex justify-between items-center">
-                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Dif. E/D:</span>
+                          <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Diferença:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
                             {Math.abs(contrapesoEsquerdo - contrapesoDirecto).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>mm</span>
                           </span>
@@ -709,13 +726,13 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. E:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {contrapesoEsquerdo}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {contrapesoEsquerdo.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Contrap. D:</span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(13)}px` }}>
-                            {contrapesoDirecto}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
+                            {contrapesoDirecto.toFixed(1)}<span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>%</span>
                           </span>
                         </div>
                       </div>
@@ -789,12 +806,13 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                            {motorDireitoRPM} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
                           </span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                            {motorDireitoCorrente.toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
                           </span>
                         </div>
+                        <div className={`text-right font-mono font-bold ${statusCor(motorDireito)}`} style={{ fontSize: `${fontSize(9)}px` }}>{motorDireitoStatus}</div>
                       </div>
 
                       <div className="border-t border-gray-200 my-1"></div>
@@ -807,12 +825,13 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {Math.round(1450 + Math.random() * 100)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
+                            {motorEsquerdoRPM} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>RPM</span>
                           </span>
                           <span className="font-mono font-bold text-[#212E3E]" style={{ fontSize: `${fontSize(12)}px` }}>
-                            {(12.5 + Math.random() * 2).toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
+                            {motorEsquerdoCorrente.toFixed(1)} <span className="text-gray-500" style={{ fontSize: `${fontSize(8)}px` }}>A</span>
                           </span>
                         </div>
+                        <div className={`text-right font-mono font-bold ${statusCor(motorEsquerdo)}`} style={{ fontSize: `${fontSize(9)}px` }}>{motorEsquerdoStatus}</div>
                       </div>
                     </div>
                   </div>
@@ -847,8 +866,8 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#212E3E] uppercase" style={{ fontSize: `${fontSize(9)}px` }}>Status:</span>
-                          <span className="font-mono font-bold text-green-600" style={{ fontSize: `${fontSize(13)}px` }}>
-                            OK
+                          <span className={`font-mono font-bold ${algumMotorEmFalha ? 'text-red-600' : algumMotorRodando ? 'text-green-600' : 'text-gray-500'}`} style={{ fontSize: `${fontSize(13)}px` }}>
+                            {statusGeralMotores}
                           </span>
                         </div>
                       </div>

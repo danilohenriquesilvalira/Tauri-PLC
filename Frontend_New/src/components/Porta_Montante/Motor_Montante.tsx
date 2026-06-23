@@ -35,11 +35,7 @@ const MotorMontante: React.FC<MotorMontanteProps> = ({
   }, [websocketValue]);
 
   return (
-    <div
-      className="w-full h-full relative"
-      style={{ overflow: 'hidden' }}
-    >
-      {/* SVG com posição absoluta para evitar recálculos de layout */}
+    <div className="w-full h-full flex items-center justify-center">
       <svg
         width="100%"
         height="100%"
@@ -47,14 +43,13 @@ const MotorMontante: React.FC<MotorMontanteProps> = ({
         preserveAspectRatio="xMidYMin meet"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          transform: direction === 'right' ? 'scaleX(-1)' : 'none',
-          transformOrigin: 'center'
-        }}
+        className="w-full h-full"
       >
+        {/* Espelhamento em UNIDADES DO VIEWBOX (não scaleX(-1)+transformOrigin
+            percentual no <svg> raiz) - evita depender de transform-origin
+            percentual, que o Safari/WebKit (iOS) resolve de forma diferente
+            do Chrome/Blink dentro de um foreignObject. */}
+        <g style={{ transform: direction === 'right' ? 'scale(-1, 1) translate(-82px, 0px)' : 'none' }}>
           <path d="M19.9999 9.45996H23.5334V26.3437H19.9999V9.45996Z" fill="url(#paint0_linear_1825_122)" stroke="#646567" strokeWidth="0.75" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
           
           {/* Corpo principal do motor */}
@@ -150,6 +145,7 @@ const MotorMontante: React.FC<MotorMontanteProps> = ({
               <stop offset="1" stopColor="#1A1A1A"/>
             </linearGradient>
           </defs>
+        </g>
         </svg>
     </div>
   );

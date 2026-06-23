@@ -731,6 +731,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 </div>
               </foreignObject>
             )}
+
           </svg>
         ) : (
           /* Loading otimizado - mantém proporções corretas */

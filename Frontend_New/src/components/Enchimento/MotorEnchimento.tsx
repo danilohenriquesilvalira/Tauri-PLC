@@ -38,18 +38,19 @@ const MotorEnchimento: React.FC<MotorEnchimentoProps> = ({
 
   return (
     <div className="w-full h-full flex items-center justify-center">
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox="0 0 82 40" 
-        fill="none" 
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 82 40"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
-        style={{
-          transform: side === 'esquerdo' ? 'scaleX(1)' : 'scaleX(-1)', // Motor esquerdo normal, direito espelhado
-          transition: 'all 0.3s ease-in-out'
-        }}
       >
+        {/* Espelhamento em UNIDADES DO VIEWBOX (não scaleX(-1) em %CSS no <svg>
+            raiz) - evita depender de transform-origin percentual, que o
+            Safari/WebKit (iOS) resolve de forma diferente do Chrome/Blink
+            dentro de um foreignObject. */}
+        <g style={{ transform: side === 'esquerdo' ? 'none' : 'scale(-1, 1) translate(-82px, 0px)', transition: 'all 0.3s ease-in-out' }}>
           <path d="M19.9999 9.45996H23.5334V26.3437H19.9999V9.45996Z" fill="url(#paint0_linear_1825_122)" stroke="#646567" strokeWidth="0.75" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
           
           {/* Corpo principal do motor - Muda de cor com o status */}
@@ -150,6 +151,7 @@ const MotorEnchimento: React.FC<MotorEnchimentoProps> = ({
               <stop offset="1" stopColor="#1A1A1A"/>
             </linearGradient>
           </defs>
+        </g>
         </svg>
     </div>
   );

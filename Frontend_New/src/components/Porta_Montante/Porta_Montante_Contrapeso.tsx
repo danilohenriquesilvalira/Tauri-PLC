@@ -11,10 +11,11 @@ const ContraPeso20t: React.FC<ContraPeso20tProps> = ({
   // Memoizar cálculos para evitar recálculos desnecessários
   const { posicaoContrapeso, alturaCorda } = React.useMemo(() => {
     const maxDescida = 350;
-    // Detectar mobile apenas no cálculo
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-    const extensaoMobile = isMobile ? 80 : 0;
-    const posicao = (websocketValue * maxDescida) / 100 + extensaoMobile;
+    // Sem extensão extra no mobile - causava o contrapeso passar da base
+    // (overshoot) só no telemóvel, já que o LAYOUT/foreignObject não tinha
+    // essa folga extra reservada. A descida deve ser idêntica em qualquer
+    // tamanho de tela.
+    const posicao = (websocketValue * maxDescida) / 100;
     const pontoConexaoOriginal = 20;
     return {
       posicaoContrapeso: posicao,
@@ -33,12 +34,6 @@ const ContraPeso20t: React.FC<ContraPeso20tProps> = ({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-full"
-        style={{
-          willChange: 'transform',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transformStyle: 'preserve-3d'
-        }}
       >
         {/* Contrapeso COM MOVIMENTO INTERNO ORIGINAL */}
         <g transform={`translate(0, ${posicaoContrapeso})`}>

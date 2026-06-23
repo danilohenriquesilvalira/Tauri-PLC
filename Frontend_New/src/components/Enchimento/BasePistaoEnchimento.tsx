@@ -17,16 +17,19 @@ const BasePistaoEnchimento: React.FC<BasePistaoEnchimentoProps> = ({
         viewBox="0 0 298 470"
         preserveAspectRatio="xMidYMid meet"
         className="w-full h-full"
-        style={{
-          transform: side === 'direito' ? 'scaleX(-1)' : 'none'
-        }}
       >
-        <image
-          href="/Enchimento/Base_Cilindro_Enchimento.svg"
-          width="298"
-          height="470"
-          preserveAspectRatio="xMidYMid meet"
-        />
+        {/* Espelhamento em UNIDADES DO VIEWBOX (não scaleX(-1) em %CSS no <svg>
+            raiz) - evita depender de transform-origin percentual, que o
+            Safari/WebKit (iOS) resolve de forma diferente do Chrome/Blink
+            dentro de um foreignObject. */}
+        <g style={{ transform: side === 'direito' ? 'scale(-1, 1) translate(-298px, 0px)' : 'none' }}>
+          <image
+            href="/Enchimento/Base_Cilindro_Enchimento.svg"
+            width="298"
+            height="470"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </g>
       </svg>
     </div>
   );
