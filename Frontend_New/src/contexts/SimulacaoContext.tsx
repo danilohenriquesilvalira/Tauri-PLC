@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Fase =
   | 'IDLE'
@@ -75,15 +75,15 @@ function ease(t: number) {
 }
 
 const FASE_LABELS: Record<Fase, string> = {
-  IDLE:               'AGUARDANDO',
-  GATE_MONT_OPENING:  'ABRINDO PORTA MONTANTE',
+  IDLE:               'A AGUARDAR',
+  GATE_MONT_OPENING:  'A ABRIR PORTA MONTANTE',
   GATE_MONT_OPEN:     'ENTRADA AUTORIZADA — MONTANTE',
-  GATE_MONT_CLOSING:  'FECHANDO PORTA MONTANTE',
-  DRAINING:           'ESVAZIANDO CALDEIRA',
-  GATE_JUS_OPENING:   'ABRINDO PORTA JUSANTE',
+  GATE_MONT_CLOSING:  'A FECHAR PORTA MONTANTE',
+  DRAINING:           'A ESVAZIAR CALDEIRA',
+  GATE_JUS_OPENING:   'A ABRIR PORTA JUSANTE',
   GATE_JUS_OPEN:      'SAÍDA AUTORIZADA — JUSANTE',
-  GATE_JUS_CLOSING:   'FECHANDO PORTA JUSANTE',
-  FILLING:            'ENCHENDO CALDEIRA',
+  GATE_JUS_CLOSING:   'A FECHAR PORTA JUSANTE',
+  FILLING:            'A ENCHER CALDEIRA',
 };
 
 // Dado um instante absoluto (Date.now()), calcula em que fase do ciclo estamos e o progresso
@@ -197,20 +197,20 @@ const SimulacaoContext = createContext<SimCtx>({
 
 export const SimulacaoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [values, setValues] = useState<EclusaSimValues>(DEFAULT_VALUES);
-  const rafRef = useRef<number | null>(null);
 
-  const tick = useCallback(() => {
-    const { fase, progress } = getFaseAtTime(Date.now());
-    setValues(computeValues(fase, progress));
-    rafRef.current = requestAnimationFrame(tick);
-  }, []);
-
+  // setInterval (não requestAnimationFrame) - função pura do tempo amostrada
+  // a cada 200ms, leve para o React. Re-renderizar tudo a 60x/segundo fazia
+  // o browser perder frames. Mesmo padrão usado em Enchimento/Esvaziamento/
+  // PortaMontante/PortaJusante.
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const tick = () => {
+      const { fase, progress } = getFaseAtTime(Date.now());
+      setValues(computeValues(fase, progress));
     };
-  }, [tick]);
+    tick();
+    const intervalId = setInterval(tick, 200);
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <SimulacaoContext.Provider value={{ simulacaoAtiva: true, values }}>

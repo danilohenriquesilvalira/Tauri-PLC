@@ -39,14 +39,19 @@ export default function NivelJusante({
       >
         <defs>
           <clipPath id="nivelJusanteClip">
-            <rect x="0" y={73 - (displayNivel / 100) * 73} width="185" height={(displayNivel / 100) * 73} />
+            <rect
+              x="0"
+              y={73 - (displayNivel / 100) * 73}
+              width="185"
+              height={(displayNivel / 100) * 73}
+              style={{ transition: 'y 0.5s ease-in-out, height 0.5s ease-in-out' }}
+            />
           </clipPath>
         </defs>
         <path
           d="M184.5 73.0032H0.5L0 0H65.5H184.5V73.0032Z"
           fill="#1E00FF"
           clipPath="url(#nivelJusanteClip)"
-          style={{ transition: 'all 0.5s ease-in-out' }}
         />
       </svg>
       

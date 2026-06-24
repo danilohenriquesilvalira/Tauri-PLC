@@ -80,7 +80,7 @@ export function TableWithPagination<T extends Record<string, any>>({
       <div className="bg-white border border-edp-neutral-lighter rounded-lg shadow-sm overflow-hidden">
         <div className="p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-edp-electric mx-auto"></div>
-          <p className="mt-4 text-edp-neutral-medium font-edp">Carregando...</p>
+          <p className="mt-4 text-edp-neutral-medium font-edp">A carregar...</p>
         </div>
       </div>
     );

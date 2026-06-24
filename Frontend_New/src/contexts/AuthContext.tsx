@@ -21,7 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const login = (u: string, p: string): boolean => {
-    if (btoa(u) === _V.u && btoa(p) === _V.p) {
+    if (btoa(u.trim().toLowerCase()) === _V.u && btoa(p) === _V.p) {
       try { sessionStorage.setItem('_edp_auth', '1'); } catch {}
       setIsAuthenticated(true);
       return true;

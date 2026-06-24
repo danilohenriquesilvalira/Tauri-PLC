@@ -5,7 +5,7 @@ interface PortaMontanteReguaProps {
   editMode?: boolean;
 }
 
-const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
+const PortaMontanteReguaBase: React.FC<PortaMontanteReguaProps> = ({
   websocketValue = 0,
 }) => {
   // Memoizar cálculos para evitar recálculos desnecessários
@@ -30,7 +30,7 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
         className="w-full h-full"
       >
         {/* Porta com movimento vertical */}
-        <g transform={`translate(0, ${posicaoPorta})`}>
+        <g style={{ transform: `translateY(${posicaoPorta}px)`, transition: 'transform 0.5s ease-in-out' }}>
           <rect x="14.3867" y="19.7812" width="15.5859" height="23.9783" fill="black"/>
           <rect x="643.82" y="18.5781" width="15.5859" height="23.9783" fill="black"/>
           <rect x="0.5" y="39.0156" width="667.659" height="381.384" fill="#7F7F7F" stroke="black"/>
@@ -106,6 +106,7 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
           x="17.18"
           y="0"
           fill="black"
+          style={{ transition: 'height 0.5s ease-in-out' }}
         />
 
         <rect
@@ -114,6 +115,7 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
           x="646.61"
           y="0"
           fill="black"
+          style={{ transition: 'height 0.5s ease-in-out' }}
         />
 
         <defs>
@@ -196,4 +198,5 @@ const PortaMontanteRegua: React.FC<PortaMontanteReguaProps> = ({
   );
 };
 
+const PortaMontanteRegua = React.memo(PortaMontanteReguaBase);
 export default PortaMontanteRegua;

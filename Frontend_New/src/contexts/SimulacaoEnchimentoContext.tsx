@@ -59,12 +59,12 @@ function lerp(a: number, b: number, t: number) {
 }
 
 const FASE_LABELS: Record<Fase, string> = {
-  IDLE:              'AGUARDANDO',
-  BOMBA_LIGA:        'LIGANDO BOMBA',
-  ALINHAR_VALVULAS:  'ALINHANDO VÁLVULAS',
-  SUBINDO:           'ABRINDO - PISTÃO A SUBIR',
+  IDLE:              'A AGUARDAR',
+  BOMBA_LIGA:        'A LIGAR BOMBA',
+  ALINHAR_VALVULAS:  'A ALINHAR VÁLVULAS',
+  SUBINDO:           'A ABRIR - PISTÃO A SUBIR',
   ABERTO:            'ENCHIMENTO EM CURSO',
-  DESCENDO:          'FECHANDO - PISTÃO A DESCER',
+  DESCENDO:          'A FECHAR - PISTÃO A DESCER',
 };
 
 // Dado um instante absoluto (Date.now()), calcula em que fase do ciclo estamos e o progresso

@@ -6,7 +6,7 @@ interface MotorMontanteProps {
   direction?: 'left' | 'right';
 }
 
-const MotorMontante: React.FC<MotorMontanteProps> = ({
+const MotorMontanteBase: React.FC<MotorMontanteProps> = ({
   websocketValue = 0,
   editMode = false,
   direction = 'left'
@@ -151,4 +151,5 @@ const MotorMontante: React.FC<MotorMontanteProps> = ({
   );
 };
 
+const MotorMontante = React.memo(MotorMontanteBase);
 export default MotorMontante;

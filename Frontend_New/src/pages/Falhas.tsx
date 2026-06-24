@@ -33,7 +33,7 @@ const Falhas: React.FC = () => {
               <div className="p-2 bg-blue-100 rounded-lg">
                 <Activity className="w-6 h-6 text-blue-600" />
               </div>
-              Sistema de Monitoramento - Debug Completo
+              Sistema de Monitorização - Debug Completo
             </h1>
             <p className="text-base text-gray-600 font-edp leading-relaxed">
               Visualização em tempo real dos dados do WebSocket e sistema de falhas

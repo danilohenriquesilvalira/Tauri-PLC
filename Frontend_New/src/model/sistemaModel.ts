@@ -472,7 +472,7 @@ export function sistemaReducer(state: SistemaState, action: Action): SistemaStat
 // HELPERS PARA A UI
 // ============================================
 
-export function getStatusGeral(state: SistemaState): 'PARADO' | 'OPERANDO' | 'ALARME' | 'FALHA' {
+export function getStatusGeral(state: SistemaState): 'PARADO' | 'EM OPERAÇÃO' | 'ALARME' | 'FALHA' {
   const protecoesOK =
     state.protBomba &&
     state.protDescalc1 &&
@@ -493,7 +493,7 @@ export function getStatusGeral(state: SistemaState): 'PARADO' | 'OPERANDO' | 'AL
     state.alarmeCondutivimetro;
 
   if (alarmeAtivo) return 'ALARME';
-  if (state.bombaRecirculacao) return 'OPERANDO';
+  if (state.bombaRecirculacao) return 'EM OPERAÇÃO';
   return 'PARADO';
 }
 
@@ -559,7 +559,7 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
     return {
       etapa: 'NÍVEL BAIXO',
       descricao: 'Depósito de entrada com nível crítico',
-      detalhe: `Nível atual: ${state.nivelEntrada.toFixed(0)}%. Aguardando reposição.`,
+      detalhe: `Nível atual: ${state.nivelEntrada.toFixed(0)}%. A aguardar reposição.`,
       icone: 'standby',
       progresso: state.nivelEntrada
     };
@@ -570,7 +570,7 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
     return {
       etapa: 'TANQUE CHEIO',
       descricao: 'Tanque final atingiu capacidade máxima',
-      detalhe: `Nível: ${state.nivelTanqueFinal.toFixed(0)}%. Distribuindo para consumo.`,
+      detalhe: `Nível: ${state.nivelTanqueFinal.toFixed(0)}%. A distribuir para consumo.`,
       icone: 'cheio',
       progresso: 100
     };
@@ -582,15 +582,15 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
       return {
         etapa: 'STANDBY',
         descricao: 'Sistema em espera',
-        detalhe: `Tanque com ${state.nivelTanqueFinal.toFixed(0)}%. Aguardando necessidade de reposição.`,
+        detalhe: `Tanque com ${state.nivelTanqueFinal.toFixed(0)}%. A aguardar necessidade de reposição.`,
         icone: 'standby',
         progresso: state.nivelTanqueFinal
       };
     }
     return {
-      etapa: 'AGUARDANDO',
-      descricao: 'Preparando para iniciar ciclo',
-      detalhe: 'Verificando condições para acionamento da bomba.',
+      etapa: 'A AGUARDAR',
+      descricao: 'A preparar para iniciar ciclo',
+      detalhe: 'A verificar condições para acionamento da bomba.',
       icone: 'standby'
     };
   }
@@ -599,8 +599,8 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
   if (state.bombaRecirculacao && !state.pressostatoBomba) {
     const progressoPressao = (state.pressaoLinha / state.parametros.pressaoMinima) * 100;
     return {
-      etapa: 'PRESSURIZANDO',
-      descricao: 'Bomba acionada, pressurizando linha',
+      etapa: 'A PRESSURIZAR',
+      descricao: 'Bomba acionada, a pressurizar linha',
       detalhe: `Pressão: ${state.pressaoLinha.toFixed(1)} bar (mínimo: ${state.parametros.pressaoMinima} bar)`,
       icone: 'pressao',
       progresso: Math.min(100, progressoPressao)
@@ -610,20 +610,20 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
   // 7. PRESSÃO OK, OSMOSE INICIANDO
   if (state.bombaRecirculacao && state.pressostatoBomba && !state.comandoOsmose) {
     return {
-      etapa: 'VERIFICANDO REDOX',
-      descricao: 'Pressão OK, verificando qualidade da água',
-      detalhe: `Redox: ${state.redox.toFixed(0)} mV - Analisando parâmetros para osmose.`,
+      etapa: 'A VERIFICAR REDOX',
+      descricao: 'Pressão OK, a verificar qualidade da água',
+      detalhe: `Redox: ${state.redox.toFixed(0)} mV - A analisar parâmetros para osmose.`,
       icone: 'osmose'
     };
   }
 
-  // 8. OSMOSE OPERANDO - PRODUZINDO ÁGUA
+  // 8. OSMOSE EM OPERAÇÃO - A PRODUZIR ÁGUA
   if (state.comandoOsmose) {
     const eficiencia = Math.min(100, ((state.pressaoLinha - state.parametros.pressaoMinima) /
       (state.parametros.pressaoNominal - state.parametros.pressaoMinima)) * 100);
 
     return {
-      etapa: 'PRODUZINDO',
+      etapa: 'A PRODUZIR',
       descricao: 'Sistema de osmose reversa em operação',
       detalhe: `Eficiência: ${eficiencia.toFixed(0)}% | Pressão: ${state.pressaoLinha.toFixed(1)} bar | Tanque: ${state.nivelTanqueFinal.toFixed(0)}%`,
       icone: 'osmose',
@@ -633,7 +633,7 @@ export function getProcessoStatus(state: SistemaState): ProcessoStatus {
 
   // DEFAULT
   return {
-    etapa: 'OPERANDO',
+    etapa: 'EM OPERAÇÃO',
     descricao: 'Sistema em operação normal',
     icone: 'standby'
   };

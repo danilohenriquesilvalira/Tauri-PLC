@@ -519,7 +519,7 @@ const WebSocketDebug: React.FC = () => {
               disabled={isConnecting}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {isConnecting ? 'Conectando...' : 'Conectar'}
+              {isConnecting ? 'A ligar...' : 'Conectar'}
             </button>
           ) : (
             <button
@@ -640,7 +640,7 @@ const WebSocketDebug: React.FC = () => {
                   </div>
                   <div className="p-2 max-h-96 overflow-y-auto">
                     <div className="text-xs text-center text-green-600 font-bold mb-2">
-                      🎯 MOSTRANDO TODOS OS {tagCount} TAGS SEM CORTAR
+                      🎯 A MOSTRAR TODOS OS {tagCount} TAGS SEM CORTAR
                     </div>
                     <div className="grid grid-cols-2 gap-1 text-xs">
                       {Object.entries(groupTags).map(([key, value]) => (

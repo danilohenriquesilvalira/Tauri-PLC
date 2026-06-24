@@ -465,15 +465,15 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
   const valvulaDirecionalDireita3 = simulacaoAtiva ? (sim.valvesOpen ? 1 : 0) : (valvulasComplexasData?.valvulaDirecionalDireita3Real || 0);
 
   // 🏷️ ESTADO - segue a fase real do ciclo (não só a % de posição), para
-  // "Fechando" aparecer corretamente enquanto desce, mesmo antes de passar
+  // "A fechar" aparecer corretamente enquanto desce, mesmo antes de passar
   // dos 50%/10% que a heurística antiga usava.
   const estadoPistao = simulacaoAtiva
-    ? (sim.fase === 'SUBINDO' ? 'SUBINDO'
-      : sim.fase === 'DESCENDO' ? 'FECHANDO'
+    ? (sim.fase === 'SUBINDO' ? 'A SUBIR'
+      : sim.fase === 'DESCENDO' ? 'A FECHAR'
       : sim.fase === 'ABERTO' ? 'ABERTO'
       : sim.fase === 'IDLE' ? 'FECHADO'
-      : 'PREPARANDO')
-    : (posicaoPorcentagemDireito > 50 ? 'ABRINDO' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL');
+      : 'A PREPARAR')
+    : (posicaoPorcentagemDireito > 50 ? 'A ABRIR' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL');
 
   return (
     <div
@@ -1128,7 +1128,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-[10px] md:text-base font-bold truncate">PARÂMETROS</h2>
-                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitoramento</p>
+                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitorização</p>
                   </div>
                 </div>
                 <button
@@ -1292,7 +1292,7 @@ const Enchimento: React.FC<EnchimentoProps> = () => {
                   className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
                   style={{ touchAction: 'manipulation' }}
                 >
-                  Salvar Configurações
+                  Guardar Configurações
                 </button>
               </div>
             </div>

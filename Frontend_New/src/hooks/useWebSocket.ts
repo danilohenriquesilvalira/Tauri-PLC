@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PLCData, ConnectionStatus, WriteRequest, TagData } from '../types/plc';
 
+declare global {
+  interface Window {
+    wsDebugTime?: number;
+    lastCacheTime?: number;
+  }
+}
+
 interface UseWebSocketReturn {
   data: PLCData | null;
   connectionStatus: ConnectionStatus;

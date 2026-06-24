@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
-import { useNav } from '../../contexts/NavContext';
 
 type NavItem = 'eclusa' | 'enchimento' | 'esvaziamento' | 'porta_jusante' | 'porta_montante';
 
@@ -20,7 +19,6 @@ export const Sidebar = () => {
   const [activeItem, setActiveItem] = useState<NavItem>('eclusa');
   const navigate = useNavigate();
   const location = useLocation();
-  const { paramAction } = useNav();
 
   useEffect(() => {
     const p = location.pathname;
@@ -98,19 +96,14 @@ export const Sidebar = () => {
         <div className="w-px self-stretch my-2 bg-white/[0.1] flex-shrink-0" />
         <div className="px-1.5 py-1.5">
           <button
-            onClick={paramAction ?? undefined}
             title="Parâmetros"
-            disabled={!paramAction}
-            className={`
+            className="
               flex flex-col items-center justify-center gap-0.5
               px-2.5 py-1.5 lg:px-3 lg:py-2 rounded-xl
               min-w-[48px] lg:min-w-[56px]
               transition-all duration-200 select-none touch-manipulation
-              ${paramAction
-                ? 'text-white/70 hover:text-white hover:bg-white/[0.1] active:bg-white/[0.15]'
-                : 'text-white/25 cursor-default'
-              }
-            `}
+              text-white/70 hover:text-white hover:bg-white/[0.1] active:bg-white/[0.15]
+            "
           >
             <Cog6ToothIcon className="w-[18px] h-[18px] lg:w-[22px] lg:h-[22px]" />
             <span className="text-[7.5px] lg:text-[9px] font-medium tracking-wide leading-none">Config.</span>

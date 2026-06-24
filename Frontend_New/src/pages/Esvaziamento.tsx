@@ -372,12 +372,12 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
   // 🏷️ ESTADO - segue a fase real do ciclo (não só a % de posição), igual
   // ao padrão da página Enchimento.
   const estadoPistao = simulacaoAtiva
-    ? (sim.fase === 'SUBINDO' ? 'SUBINDO'
-      : sim.fase === 'DESCENDO' ? 'FECHANDO'
+    ? (sim.fase === 'SUBINDO' ? 'A SUBIR'
+      : sim.fase === 'DESCENDO' ? 'A FECHAR'
       : sim.fase === 'ABERTO' ? 'ABERTO'
       : sim.fase === 'IDLE' ? 'FECHADO'
-      : 'PREPARANDO')
-    : (posicaoPorcentagemDireito > 50 ? 'ABRINDO' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL');
+      : 'A PREPARAR')
+    : (posicaoPorcentagemDireito > 50 ? 'A ABRIR' : posicaoPorcentagemDireito < 10 ? 'FECHADO' : 'PARCIAL');
 
   return (
     <div
@@ -825,7 +825,7 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-[10px] md:text-base font-bold truncate">PARÂMETROS — ESVAZIAMENTO</h2>
-                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitoramento</p>
+                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitorização</p>
                   </div>
                 </div>
                 <button
@@ -962,7 +962,7 @@ const Esvaziamento: React.FC<EsvaziamentoProps> = () => {
                   className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
                   style={{ touchAction: 'manipulation' }}
                 >
-                  Salvar Configurações
+                  Guardar Configurações
                 </button>
               </div>
             </div>

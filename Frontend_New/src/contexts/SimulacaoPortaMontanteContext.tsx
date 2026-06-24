@@ -34,9 +34,9 @@ function lerp(a: number, b: number, t: number) {
 
 const FASE_LABELS: Record<Fase, string> = {
   IDLE:      'FECHADA',
-  ABRINDO:   'ABRINDO',
+  ABRINDO:   'A ABRIR',
   ABERTO:    'ABERTA',
-  FECHANDO:  'FECHANDO',
+  FECHANDO:  'A FECHAR',
 };
 
 // Dado um instante absoluto (Date.now()), calcula em que fase do ciclo estamos e o progresso

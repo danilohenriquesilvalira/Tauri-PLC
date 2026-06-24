@@ -363,30 +363,30 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 </div>
               </div>
 
-              {/* CARD 3 — VELOCIDADES RADARES */}
+              {/* CARD 3 — INFORMAÇÕES OPERACIONAIS */}
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                 <div className="bg-edp-marine text-white px-2 py-1">
-                  <h3 className="font-bold text-[7px] uppercase tracking-wide text-center leading-tight">
-                    VELOC. RADARES
+                  <h3 className="font-bold text-[7px] uppercase tracking-wide text-center leading-tight whitespace-nowrap">
+                    INFO. OPERACIONAL
                   </h3>
                 </div>
                 <div className="p-2 flex-1 flex flex-col justify-between">
                   <div className="text-center">
-                    <div className="text-[7px] text-gray-500 font-medium uppercase">Montante</div>
-                    <div className={`font-mono font-bold text-[10px] ${radarMontante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
-                      {radarMontante.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Operador</div>
+                    <div className="font-mono font-bold text-[#212E3E] text-[10px]">
+                      J. SILVA
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-[7px] text-gray-500 font-medium uppercase">Caldeira</div>
-                    <div className={`font-mono font-bold text-[10px] ${radarCaldeira > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
-                      {radarCaldeira.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Porta Mont.</div>
+                    <div className="font-mono font-bold text-edp-marine text-[10px]">
+                      {Math.round(efPortaMontante)}%
                     </div>
                   </div>
                   <div className="border-t border-gray-100 pt-1 text-center">
-                    <div className="text-[7px] text-gray-500 font-medium uppercase">Jusante</div>
-                    <div className={`font-mono font-bold text-[10px] ${radarJusante > 2.0 ? 'text-red-600' : 'text-[#212E3E]'}`}>
-                      {radarJusante.toFixed(2)} <span className="text-gray-400 text-[7px]">m/s</span>
+                    <div className="text-[7px] text-gray-500 font-medium uppercase">Porta Jus.</div>
+                    <div className="font-mono font-bold text-edp-marine text-[10px]">
+                      {Math.round(dispPortaJusante)}%
                     </div>
                   </div>
                 </div>
@@ -498,7 +498,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
             {/* Componente Porta Jusante - Dados reais do PLC */}
             <foreignObject x={LAYOUT.portaJusante.x} y={LAYOUT.portaJusante.y} width={LAYOUT.portaJusante.width} height={LAYOUT.portaJusante.height}>
               <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} className="w-full h-full">
-                <PortaJusante websocketValue={efPortaJusante} editMode={false} instant={simulacaoAtiva} />
+                <PortaJusante websocketValue={efPortaJusante} editMode={false} instant={false} />
               </div>
             </foreignObject>
 
@@ -508,7 +508,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                 <PortaMontante
                   websocketValue={efPortaMontante}
                   editMode={false}
-                  instant={simulacaoAtiva}
+                  instant={false}
                 />
               </div>
             </foreignObject>
@@ -790,7 +790,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-xs lg:text-sm font-bold tracking-wide">PARÂMETROS</h2>
-                    <p className="text-white/60 text-[10px] lg:text-xs mt-0.5">Configurações e Monitoramento</p>
+                    <p className="text-white/60 text-[10px] lg:text-xs mt-0.5">Configurações e Monitorização</p>
                   </div>
                 </div>
                 <button
@@ -899,7 +899,7 @@ const EclusaRegua: React.FC<EclusaReguaProps> = () => {
                   className="flex-1 lg:flex-none lg:w-auto px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs lg:text-sm font-medium transition-colors shadow-sm"
                   style={{ touchAction: 'manipulation' }}
                 >
-                  Salvar Configurações
+                  Guardar Configurações
                 </button>
               </div>
             </div>

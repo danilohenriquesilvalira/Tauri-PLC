@@ -39,14 +39,19 @@ export default function NivelCaldeira({
       >
         <defs>
           <clipPath id="nivelCaldeiraClip">
-            <rect x="0" y={158 - (displayNivel / 100) * 158} width="687" height={(displayNivel / 100) * 158} />
+            <rect
+              x="0"
+              y={158 - (displayNivel / 100) * 158}
+              width="687"
+              height={(displayNivel / 100) * 158}
+              style={{ transition: 'y 0.5s ease-in-out, height 0.5s ease-in-out' }}
+            />
           </clipPath>
         </defs>
         <path
           d="M0 83.5134V0.0134258H16H25L686.5 0V157.013H674.5H673H633.5H632.5H11.5L3 144.513V88.5134L0 83.5134Z"
           fill="#1E00FF"
           clipPath="url(#nivelCaldeiraClip)"
-          style={{ transition: 'all 0.5s ease-in-out' }}
         />
       </svg>
       

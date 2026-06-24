@@ -39,14 +39,19 @@ export default function NivelMontante({
       >
         <defs>
           <clipPath id="nivelMontanteClip">
-            <rect x="0" y={137 - (displayNivel / 100) * 137} width="296" height={(displayNivel / 100) * 137} />
+            <rect
+              x="0"
+              y={137 - (displayNivel / 100) * 137}
+              width="296"
+              height={(displayNivel / 100) * 137}
+              style={{ transition: 'y 0.5s ease-in-out, height 0.5s ease-in-out' }}
+            />
           </clipPath>
         </defs>
         <path
           d="M223.559 136.5H0V0.5H180H184.689H296V44H252L231.5 131H224L223.559 136.5Z"
           fill="#1E00FF"
           clipPath="url(#nivelMontanteClip)"
-          style={{ transition: 'all 0.5s ease-in-out' }}
         />
       </svg>
       

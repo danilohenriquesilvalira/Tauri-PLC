@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 /* ═══════════════════════════════════════════════════════
-   Eclusa de Crestuma-Lever — comporta vagão, plano fechado
+   Eclusa de Navegação — comporta vagão, plano fechado
    Cena leve para fundo de login: sem câmara completa,
    sem casinha, sem árvores/pássaros/barco, sem OrbitControls.
 ═══════════════════════════════════════════════════════ */
@@ -35,12 +35,19 @@ function bx(
   scene.add(m); return m;
 }
 /* Caixa com bordas chanfradas/arredondadas — evita o ar "quadrado duro" */
+const rbxGeoCache = new Map<string, THREE.BufferGeometry>();
 function rbx(
   w: number, h: number, d: number, x: number, y: number, z: number,
   mat: THREE.Material, scene: THREE.Scene, cast = true, radius = 0.05
 ) {
   const r = Math.min(radius, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001);
-  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.max(r, 0.001)), mat);
+  const key = `${w}|${h}|${d}|${r}`;
+  let geo = rbxGeoCache.get(key);
+  if (!geo) {
+    geo = new RoundedBoxGeometry(w, h, d, 2, Math.max(r, 0.001));
+    rbxGeoCache.set(key, geo);
+  }
+  const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.castShadow = cast; m.receiveShadow = true;
   scene.add(m); return m;
@@ -458,8 +465,8 @@ export const EclusaScene = () => {
     const el = mountRef.current;
     if (!el) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -487,7 +494,7 @@ export const EclusaScene = () => {
     scene.add(ambient);
     const sun = new THREE.DirectionalLight(0xffe0a0, 4.6);
     sun.position.set(-12, 14, -8); sun.castShadow = true;
-    sun.shadow.mapSize.set(1536, 1536);
+    sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
     sun.shadow.camera.top = 16;   sun.shadow.camera.bottom = -16;
     sun.shadow.camera.far = 60;   sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
@@ -539,22 +546,25 @@ export const EclusaScene = () => {
       const dt = clock.getDelta();
       elapsed += dt;
 
-      // transição suave dia ↔ noite
-      dnT += (nightTargetRef.current - dnT) * Math.min(1, dt * 1.4);
+      // transição suave dia ↔ noite — só recalcula enquanto estiver a transitar
+      const dnDelta = nightTargetRef.current - dnT;
+      if (Math.abs(dnDelta) > 0.001) {
+        dnT += dnDelta * Math.min(1, dt * 1.4);
 
-      uZenith.lerpColors(zenithDay, zenithNight, dnT);
-      uHorizon.lerpColors(horizonDay, horizonNight, dnT);
-      uNight.value = dnT;
-      (scene.background as THREE.Color).lerpColors(bgDay, bgNight, dnT);
-      (scene.fog as THREE.FogExp2).color.lerpColors(bgDay, bgNight, dnT);
-      ambient.color.lerpColors(ambColDay, ambColNight, dnT);
-      ambient.intensity = ambIntDay + (ambIntNight - ambIntDay) * dnT;
-      sun.color.lerpColors(sunColDay, sunColNight, dnT);
-      sun.intensity = sunIntDay + (sunIntNight - sunIntDay) * dnT;
-      fill.color.lerpColors(fillColDay, fillColNight, dnT);
-      fill.intensity = fillIntDay + (fillIntNight - fillIntDay) * dnT;
-      rim.color.lerpColors(rimColDay, rimColNight, dnT);
-      rim.intensity = rimIntDay + (rimIntNight - rimIntDay) * dnT;
+        uZenith.lerpColors(zenithDay, zenithNight, dnT);
+        uHorizon.lerpColors(horizonDay, horizonNight, dnT);
+        uNight.value = dnT;
+        (scene.background as THREE.Color).lerpColors(bgDay, bgNight, dnT);
+        (scene.fog as THREE.FogExp2).color.lerpColors(bgDay, bgNight, dnT);
+        ambient.color.lerpColors(ambColDay, ambColNight, dnT);
+        ambient.intensity = ambIntDay + (ambIntNight - ambIntDay) * dnT;
+        sun.color.lerpColors(sunColDay, sunColNight, dnT);
+        sun.intensity = sunIntDay + (sunIntNight - sunIntDay) * dnT;
+        fill.color.lerpColors(fillColDay, fillColNight, dnT);
+        fill.intensity = fillIntDay + (fillIntNight - fillIntDay) * dnT;
+        rim.color.lerpColors(rimColDay, rimColNight, dnT);
+        rim.intensity = rimIntDay + (rimIntNight - rimIntDay) * dnT;
+      }
 
       animWater(elapsed, dnT);
       gate.animate(elapsed, dnT);

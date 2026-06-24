@@ -130,7 +130,7 @@ const TagsViewer: React.FC = () => {
               <div className="p-3 bg-gray-50">
                 <div className="mb-3">
                   <span className="text-sm text-green-600 font-bold">
-                    🎯 MOSTRANDO TODOS OS {filteredData.ints?.length || 0} INTEGERS SEM CORTAR
+                    🎯 A MOSTRAR TODOS OS {filteredData.ints?.length || 0} INTEGERS SEM CORTAR
                   </span>
                 </div>
                 <div className="grid grid-cols-8 gap-2 max-h-[600px] overflow-y-auto">
@@ -163,7 +163,7 @@ const TagsViewer: React.FC = () => {
               <div className="p-3 bg-gray-50">
                 <div className="mb-3">
                   <span className="text-sm text-purple-600 font-bold">
-                    🎯 MOSTRANDO TODOS OS {filteredData.reals?.length || 0} REAIS SEM CORTAR
+                    🎯 A MOSTRAR TODOS OS {filteredData.reals?.length || 0} REAIS SEM CORTAR
                   </span>
                 </div>
                 <div className="grid grid-cols-6 gap-2 max-h-[600px] overflow-y-auto">
@@ -199,7 +199,7 @@ const TagsViewer: React.FC = () => {
               <div className="p-3 bg-gray-50">
                 <div className="mb-3">
                   <span className="text-sm text-yellow-600 font-bold">
-                    🎯 MOSTRANDO TODAS AS {filteredData.bit_data?.status_bits?.length || 0} WORDS DE STATUS SEM CORTAR
+                    🎯 A MOSTRAR TODAS AS {filteredData.bit_data?.status_bits?.length || 0} WORDS DE STATUS SEM CORTAR
                   </span>
                 </div>
                 <div className="space-y-3 max-h-[800px] overflow-y-auto">
@@ -262,7 +262,7 @@ const TagsViewer: React.FC = () => {
               <div className="p-3 bg-gradient-to-b from-red-50 to-white">
                 <div className="mb-3">
                   <span className="text-sm text-red-600 font-bold">
-                    🔥 MOSTRANDO TODAS AS {filteredData.bit_data?.alarm_bits?.length || 0} WORDS DE ALARME SEM CORTAR
+                    🔥 A MOSTRAR TODAS AS {filteredData.bit_data?.alarm_bits?.length || 0} WORDS DE ALARME SEM CORTAR
                   </span>
                 </div>
                 <div className="space-y-3 max-h-[800px] overflow-y-auto">
@@ -330,7 +330,7 @@ const TagsViewer: React.FC = () => {
                 <div className="p-3 bg-gray-50">
                   <div className="mb-3">
                     <span className="text-sm text-blue-600 font-bold">
-                      🎯 MOSTRANDO TODAS AS {filteredData.strings?.length || 0} STRINGS SEM CORTAR
+                      🎯 A MOSTRAR TODAS AS {filteredData.strings?.length || 0} STRINGS SEM CORTAR
                     </span>
                   </div>
                   <div className="space-y-2 max-h-[600px] overflow-y-auto">

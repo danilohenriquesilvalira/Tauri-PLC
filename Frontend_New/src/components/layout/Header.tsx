@@ -54,8 +54,12 @@ export const Header = () => {
         </h1>
       </div>
 
-      {/* Avatar + dropdown */}
-      <div className="relative flex-shrink-0" ref={dropRef}>
+      {/* Utilizador + Avatar + dropdown */}
+      <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+        <span className="text-white/90 text-sm sm:text-base font-semibold tracking-wide hidden sm:inline truncate max-w-[140px]">
+          Admin
+        </span>
+        <div className="relative flex-shrink-0" ref={dropRef}>
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
@@ -99,6 +103,7 @@ export const Header = () => {
             </button>
           </div>
         )}
+        </div>
       </div>
     </header>
   );

@@ -265,40 +265,13 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
   const motorEsquerdoRPM = motorEsquerdo === 1 ? RPM_NOMINAL : 0;
   const motorDireitoCorrente = motorDireito === 1 ? CORRENTE_NOMINAL : 0;
   const motorEsquerdoCorrente = motorEsquerdo === 1 ? CORRENTE_NOMINAL : 0;
-  const statusLabel = (m: number) => (m === 1 ? 'RODANDO' : m === 2 ? 'FALHA' : 'PARADO');
+  const statusLabel = (m: number) => (m === 1 ? 'EM FUNCIONAMENTO' : m === 2 ? 'FALHA' : 'PARADO');
   const statusCor = (m: number) => (m === 1 ? 'text-green-600' : m === 2 ? 'text-red-600' : 'text-gray-500');
   const motorDireitoStatus = statusLabel(motorDireito);
   const motorEsquerdoStatus = statusLabel(motorEsquerdo);
   const algumMotorEmFalha = motorDireito === 2 || motorEsquerdo === 2;
   const algumMotorRodando = motorDireito === 1 || motorEsquerdo === 1;
-  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'RODANDO' : 'PARADO';
-
-  // Performance optimization: Debug logging only in development
-  React.useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('🎯 [PortaJusante] Debug Tags JUS WebSocket:', {
-        reguaPortaJusanteRaw: reguaPortaJusanteRaw,
-        contrapesoDirectoRaw: contrapesoDirectoRaw,
-        contrapesoEsquerdoRaw: contrapesoEsquerdoRaw,
-        motorDireito: motorDireito,
-        motorEsquerdo: motorEsquerdo,
-        reguaPortaJusante: reguaPortaJusante,
-        contrapesoDirecto: contrapesoDirecto,
-        contrapesoEsquerdo: contrapesoEsquerdo,
-        tagsDisponiveis: {
-          JUS_PORTA: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_PORTA_JUSANTE'],
-          JUS_CONTRA_DIR: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_DIREITO'],
-          JUS_CONTRA_ESQ: !!plcData?.tags?.['JUS_ENVIA_MOVIMENTO_CONTRA_PESO_ESQUERDO'],
-          JUS_MOTOR_DIR: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_MEST_DIR'],
-          JUS_MOTOR_ESQ: !!plcData?.tags?.['JUS_DB_GEST_MOT.VELOC_MOT_ESCRAV_ESQ']
-        },
-        connected: connectionStatus.connected
-      });
-    }
-  }, [contrapesoDirectoRaw, contrapesoEsquerdoRaw, contrapesoDirecto, contrapesoEsquerdo,
-    reguaPortaJusanteRaw, reguaPortaJusante, motorDireito, motorEsquerdo, connectionStatus.connected]);
-
-
+  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'EM FUNCIONAMENTO' : 'PARADO';
 
   return (
     <div
@@ -465,7 +438,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-[10px] md:text-base font-bold truncate">PARÂMETROS</h2>
-                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitoramento</p>
+                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitorização</p>
                   </div>
                 </div>
                 <button
@@ -636,7 +609,7 @@ const PortaJusante: React.FC<PortaJusanteProps> = () => {
                     className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
                     style={{ touchAction: 'manipulation' }}
                   >
-                    Salvar Configurações
+                    Guardar Configurações
                   </button>
                 </div>
               </div>

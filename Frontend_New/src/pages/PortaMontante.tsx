@@ -289,27 +289,13 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
   const motorEsquerdoRPM = motorEsquerdo === 1 ? RPM_NOMINAL : 0;
   const motorDireitoCorrente = motorDireito === 1 ? CORRENTE_NOMINAL : 0;
   const motorEsquerdoCorrente = motorEsquerdo === 1 ? CORRENTE_NOMINAL : 0;
-  const statusLabel = (m: number) => (m === 1 ? 'RODANDO' : m === 2 ? 'FALHA' : 'PARADO');
+  const statusLabel = (m: number) => (m === 1 ? 'EM FUNCIONAMENTO' : m === 2 ? 'FALHA' : 'PARADO');
   const statusCor = (m: number) => (m === 1 ? 'text-green-600' : m === 2 ? 'text-red-600' : 'text-gray-500');
   const motorDireitoStatus = statusLabel(motorDireito);
   const motorEsquerdoStatus = statusLabel(motorEsquerdo);
   const algumMotorEmFalha = motorDireito === 2 || motorEsquerdo === 2;
   const algumMotorRodando = motorDireito === 1 || motorEsquerdo === 1;
-  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'RODANDO' : 'PARADO';
-
-  // 🔍 DEBUG CRÍTICO: Monitorar valores em tempo real para detectar atraso
-  React.useEffect(() => {
-    if (import.meta.env.DEV) {
-      const now = Date.now();
-      if (!window.lastContrapesoTime) window.lastContrapesoTime = now;
-      const interval = now - window.lastContrapesoTime;
-      window.lastContrapesoTime = now;
-
-      console.log(`🎯 [${interval}ms] MONT Contrapeso D: ${contrapesoDirecto}% | E: ${contrapesoEsquerdo}% | Raw: ${contrapesoDirectoRaw}/${contrapesoEsquerdoRaw}`);
-    }
-  }, [contrapesoDirecto, contrapesoEsquerdo, contrapesoDirectoRaw, contrapesoEsquerdoRaw]);
-
-
+  const statusGeralMotores = algumMotorEmFalha ? 'FALHA' : algumMotorRodando ? 'EM FUNCIONAMENTO' : 'PARADO';
 
   // 🎯 LARGURA INTELIGENTE DOS CARDS - MEMOIZADA PARA PERFORMANCE
   const cardWidthValue = React.useMemo(() => {
@@ -379,23 +365,6 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
   const margemSeguranca = 30; // Margem de segurança para NUNCA encostar nos SVGs
   const espacoNecessario = cardWidthValue + margemLateralCard + margemSeguranca;
   const cardsCabem = windowWidth >= 1200 ? (espacoLateralDisponivel >= espacoNecessario) : true;
-
-  // Performance optimization: Debug logging only in development
-  if (import.meta.env.DEV) {
-    console.log('🎯 PORTAMONTANTE - CARDS INTELIGENTES:', {
-      container_width: windowWidth,
-      maxWidth_limitado: `${maxWidth.toFixed(0)}px (max 1920px)`,
-      espaco_lateral_disponivel: `${espacoLateralDisponivel.toFixed(0)}px`,
-      card_width: `${cardWidthValue.toFixed(0)}px`,
-      margem_lateral_card: `${margemLateralCard.toFixed(0)}px`,
-      margem_seguranca: `${margemSeguranca}px`,
-      espaco_necessario: `${espacoNecessario.toFixed(0)}px`,
-      cards_cabem: cardsCabem ? '✅ SIM - RENDERIZAR' : '❌ NÃO - OCULTAR PARA EVITAR SOBREPOSIÇÃO',
-      calculo: `${espacoLateralDisponivel.toFixed(0)}px >= ${espacoNecessario.toFixed(0)}px ? ${cardsCabem}`,
-      card_final: `${cardWidthValue.toFixed(0)}px`,
-      limites: `min=${isMobile ? 220 : 280}px, max=${isMobile ? 350 : Math.max(500, windowWidth * 0.15).toFixed(0)}px`
-    });
-  }
 
   return (
     <div className="w-full h-full flex flex-col items-center relative pb-20 lg:pb-[104px]">
@@ -713,7 +682,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-[10px] md:text-base font-bold truncate">PARÂMETROS</h2>
-                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitoramento</p>
+                    <p className="text-gray-300 text-xs md:text-sm mt-0.5 hidden md:block">Configurações e Monitorização</p>
                   </div>
                 </div>
                 <button
@@ -884,7 +853,7 @@ const PortaMontante: React.FC<PortaMontanteProps> = () => {
                     className="w-full md:w-auto px-2 py-1.5 md:px-6 md:py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-[#212E3E] rounded transition-colors font-medium text-[9px] md:text-base shadow-lg"
                     style={{ touchAction: 'manipulation' }}
                   >
-                    Salvar Configurações
+                    Guardar Configurações
                   </button>
                 </div>
               </div>

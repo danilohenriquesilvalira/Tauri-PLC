@@ -32,7 +32,7 @@ const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
         className="w-full h-full"
       >
         {/* Contrapeso COM MOVIMENTO INTERNO ORIGINAL */}
-        <g transform={`translate(0, ${posicaoContrapeso})`}>
+        <g style={{ transform: `translateY(${posicaoContrapeso}px)`, transition: 'transform 0.5s ease-in-out' }}>
           <path d="M92.3634 164.267C102.495 162.528 108.18 160.17 108.168 157.711L1.3319 157.727C1.35686 160.185 5.71836 162.532 15.8759 164.27C26.0333 166.008 39.7967 166.984 54.1399 166.983C68.4831 166.982 82.2319 166.005 92.3634 164.267Z" fill="url(#paint0_linear_3776_4079)" />
           <path d="M92.3634 163.04C102.495 161.301 108.18 158.943 108.168 156.484L1.3319 156.5C1.35686 158.959 5.71836 161.306 15.8759 163.044C26.0333 164.781 39.7967 165.757 54.1399 165.757C68.4831 165.756 82.2319 164.779 92.3634 163.04Z" fill="url(#paint1_linear_3776_4079)" />
           <path d="M1.15688 157.306H107.988L107.727 17H1.15688V157.306Z" fill="url(#paint2_linear_3776_4079)" />
@@ -47,7 +47,7 @@ const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
           x="49"
           y="0"
           fill="black"
-          style={{ zIndex: 999 }}
+          style={{ transition: 'height 0.5s ease-in-out' }}
         />
 
         {/* Círculo preto de conexão NA FRENTE - ORIGINAL */}
@@ -57,7 +57,7 @@ const ContraPeso60t: React.FC<ContraPeso60tProps> = ({
           rx="13.4706"
           ry="2.45262"
           fill="black"
-          style={{ zIndex: 1000 }}
+          style={{ transition: 'cy 0.5s ease-in-out' }}
         />
 
         <defs>
